@@ -5,12 +5,11 @@ import os
 import json
 from transformers import CLIPProcessor, CLIPModel
 from peft import LoraConfig, get_peft_model
-from ..models import get_models
 import argparse
 from omegaconf import OmegaConf
 import sys
 sys.path.append(os.path.split(sys.path[0])[0])
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from models import get_models
 from download import find_model
 
 class VideoDataset(Dataset):
