@@ -67,7 +67,7 @@ class VideoDataset(Dataset):
       return frame
 
 
-def train_lora_model(data, video_folder, pretrained_model_name='openai/clip-vit-base-patch32'):
+def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Carica il modello UNet e applica LoRA
