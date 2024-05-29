@@ -12,7 +12,65 @@ sys.path.append(os.path.split(sys.path[0])[0])
 from models import get_models
 from download import find_model
 
-class VideoDataset(Dataset):
+
+class VideoDatasetMsvd(Dataset):
+    def __init__(self, annotations_file, video_dir, transform=None):
+        self.video_dir = video_dir
+        self.transform = transform
+        
+        # Legge il file annotations.txt e memorizza le descrizioni in un dizionario
+        self.video_descriptions = {}
+        with open(annotations_file, 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                parts = line.strip().split(' ')
+                video_id = parts[0]
+                description = ' '.join(parts[1:])
+                if video_id not in self.video_descriptions:
+                    self.video_descriptions[video_id] = []
+                self.video_descriptions[video_id].append(description)
+        
+        # Ottieni la lista dei file video nella cartella YouTubeClips
+        self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
+
+    def __len__(self):
+        return len(self.video_files)
+
+    def __getitem__(self, idx):
+        video_file = self.video_files[idx]
+        video_path = os.path.join(self.video_dir, video_file)
+        
+        # Carica il video utilizzando OpenCV
+        cap = cv2.VideoCapture(video_path)
+        frames = []
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frames.append(frame)
+        cap.release()
+        
+        video = torch.tensor(frames, dtype=torch.float32).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
+        
+        # Estrarre un frame centrale
+        mid_frame = frames[len(frames) // 2]
+        mid_frame = torch.tensor(mid_frame, dtype=torch.float32).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
+        
+        # Ottieni le descrizioni del video
+        video_id = os.path.splitext(video_file)[0]
+        descriptions = self.video_descriptions.get(video_id, [])
+        
+        # Applica trasformazioni, se presenti
+        if self.transform:
+            video = self.transform(video)
+            mid_frame = self.transform(mid_frame)
+        
+        return video, descriptions, mid_frame
+
+
+
+
+class VideoDatasetMsrvtt(Dataset):
     def __init__(self, data, video_folder):
         self.videos = [video for video in data['videos'] if os.path.exists(os.path.join(video_folder, f"{video['video_id']}.mp4"))]
         self.sentences = {sentence['video_id']: sentence['caption'] for sentence in data['sentences']}
@@ -79,13 +137,14 @@ def train_lora_model(data, video_folder, args):
     
     lora_config = LoraConfig(
         r=8,
-        lora_alpha=16,
-        target_modules=["attn1.to_q", "attn1.to_k", "attn1.to_v", "attn2.to_q", "attn2.to_k", "attn2.to_v"]
+        lora_alpha=16
+        #target_modules=["attn1.to_q", "attn1.to_k", "attn1.to_v", "attn2.to_q", "attn2.to_k", "attn2.to_v"]
     )
     
     unet = get_peft_model(unet, lora_config)
     
-    dataset = VideoDataset(data, video_folder)
+    #dataset = VideoDatasetMsrvtt(data, video_folder)
+    dataset = VideoDatasetMsvd(data, video_folder)
     dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
     
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
@@ -122,6 +181,25 @@ if __name__ == "__main__":
 
     if on_colab:
         # Percorso del dataset su Google Colab
+        dataset_path = '/content/drive/My Drive/msvd'
+    else:
+        # Percorso del dataset locale (sincronizzato con Google Drive)
+        dataset_path = '/path/to/your/Google_Drive/sync/folder/path/to/your/dataset'
+    
+    # Percorsi dei file
+    video_folder = os.path.join(dataset_path, 'YouTubeClips')
+    data = os.path.join(dataset_path, 'annotations.txt')
+    
+    train_lora_model(data, video_folder, OmegaConf.load(args.config))
+
+    '''
+    Questa parte commentata serve se devo usare il dataset msrvtt
+
+    # Determina se sei su Google Colab
+    on_colab = 'COLAB_GPU' in os.environ
+
+    if on_colab:
+        # Percorso del dataset su Google Colab
         dataset_path = '/content/drive/My Drive/msrvtt'
     else:
         # Percorso del dataset locale (sincronizzato con Google Drive)
@@ -141,3 +219,5 @@ if __name__ == "__main__":
 
     
     train_lora_model(data, video_folder, OmegaConf.load(args.config))
+
+    '''
