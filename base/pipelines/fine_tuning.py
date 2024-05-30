@@ -153,8 +153,8 @@ def train_lora_model(data, video_folder, args):
     target_modules = get_supported_target_modules(unet)
 
     lora_config = LoraConfig(
-        r=16, lora_alpha=32,
-        target_modules=["q_proj", "v_proj"],
+        r=16, 
+        lora_alpha=32,
         lora_dropout=0.1
     )
 
