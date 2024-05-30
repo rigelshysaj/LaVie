@@ -148,8 +148,7 @@ def train_lora_model(data, video_folder, args):
     )
     
 
-    unet_config = unet.config.to_dict()
-    unet_config['model_type'] = 'unet'
+    unet.config = {"model_type": "UNet"}
 
     unet = get_peft_model(unet, lora_config)
     
