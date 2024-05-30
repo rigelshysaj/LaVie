@@ -16,10 +16,11 @@ import torch.nn as nn
 import numpy as np
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None, target_size=(224, 224)):
+    def __init__(self, annotations_file, video_dir, transform=None, target_size=(224, 224), fixed_frame_count=30):
         self.video_dir = video_dir
         self.transform = transform
         self.target_size = target_size
+        self.fixed_frame_count = fixed_frame_count
         
         # Legge il file annotations.txt e memorizza le descrizioni in un dizionario
         self.video_descriptions = {}
@@ -53,6 +54,13 @@ class VideoDatasetMsvd(Dataset):
             frame = cv2.resize(frame, self.target_size)
             frames.append(frame)
         cap.release()
+
+        # Se il numero di frame è inferiore a fixed_frame_count, ripeti l'ultimo frame
+        if len(frames) < self.fixed_frame_count:
+            frames += [frames[-1]] * (self.fixed_frame_count - len(frames))  # Ripeti l'ultimo frame
+        else:
+            # Prendi i primi fixed_frame_count frame
+            frames = frames[:self.fixed_frame_count]
         
         frames_np = np.array(frames, dtype=np.float32)
         video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
