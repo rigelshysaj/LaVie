@@ -147,6 +147,8 @@ def train_lora_model(data, video_folder, args):
         r=16, lora_alpha=32, lora_dropout=0.1, bias="none", task_type="CAUSAL_LM"
     )
     
+    print("puertoooooooooo ricooooooooooo")
+
     unet.config = {"model_type": "UNet"}
 
     unet = get_peft_model(unet, lora_config)
