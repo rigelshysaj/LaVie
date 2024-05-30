@@ -11,6 +11,7 @@ import sys
 sys.path.append(os.path.split(sys.path[0])[0])
 from models import get_models
 from download import find_model
+from transformers import CLIPTokenizer, CLIPTextModel
 
 
 class VideoDatasetMsvd(Dataset):
@@ -134,11 +135,16 @@ def train_lora_model(data, video_folder, args):
     state_dict = find_model(args.ckpt_path)
     unet.load_state_dict(state_dict)
 
-    
+    tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
+    text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder", torch_dtype=torch.float16).to(device)
+
+    # Load CLIP model and processor for image conditioning
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+
     lora_config = LoraConfig(
-        r=8,
-        lora_alpha=16,
-        target_modules=["attn1.to_q", "attn1.to_k", "attn1.to_v", "attn2.to_q", "attn2.to_k", "attn2.to_v"]
+        r=16, lora_alpha=32, lora_dropout=0.1, bias="none", task_type="CAUSAL_LM"
     )
     
     unet = get_peft_model(unet, lora_config)
@@ -151,20 +157,31 @@ def train_lora_model(data, video_folder, args):
     num_epochs = 3
     
     unet.train()
+    
     for epoch in range(num_epochs):
-        for batch in dataloader:
-            _, descriptions, frames = batch
-            inputs = frames.to(device)
+        for video_path, description, frame_tensor in dataloader:
             optimizer.zero_grad()
             
-            # Genera output e calcola la perdita
-            outputs = unet(inputs)
-            loss = outputs.loss  # Assumi che il modello UNet restituisca una perdita
+            text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
+            text_features = text_encoder(text_inputs)[0]
+
+            image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
+            image_features = clip_model.get_image_features(image_inputs)
+
+            encoder_hidden_states = torch.cat([text_features, image_features.unsqueeze(1).repeat(1, text_features.size(1), 1)], dim=-1)
+
+            # Forward pass
+            output = unet(
+                sample=torch.randn(4, 4, 64, 64, 64).to(unet.device),
+                timestep=torch.randint(0, 1000, (4,)).to(unet.device),
+                encoder_hidden_states=encoder_hidden_states
+            )
+            loss = torch.nn.functional.mse_loss(output.sample, torch.randn_like(output.sample))
+
             loss.backward()
-            
             optimizer.step()
-            
-            print(f"Epoch {epoch}, Loss: {loss.item()}")
+        print(f"Epoch {epoch + 1}/{num_epochs} completed with loss: {loss.item()}")
+    
             
     unet.save_pretrained("/content/drive/My Drive/finetuned_lora_unet")
     

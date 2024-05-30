@@ -30,6 +30,7 @@ from diffusers.utils import (
     replace_example_docstring,
     BaseOutput,
 )
+from transformers import CLIPProcessor, CLIPModel
 
 try:
     from diffusers.utils import randn_tensor
@@ -103,6 +104,8 @@ class VideoGenPipeline(DiffusionPipeline):
         tokenizer: CLIPTokenizer,
         unet: UNet3DConditionModel,
         scheduler: KarrasDiffusionSchedulers,
+        clip_model: CLIPModel, 
+        clip_processor: CLIPProcessor
     ):
         super().__init__()
 
@@ -162,6 +165,8 @@ class VideoGenPipeline(DiffusionPipeline):
             tokenizer=tokenizer,
             unet=unet,
             scheduler=scheduler,
+            clip_model=clip_model, 
+            clip_processor=clip_processor
         )
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
         # self.register_to_config(requires_safety_checker=requires_safety_checker)
@@ -274,6 +279,7 @@ class VideoGenPipeline(DiffusionPipeline):
         negative_prompt=None,
         prompt_embeds: Optional[torch.FloatTensor] = None,
         negative_prompt_embeds: Optional[torch.FloatTensor] = None,
+        image_tensor=None
     ):
         r"""
         Encodes the prompt into text encoder hidden states.
@@ -340,6 +346,15 @@ class VideoGenPipeline(DiffusionPipeline):
             prompt_embeds = prompt_embeds[0]
 
         prompt_embeds = prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
+
+
+        # Encode image
+        if image_tensor is not None:
+            image_features = self.clip_model.get_image_features(image_tensor)
+            image_features = image_features.to(dtype=self.text_encoder.dtype, device=device)
+            prompt_embeds = torch.cat([prompt_embeds, image_features.unsqueeze(1).repeat(1, prompt_embeds.size(1), 1)], dim=-1)
+            #prompt_embeds = torch.cat((prompt_embeds, image_features), dim=1)
+
 
         bs_embed, seq_len, _ = prompt_embeds.shape
         # duplicate text embeddings for each generation per prompt, using mps friendly method
@@ -498,6 +513,7 @@ class VideoGenPipeline(DiffusionPipeline):
     def __call__(
         self,
         prompt: Union[str, List[str]] = None,
+        image_tensor = None,
         height: Optional[int] = None,
         width: Optional[int] = None,
         video_length: int = 16,
@@ -617,6 +633,7 @@ class VideoGenPipeline(DiffusionPipeline):
             negative_prompt,
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
+            image_tensor=image_tensor
         )
 
         # 4. Prepare timesteps

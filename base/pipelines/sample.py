@@ -10,6 +10,8 @@ from diffusers.schedulers import DDIMScheduler, DDPMScheduler, PNDMScheduler, Eu
 from diffusers.models import AutoencoderKL
 from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
 from omegaconf import OmegaConf
+from transformers import CLIPProcessor, CLIPModel
+from PIL import Image
 
 import os, sys
 sys.path.append(os.path.split(sys.path[0])[0])
@@ -29,10 +31,15 @@ def main(args):
 	tokenizer_one = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
 	text_encoder_one = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder", torch_dtype=torch.float16).to(device) # huge
 
+	# Load CLIP model and processor for image conditioning
+	clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+	clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
 	# set eval mode
 	unet.eval()
 	vae.eval()
 	text_encoder_one.eval()
+	clip_model.eval()
 	
 	if args.sample_method == 'ddim':
 		scheduler = DDIMScheduler.from_pretrained(sd_path, 
@@ -59,21 +66,28 @@ def main(args):
 								 text_encoder=text_encoder_one, 
 								 tokenizer=tokenizer_one, 
 								 scheduler=scheduler, 
-								 unet=unet).to(device)
+								 unet=unet,
+								 clip_model=clip_model, 
+								 clip_processor=clip_processor).to(device)
 	videogen_pipeline.enable_xformers_memory_efficient_attention()
 
 	if not os.path.exists(args.output_folder):
 		os.makedirs(args.output_folder)
 
 	video_grids = []
-	for prompt in args.text_prompt:
+	for prompt, image_path in zip(args.text_prompt, args.image_paths):
+		image = Image.open(image_path).convert("RGB")
+		image_tensor = clip_processor(images=image, return_tensors="pt")["pixel_values"].to(device)
+
 		print('Processing the ({}) prompt'.format(prompt))
-		videos = videogen_pipeline(prompt, 
+		videos = videogen_pipeline(prompt,
+							 	image_tensor, 
 								video_length=args.video_length, 
 								height=args.image_size[0], 
 								width=args.image_size[1], 
 								num_inference_steps=args.num_sampling_steps,
 								guidance_scale=args.guidance_scale).video
+		
 		imageio.mimwrite(args.output_folder + prompt.replace(' ', '_') + '.mp4', videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 	
 	print('save path {}'.format(args.output_folder))
