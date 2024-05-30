@@ -153,9 +153,9 @@ def train_lora_model(data, video_folder, args):
     target_modules = get_supported_target_modules(unet)
 
     lora_config = LoraConfig(
-        r=16, 
-        lora_alpha=32,
-        lora_dropout=0.1
+        r=8, 
+        lora_alpha=16,
+        target_modules=["attn1.to_q", "attn1.to_k", "attn1.to_v", "attn2.to_q", "attn2.to_k", "attn2.to_v"]
     )
 
     unet = get_peft_model(unet, lora_config)
