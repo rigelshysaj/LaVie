@@ -172,10 +172,15 @@ def train_lora_model(data, video_folder, args):
     
     unet.train()
     
+    conta = 1
+
     for epoch in range(num_epochs):
         for video_path, description, frame_tensor in dataloader:
             optimizer.zero_grad()
-            
+            print("-----------------begin------------------------")
+            print(conta)
+            print("-----------------end------------------------")
+            conta += 1
             text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
             text_features = text_encoder(text_inputs)[0]
 
