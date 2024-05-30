@@ -125,11 +125,11 @@ class VideoDatasetMsrvtt(Dataset):
           return None
       return frame
 
-
-def get_target_modules(model):
+def get_supported_target_modules(model):
+    supported_modules = (nn.Linear, nn.Embedding, nn.Conv2d, nn.Conv1d)
     target_modules = []
     for name, module in model.named_modules():
-        if isinstance(module, (nn.Module)):
+        if isinstance(module, supported_modules):
             target_modules.append(name)
     return target_modules
 
