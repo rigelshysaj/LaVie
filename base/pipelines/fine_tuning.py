@@ -16,9 +16,10 @@ import torch.nn as nn
 import numpy as np
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None):
+    def __init__(self, annotations_file, video_dir, transform=None, target_size=(224, 224)):
         self.video_dir = video_dir
         self.transform = transform
+        self.target_size = target_size
         
         # Legge il file annotations.txt e memorizza le descrizioni in un dizionario
         self.video_descriptions = {}
@@ -49,6 +50,7 @@ class VideoDatasetMsvd(Dataset):
             ret, frame = cap.read()
             if not ret:
                 break
+            frame = cv2.resize(frame, self.target_size)
             frames.append(frame)
         cap.release()
         
@@ -164,7 +166,7 @@ def train_lora_model(data, video_folder, args):
     unet = get_peft_model(unet, lora_config)
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
-    dataset = VideoDatasetMsvd(data, video_folder)
+    dataset = VideoDatasetMsvd(data, video_folder, target_size=(224, 224))
     dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
     
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
