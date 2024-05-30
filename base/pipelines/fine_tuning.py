@@ -144,7 +144,11 @@ def train_lora_model(data, video_folder, args):
 
 
     lora_config = LoraConfig(
-        r=16, lora_alpha=32, lora_dropout=0.1, bias="none", task_type="CAUSAL_LM"
+        r=16, lora_alpha=32,
+        target_modules=["Conv2d", "Conv3d", "BatchNorm2d", "BatchNorm3d", "ReLU", "ConvTranspose2d", "MultiheadAttention", "Attention"], 
+        lora_dropout=0.1, 
+        bias="none", 
+        task_type="CAUSAL_LM"
     )
     
 
