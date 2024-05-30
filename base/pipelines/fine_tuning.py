@@ -12,7 +12,7 @@ sys.path.append(os.path.split(sys.path[0])[0])
 from models import get_models
 from download import find_model
 from transformers import CLIPTokenizer, CLIPTextModel
-
+import torch.nn as nn
 
 class VideoDatasetMsvd(Dataset):
     def __init__(self, annotations_file, video_dir, transform=None):
@@ -126,6 +126,14 @@ class VideoDatasetMsrvtt(Dataset):
       return frame
 
 
+def get_target_modules(model):
+    target_modules = []
+    for name, module in model.named_modules():
+        if isinstance(module, (nn.Module)):
+            target_modules.append(name)
+    return target_modules
+
+
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -142,10 +150,11 @@ def train_lora_model(data, video_folder, args):
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
     clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
+    target_modules = get_target_modules(unet)
 
     lora_config = LoraConfig(
         r=16, lora_alpha=32,
-        target_modules=["Conv2d", "Conv3d", "BatchNorm2d", "BatchNorm3d", "ReLU", "ConvTranspose2d", "MultiheadAttention", "Attention"], 
+        target_modules=target_modules, 
         lora_dropout=0.1, 
         bias="none", 
         task_type="CAUSAL_LM"
