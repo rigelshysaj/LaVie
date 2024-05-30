@@ -150,7 +150,7 @@ def train_lora_model(data, video_folder, args):
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
     clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
-    target_modules = get_target_modules(unet)
+    target_modules = get_supported_target_modules(unet)
 
     lora_config = LoraConfig(
         r=16, lora_alpha=32,
