@@ -13,6 +13,7 @@ from models import get_models
 from download import find_model
 from transformers import CLIPTokenizer, CLIPTextModel
 import torch.nn as nn
+import numpy as np
 
 class VideoDatasetMsvd(Dataset):
     def __init__(self, annotations_file, video_dir, transform=None):
@@ -51,11 +52,13 @@ class VideoDatasetMsvd(Dataset):
             frames.append(frame)
         cap.release()
         
-        video = torch.tensor(frames, dtype=torch.float32).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
+        frames_np = np.array(frames, dtype=np.float32)
+        video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
         
         # Estrarre un frame centrale
         mid_frame = frames[len(frames) // 2]
-        mid_frame = torch.tensor(mid_frame, dtype=torch.float32).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
+        mid_frame_np = np.array(mid_frame, dtype=np.float32)
+        mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
         
         # Ottieni le descrizioni del video
         video_id = os.path.splitext(video_file)[0]
