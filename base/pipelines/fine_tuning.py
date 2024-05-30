@@ -147,6 +147,12 @@ def get_supported_target_modules(model):
     return target_modules
 
 
+def my_collate(batch):
+    videos, descriptions, frames = zip(*batch)
+    descriptions = [desc for sublist in descriptions for desc in sublist]
+    return torch.stack(videos), descriptions, torch.stack(frames)
+
+
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -163,8 +169,6 @@ def train_lora_model(data, video_folder, args):
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
     clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
-    target_modules = get_supported_target_modules(unet)
-
     lora_config = LoraConfig(
         r=8, 
         lora_alpha=16,
@@ -174,7 +178,7 @@ def train_lora_model(data, video_folder, args):
     unet = get_peft_model(unet, lora_config)
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
-    dataset = VideoDatasetMsvd(data, video_folder, target_size=(224, 224))
+    dataset = VideoDatasetMsvd(data, video_folder, target_size=(224, 224), collate_fn=my_collate)
     dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
     
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
