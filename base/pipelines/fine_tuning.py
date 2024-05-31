@@ -203,14 +203,23 @@ def train_lora_model(data, video_folder, args):
             image_features = clip_model.get_image_features(image_inputs)
             print(f"image_features shape: {image_features.shape}")
 
-             # Ripetere image_features per allineare le dimensioni del batch
             text_batch_size = text_features.size(0)
             image_batch_size = image_features.size(0)
-            repeat_factor = text_batch_size // image_batch_size
-            if text_batch_size % image_batch_size != 0:
-                raise ValueError("Il batch size del testo non è un multiplo del batch size delle immagini")
+            
+            if text_batch_size != image_batch_size:
+                if text_batch_size > image_batch_size:
+                    factor = text_batch_size // image_batch_size
+                    image_features = image_features.repeat(factor, 1)
+                    remainder = text_batch_size % image_batch_size
+                    if remainder != 0:
+                        image_features = torch.cat([image_features, image_features[:remainder]], dim=0)
+                else:
+                    factor = image_batch_size // text_batch_size
+                    text_features = text_features.repeat(factor, 1, 1)
+                    remainder = image_batch_size % text_batch_size
+                    if remainder != 0:
+                        text_features = torch.cat([text_features, text_features[:remainder]], dim=0)
 
-            image_features = image_features.unsqueeze(1).repeat(1, repeat_factor, 1).view(-1, image_features.size(-1))
             image_features = image_features.unsqueeze(1).repeat(1, text_features.size(1), 1)
             print(f"Reshaped image_features shape: {image_features.shape}")
 
