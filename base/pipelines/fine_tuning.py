@@ -196,11 +196,11 @@ def train_lora_model(data, video_folder, args):
             print("-----------------end------------------------")
             conta += 1
             text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
-            text_features = text_encoder(text_inputs)[0]
+            text_features = text_encoder(text_inputs)[0].to(torch.float16)
             print(f"text_features shape: {text_features.shape}")
 
             image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
-            image_features = clip_model.get_image_features(image_inputs)
+            image_features = clip_model.get_image_features(image_inputs).to(torch.float16)
             print(f"image_features shape: {image_features.shape}")
 
             text_batch_size = text_features.size(0)
@@ -227,7 +227,7 @@ def train_lora_model(data, video_folder, args):
 
             # Forward pass
             output = unet(
-                sample=torch.randn(4, 4, 64, 64, 64).to(unet.device),
+                sample=torch.randn(4, 4, 64, 64, 64).to(unet.device, dtype=torch.float16),
                 timestep=torch.randint(0, 1000, (4,)).to(unet.device),
                 encoder_hidden_states=encoder_hidden_states
             )
