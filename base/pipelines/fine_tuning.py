@@ -203,7 +203,6 @@ def train_lora_model(data, video_folder, args):
             image_features = clip_model.get_image_features(image_inputs).to(torch.float16)
             print(f"image_features shape: {image_features.shape}")
 
-            '''
             text_batch_size = text_features.size(0)
             image_batch_size = image_features.size(0)
             
@@ -220,8 +219,8 @@ def train_lora_model(data, video_folder, args):
                     remainder = image_batch_size % text_batch_size
                     if remainder != 0:
                         text_features = torch.cat([text_features, text_features[:remainder]], dim=0)
-            '''
-            image_features = torch.randn(1, text_features.size(1), 512).to(unet.device, dtype=torch.float16)
+
+            image_features = image_features.unsqueeze(1).repeat(1, text_features.size(1), 1)
             print(f"Reshaped image_features shape: {image_features.shape}")
 
             encoder_hidden_states = torch.cat([text_features, image_features], dim=-1)
