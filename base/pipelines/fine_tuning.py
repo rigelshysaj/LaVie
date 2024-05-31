@@ -31,9 +31,9 @@ class VideoDatasetMsvd(Dataset):
                 video_id = parts[0]
                 description = ' '.join(parts[1:])
                 if video_id not in self.video_descriptions:
-                    self.video_descriptions[video_id] = []
-                    #self.video_descriptions[video_id] = description
-                self.video_descriptions[video_id].append(description)
+                    #self.video_descriptions[video_id] = []
+                    self.video_descriptions[video_id] = description
+                #self.video_descriptions[video_id].append(description)
 
         for video_id, descriptions in self.video_descriptions.items():
             print(f"Video ID: {video_id}, Tipo: {type(descriptions)}, Description: {descriptions}")
