@@ -222,7 +222,7 @@ def train_lora_model(data, video_folder, args):
                         text_features = torch.cat([text_features, text_features[:remainder]], dim=0)
             '''
             image_features = image_features.unsqueeze(0)
-            image_features = image_features.repeat(1, text_features.size(1), 1)
+            image_features = image_features.repeat(1, text_features.size(1)/4, 1)
             print(f"Reshaped image_features shape: {image_features.shape}")
 
             encoder_hidden_states = torch.cat([text_features, image_features], dim=-1)
