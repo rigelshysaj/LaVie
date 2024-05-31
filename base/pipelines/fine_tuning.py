@@ -197,18 +197,18 @@ def train_lora_model(data, video_folder, args):
             conta += 1
             text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
             text_features = text_encoder(text_inputs)[0]
+            print(f"text_features shape: {text_features.shape}")
 
             image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
             image_features = clip_model.get_image_features(image_inputs)
+            print(f"image_features shape: {image_features.shape}")
 
-            print("-----------------text begin------------------------")
-            print(text_features.shape)
-            print("-----------------text end------------------------")
-            print("-----------------image begin------------------------")
-            print(image_features.shape)
-            print("-----------------image end------------------------")
+            batch_size = text_features.size(0)
+            seq_len = text_features.size(1)
+            image_features = image_features.unsqueeze(1).repeat(1, seq_len, 1)
+            print(f"Reshaped image_features shape: {image_features.shape}") 
 
-            encoder_hidden_states = torch.cat([text_features, image_features.unsqueeze(1).repeat(1, text_features.size(1), 1)], dim=-1)
+            encoder_hidden_states = torch.cat([text_features, image_features], dim=-1)
 
             # Forward pass
             output = unet(
