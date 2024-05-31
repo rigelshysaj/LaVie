@@ -201,6 +201,13 @@ def train_lora_model(data, video_folder, args):
             image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
             image_features = clip_model.get_image_features(image_inputs)
 
+            print("-----------------text begin------------------------")
+            print(text_features.shape)
+            print("-----------------text end------------------------")
+            print("-----------------image begin------------------------")
+            print(image_features.shape)
+            print("-----------------image end------------------------")
+
             encoder_hidden_states = torch.cat([text_features, image_features.unsqueeze(1).repeat(1, text_features.size(1), 1)], dim=-1)
 
             # Forward pass
