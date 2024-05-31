@@ -139,6 +139,7 @@ class VideoDatasetMsrvtt(Dataset):
           return None
       return frame
 
+'''
 def get_supported_target_modules(model):
     supported_modules = (nn.Linear, nn.Embedding, nn.Conv2d, nn.Conv1d)
     target_modules = []
@@ -153,6 +154,7 @@ def my_collate(batch):
     descriptions = [desc for sublist in descriptions for desc in sublist]
     return torch.stack(videos), descriptions, torch.stack(frames)
 
+'''
 
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -192,9 +194,7 @@ def train_lora_model(data, video_folder, args):
     for epoch in range(num_epochs):
         for video_path, description, frame_tensor in dataloader:
             optimizer.zero_grad()
-            print("-----------------begin------------------------")
-            print(conta)
-            print("-----------------end------------------------")
+            print(f"Iterazione numero: {conta}")
             conta += 1
             text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
             text_features = text_encoder(text_inputs)[0].to(torch.float16)
@@ -204,9 +204,11 @@ def train_lora_model(data, video_folder, args):
             image_features = clip_model.get_image_features(image_inputs).to(torch.float16)
             print(f"image_features shape: {image_features.shape}")
 
+            
+            '''
             text_batch_size = text_features.size(0)
             image_batch_size = image_features.size(0)
-            
+
             if text_batch_size != image_batch_size:
                 if text_batch_size > image_batch_size:
                     factor = text_batch_size // image_batch_size
@@ -223,6 +225,7 @@ def train_lora_model(data, video_folder, args):
 
             image_features = image_features.unsqueeze(1).repeat(1, text_features.size(1), 1)
             print(f"Reshaped image_features shape: {image_features.shape}")
+            '''
 
             encoder_hidden_states = torch.cat([text_features, image_features], dim=-1)
 
