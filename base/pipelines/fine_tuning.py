@@ -203,9 +203,10 @@ def train_lora_model(data, video_folder, args):
             image_features = clip_model.get_image_features(image_inputs)
             print(f"image_features shape: {image_features.shape}")
 
-            batch_size = text_features.size(0)
-            seq_len = text_features.size(1)
-            image_features = image_features.unsqueeze(1).repeat(1, seq_len, 1)
+            # Ripetere image_features lungo la dimensione batch per allinearsi a text_features
+            if text_features.size(0) != image_features.size(0):
+                repeat_factor = text_features.size(0) // image_features.size(0)
+                image_features = image_features.repeat(repeat_factor, 1, 1)
             print(f"Reshaped image_features shape: {image_features.shape}") 
 
             encoder_hidden_states = torch.cat([text_features, image_features], dim=-1)
