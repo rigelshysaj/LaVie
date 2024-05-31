@@ -36,7 +36,7 @@ class VideoDatasetMsvd(Dataset):
                 #self.video_descriptions[video_id].append(description)
 
         for video_id, descriptions in self.video_descriptions.items():
-            print(f"Video ID: {video_id}, Tipo: {type(descriptions)}, Lunghezza: {len(descriptions)}")
+            print(f"Video ID: {video_id}, Tipo: {type(descriptions)}, Description: {descriptions}")
         
         # Ottieni la lista dei file video nella cartella YouTubeClips
         self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
