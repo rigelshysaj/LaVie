@@ -166,8 +166,8 @@ def train_lora_model(data, video_folder, args):
     text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder", torch_dtype=torch.float16).to(device)
 
     # Load CLIP model and processor for image conditioning
-    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
-    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
+    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
 
     lora_config = LoraConfig(
         r=8, 
