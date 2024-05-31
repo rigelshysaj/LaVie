@@ -224,6 +224,7 @@ def train_lora_model(data, video_folder, args):
             image_features = image_features.unsqueeze(0)
             val = text_features.size(1)
             val = val/4
+            val = val.to(torch.int)
             image_features = image_features.repeat(1, val, 1)
             print(f"Reshaped image_features shape: {image_features.shape}")
 
