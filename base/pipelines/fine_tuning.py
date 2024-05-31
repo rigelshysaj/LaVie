@@ -89,6 +89,8 @@ class VideoDatasetMsrvtt(Dataset):
         self.videos = [video for video in data['videos'] if os.path.exists(os.path.join(video_folder, f"{video['video_id']}.mp4"))]
         self.sentences = {sentence['video_id']: sentence['caption'] for sentence in data['sentences']}
         self.video_folder = video_folder
+        for video_id, caption in self.sentences.items():
+            print(f"Video ID: {video_id}, Tipo: {type(caption)}, Lunghezza: {len(caption)}")
 
     def __len__(self):
         return len(self.videos)
