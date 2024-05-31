@@ -33,6 +33,9 @@ class VideoDatasetMsvd(Dataset):
                 if video_id not in self.video_descriptions:
                     self.video_descriptions[video_id] = []
                 self.video_descriptions[video_id].append(description)
+
+        for video_id, descriptions in self.video_descriptions.items():
+            print(f"Video ID: {video_id}, Tipo: {type(descriptions)}, Lunghezza: {len(descriptions)}")
         
         # Ottieni la lista dei file video nella cartella YouTubeClips
         self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
@@ -89,8 +92,7 @@ class VideoDatasetMsrvtt(Dataset):
         self.videos = [video for video in data['videos'] if os.path.exists(os.path.join(video_folder, f"{video['video_id']}.mp4"))]
         self.sentences = {sentence['video_id']: sentence['caption'] for sentence in data['sentences']}
         self.video_folder = video_folder
-        for video_id, caption in self.sentences.items():
-            print(f"Video ID: {video_id}, Tipo: {type(caption)}, Lunghezza: {len(caption)}")
+        
 
     def __len__(self):
         return len(self.videos)
