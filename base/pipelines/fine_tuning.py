@@ -201,8 +201,13 @@ def train_lora_model(data, video_folder, args):
             print(f"text_features shape: {text_features.shape}")
 
             image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
-            image_features = clip_model.get_image_features(image_inputs).to(torch.float16)
+
+            image_features, last_hidden_state = clip_model.get_image_features_and_last_hidden_state(image_inputs)
+            image_features = image_features.to(torch.float16)
+            last_hidden_state = last_hidden_state.to(torch.float16)
+
             print(f"image_features shape: {image_features.shape}")
+            print(f"last_hidden_state shape: {last_hidden_state.shape}")
 
             
             '''
