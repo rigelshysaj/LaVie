@@ -202,7 +202,7 @@ def train_lora_model(data, video_folder, args):
 
             image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
             output = clip_model.get_image_features(image_inputs, output_hidden_states=True)
-            print(f"la lunghezza: {len(output)}")
+            image_features, last_hidden_state, unknown1, unknown2 = output
             image_features = image_features.to(torch.float16)
             last_hidden_state = last_hidden_state.to(torch.float16)
             print(f"image_features shape: {image_features.shape}")
