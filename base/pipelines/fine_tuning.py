@@ -191,6 +191,8 @@ def train_lora_model(data, video_folder, args):
     
     conta = 1
 
+    projection_layer = nn.Linear(768, 1024).to(unet.device)
+
     for epoch in range(num_epochs):
         for video_path, description, frame_tensor in dataloader:
             optimizer.zero_grad()
@@ -198,12 +200,12 @@ def train_lora_model(data, video_folder, args):
             conta += 1
             text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
             text_features = text_encoder(text_inputs)[0].to(torch.float16)
+            text_features = projection_layer(text_features)
             print(f"text_features shape: {text_features.shape}")
 
             image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
             outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
             last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
-            print(f"outputs: {outputs.shape}")
             print(f"last_hidden_state shape: {last_hidden_state.shape}")
 
             encoder_hidden_states = torch.cat([text_features, last_hidden_state], dim=1)
