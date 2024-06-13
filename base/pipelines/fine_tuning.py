@@ -220,7 +220,7 @@ def train_lora_model(data, video_folder, args):
             assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
 
             # Calcola l'attenzione
-            attention_output, _ = attention_layer(last_hidden_state, text_features, text_features)
+            attention_output, _ = attention_layer(last_hidden_state.to(torch.float16), text_features.to(torch.float16), text_features.to(torch.float16))
             
             # Ritorna alle dimensioni originali
             attention_output = attention_output.transpose(0, 1)
