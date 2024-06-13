@@ -199,8 +199,8 @@ def train_lora_model(data, video_folder, args):
             print(f"Iterazione numero: {conta}")
             conta += 1
             text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
-            text_features = text_encoder(text_inputs)[0].to(torch.float16)
-            text_features = projection_layer(text_features)
+            text_features = text_encoder(text_inputs)[0].to(torch.float32)  # Cambia a float32 per la proiezione
+            text_features = projection_layer(text_features).to(torch.float16)  # Torna a float16 dopo la proiezione
             print(f"text_features shape: {text_features.shape}")
 
             image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
