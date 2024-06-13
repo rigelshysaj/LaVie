@@ -214,6 +214,9 @@ def train_lora_model(data, video_folder, args):
             text_features = text_features.transpose(0, 1)
             last_hidden_state = last_hidden_state.transpose(0, 1)
 
+
+            print("maoooooooooooooooooooooo")
+
             # Calcola l'attenzione
             attention_output, _ = attention_layer(last_hidden_state, text_features, text_features)
             
