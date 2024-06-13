@@ -201,37 +201,12 @@ def train_lora_model(data, video_folder, args):
             print(f"text_features shape: {text_features.shape}")
 
             image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
-            output = clip_model.get_image_features(image_inputs, output_hidden_states=True)
-            image_features, last_hidden_state, unknown1, unknown2 = output
-            image_features = image_features.to(torch.float16)
-            last_hidden_state = last_hidden_state.to(torch.float16)
-            print(f"image_features shape: {image_features.shape}")
+            output = clip_model(image_inputs, output_hidden_states=True)
+        
+            last_hidden_state = output.hidden_states[-1].to(torch.float16)
             print(f"last_hidden_state shape: {last_hidden_state.shape}")
 
-            
-            '''
-            text_batch_size = text_features.size(0)
-            image_batch_size = image_features.size(0)
-
-            if text_batch_size != image_batch_size:
-                if text_batch_size > image_batch_size:
-                    factor = text_batch_size // image_batch_size
-                    image_features = image_features.repeat(factor, 1)
-                    remainder = text_batch_size % image_batch_size
-                    if remainder != 0:
-                        image_features = torch.cat([image_features, image_features[:remainder]], dim=0)
-                else:
-                    factor = image_batch_size // text_batch_size
-                    text_features = text_features.repeat(factor, 1, 1)
-                    remainder = image_batch_size % text_batch_size
-                    if remainder != 0:
-                        text_features = torch.cat([text_features, text_features[:remainder]], dim=0)
-            '''
-
-            image_features = image_features.unsqueeze(1).repeat(1, text_features.size(1), 1)
-            print(f"Reshaped image_features shape: {image_features.shape}")
-
-            encoder_hidden_states = torch.cat([text_features, image_features], dim=-1)
+            encoder_hidden_states = torch.cat([text_features, last_hidden_state], dim=1)
 
             # Forward pass
             output = unet(
