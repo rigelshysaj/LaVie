@@ -191,6 +191,7 @@ def train_lora_model(data, video_folder, args):
     
     conta = 1
 
+    attention_layer = nn.MultiheadAttention(embed_dim=1024, num_heads=8).to(unet.device)
     projection_layer = nn.Linear(768, 1024).to(unet.device)
 
     for epoch in range(num_epochs):
@@ -208,7 +209,18 @@ def train_lora_model(data, video_folder, args):
             last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
             print(f"last_hidden_state shape: {last_hidden_state.shape}")
 
-            encoder_hidden_states = torch.cat([text_features, last_hidden_state], dim=1)
+            
+            # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
+            text_features = text_features.transpose(0, 1)
+            last_hidden_state = last_hidden_state.transpose(0, 1)
+
+            # Calcola l'attenzione
+            attention_output, _ = attention_layer(last_hidden_state, text_features, text_features)
+            
+            # Ritorna alle dimensioni originali
+            attention_output = attention_output.transpose(0, 1)
+
+            encoder_hidden_states = attention_output
 
             # Forward pass
             output = unet(
