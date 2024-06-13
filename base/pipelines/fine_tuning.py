@@ -216,6 +216,8 @@ def train_lora_model(data, video_folder, args):
 
             print(f"text_features_transpose shape: {text_features.shape}")
 
+            assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
+
             # Calcola l'attenzione
             attention_output, _ = attention_layer(last_hidden_state, text_features, text_features)
             
