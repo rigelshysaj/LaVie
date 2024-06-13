@@ -203,6 +203,7 @@ def train_lora_model(data, video_folder, args):
             image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
             outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
             last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
+            print(f"outputs: {outputs.shape}")
             print(f"last_hidden_state shape: {last_hidden_state.shape}")
 
             encoder_hidden_states = torch.cat([text_features, last_hidden_state], dim=1)
