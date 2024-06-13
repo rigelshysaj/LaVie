@@ -214,7 +214,8 @@ def train_lora_model(data, video_folder, args):
             text_features = text_features.transpose(0, 1)
             last_hidden_state = last_hidden_state.transpose(0, 1)
 
-            print(f"text_features_transpose shape: {text_features.shape}")
+            text_features = text_features.to(torch.float16)
+            last_hidden_state = last_hidden_state.to(torch.float16)
 
             assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
 
