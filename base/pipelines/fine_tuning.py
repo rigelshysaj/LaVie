@@ -225,9 +225,13 @@ def train_lora_model(data, video_folder, args):
 
                 # Calcola l'attenzione
                 attention_output, _ = attention_layer(last_hidden_state, text_features, text_features)
+
+                print(f"attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}")
                 
                 # Ritorna alle dimensioni originali
                 attention_output = attention_output.transpose(0, 1)
+
+                print(f"attention_output_transpose shape: {attention_output.shape}, dtype: {attention_output.dtype}")
 
                 attention_output = projection_layer(last_hidden_state).to(torch.float16)
 
