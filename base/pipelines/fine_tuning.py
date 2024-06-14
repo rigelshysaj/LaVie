@@ -230,6 +230,9 @@ def train_lora_model(data, video_folder, args):
 
                 encoder_hidden_states = attention_output
 
+                print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
+
+
                 # Forward pass
                 output = unet(
                     sample=torch.randn(4, 4, 64, 64, 64).to(unet.device, dtype=torch.float16),
@@ -240,7 +243,7 @@ def train_lora_model(data, video_folder, args):
 
                 loss.backward()
                 optimizer.step()
-        print(f"Epoch {epoch + 1}/{num_epochs} completed with loss: {loss.item()}")
+            print(f"Epoch {epoch + 1}/{num_epochs} completed with loss: {loss.item()}")
     
             
     unet.save_pretrained("/content/drive/My Drive/finetuned_lora_unet")
