@@ -199,44 +199,47 @@ def train_lora_model(data, video_folder, args):
             optimizer.zero_grad()
             print(f"Iterazione numero: {conta}")
             conta += 1
-            text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
-            text_features = text_encoder(text_inputs)[0].to(torch.float32)  # Cambia a float32 per la proiezione
-            text_features = projection_layer(text_features).to(torch.float16)  # Torna a float16 dopo la proiezione
-            print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
-            image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
-            outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
-            last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
-            print(f"last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}")
+            with torch.cuda.amp.autocast():
 
-            
-            # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
-            text_features = text_features.transpose(0, 1)
-            last_hidden_state = last_hidden_state.transpose(0, 1)
+                text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
+                text_features = text_encoder(text_inputs)[0].to(torch.float32)  # Cambia a float32 per la proiezione
+                text_features = projection_layer(text_features).to(torch.float16)  # Torna a float16 dopo la proiezione
+                print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
-            print(f"text_features_transpose shape: {text_features.shape}, dtype: {text_features.dtype}")
-            print(f"last_hidden_state_transpose shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}")
+                image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
+                outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
+                last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
+                print(f"last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}")
 
-            assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
+                
+                # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
+                text_features = text_features.transpose(0, 1)
+                last_hidden_state = last_hidden_state.transpose(0, 1)
 
-            # Calcola l'attenzione
-            attention_output, _ = attention_layer(last_hidden_state.to(torch.float16), text_features.to(torch.float16), text_features.to(torch.float16))
-            
-            # Ritorna alle dimensioni originali
-            attention_output = attention_output.transpose(0, 1)
+                print(f"text_features_transpose shape: {text_features.shape}, dtype: {text_features.dtype}")
+                print(f"last_hidden_state_transpose shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}")
 
-            encoder_hidden_states = attention_output
+                assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
 
-            # Forward pass
-            output = unet(
-                sample=torch.randn(4, 4, 64, 64, 64).to(unet.device, dtype=torch.float16),
-                timestep=torch.randint(0, 1000, (4,)).to(unet.device),
-                encoder_hidden_states=encoder_hidden_states
-            )
-            loss = torch.nn.functional.mse_loss(output.sample, torch.randn_like(output.sample))
+                # Calcola l'attenzione
+                attention_output, _ = attention_layer(last_hidden_state, text_features, text_features)
+                
+                # Ritorna alle dimensioni originali
+                attention_output = attention_output.transpose(0, 1)
 
-            loss.backward()
-            optimizer.step()
+                encoder_hidden_states = attention_output
+
+                # Forward pass
+                output = unet(
+                    sample=torch.randn(4, 4, 64, 64, 64).to(unet.device, dtype=torch.float16),
+                    timestep=torch.randint(0, 1000, (4,)).to(unet.device),
+                    encoder_hidden_states=encoder_hidden_states
+                )
+                loss = torch.nn.functional.mse_loss(output.sample, torch.randn_like(output.sample))
+
+                loss.backward()
+                optimizer.step()
         print(f"Epoch {epoch + 1}/{num_epochs} completed with loss: {loss.item()}")
     
             
