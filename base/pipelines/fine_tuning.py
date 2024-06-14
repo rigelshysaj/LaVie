@@ -213,7 +213,7 @@ def train_lora_model(data, video_folder, args):
                 outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
                 last_hidden_state = outputs.hidden_states[-1].to(torch.float32)
                 print(f"last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}")
-                last_hidden_state = projection_layer(last_hidden_state).to(torch.float16)
+                #last_hidden_state = projection_layer(last_hidden_state).to(torch.float16)
                 
                 # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
                 text_features = text_features.transpose(0, 1)
