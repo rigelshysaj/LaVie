@@ -169,8 +169,8 @@ def train_lora_model(data, video_folder, args):
     text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder", torch_dtype=torch.float16).to(device)
 
     # Load CLIP model and processor for image conditioning
-    clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
-    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
     lora_config = LoraConfig(
         r=8, 
@@ -191,13 +191,14 @@ def train_lora_model(data, video_folder, args):
     
     conta = 1
 
-    #attention_layer = nn.MultiheadAttention(embed_dim=1024, num_heads=8).to(unet.device)
-    #projection_layer = nn.Linear(768, 1024).to(unet.device)
+    
     attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
     projection_layer = nn.Linear(1024, 768).to(unet.device)
 
+    accumulation_steps = 4
+
     for epoch in range(num_epochs):
-        for video_path, description, frame_tensor in dataloader:
+        for i, (video_path, description, frame_tensor) in enumerate(dataloader):
             optimizer.zero_grad()
             print(f"Iterazione numero: {conta}")
             conta += 1
@@ -205,14 +206,11 @@ def train_lora_model(data, video_folder, args):
             with torch.cuda.amp.autocast():
 
                 text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
-                #text_features = text_encoder(text_inputs)[0].to(torch.float32)  # Cambia a float32 per la proiezione
-                #text_features = projection_layer(text_features).to(torch.float16)  # Torna a float16 dopo la proiezione
                 text_features = text_encoder(text_inputs)[0].to(torch.float16)
                 print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
                 image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
                 outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
-                #last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
                 last_hidden_state = outputs.hidden_states[-1].to(torch.float32)
                 last_hidden_state = projection_layer(last_hidden_state).to(torch.float16)
                 print(f"last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}")
@@ -246,8 +244,15 @@ def train_lora_model(data, video_folder, args):
                 )
                 loss = torch.nn.functional.mse_loss(output.sample, torch.randn_like(output.sample))
 
-                loss.backward()
+            loss = loss / accumulation_steps
+            loss.backward()
+
+            if (i + 1) % accumulation_steps == 0:
                 optimizer.step()
+                optimizer.zero_grad()
+            
+            torch.cuda.empty_cache()
+
             print(f"Epoch {epoch + 1}/{num_epochs} completed with loss: {loss.item()}")
     
             
