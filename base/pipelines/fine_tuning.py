@@ -182,7 +182,7 @@ def train_lora_model(data, video_folder, args):
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(data, video_folder, target_size=(224, 224))
-    dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
     
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
     num_epochs = 3
