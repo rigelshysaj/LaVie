@@ -193,7 +193,7 @@ def train_lora_model(data, video_folder, args):
 
     
     attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
-    projection_layer = nn.Linear(1024, 768).to(unet.device)
+    projection_layer = nn.Linear(768, 512).to(unet.device)
 
     accumulation_steps = 4
 
@@ -213,7 +213,6 @@ def train_lora_model(data, video_folder, args):
                 outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
                 last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
                 print(f"last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}")
-                #last_hidden_state = projection_layer(last_hidden_state).to(torch.float16)
                 
                 # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
                 text_features = text_features.transpose(0, 1)
@@ -229,6 +228,8 @@ def train_lora_model(data, video_folder, args):
                 
                 # Ritorna alle dimensioni originali
                 attention_output = attention_output.transpose(0, 1)
+
+                attention_output = projection_layer(last_hidden_state).to(torch.float16)
 
                 encoder_hidden_states = attention_output
 
