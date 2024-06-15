@@ -197,6 +197,8 @@ def train_lora_model(data, video_folder, args):
 
     accumulation_steps = 4
 
+    scaler = torch.cuda.amp.GradScaler()
+
     for epoch in range(num_epochs):
         for i, (video_path, description, frame_tensor) in enumerate(dataloader):
             optimizer.zero_grad()
@@ -251,9 +253,11 @@ def train_lora_model(data, video_folder, args):
             loss.backward()
 
             if (i + 1) % accumulation_steps == 0:
-                optimizer.step()
+                scaler.step(optimizer)
+                scaler.update()
                 optimizer.zero_grad()
-            
+
+            del text_inputs, text_features, image_inputs, last_hidden_state, attention_output, encoder_hidden_states
             torch.cuda.empty_cache()
 
             print(f"Epoch {epoch + 1}/{num_epochs} completed with loss: {loss.item()}")
