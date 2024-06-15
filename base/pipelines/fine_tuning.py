@@ -182,7 +182,7 @@ def train_lora_model(data, video_folder, args):
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(data, video_folder, target_size=(224, 224))
-    dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
     
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
     num_epochs = 3
@@ -241,8 +241,8 @@ def train_lora_model(data, video_folder, args):
 
                 # Forward pass
                 output = unet(
-                    sample=torch.randn(2, 4, 64, 64, 64).to(unet.device, dtype=torch.float16),
-                    timestep=torch.randint(0, 1000, (2,)).to(unet.device),
+                    sample=torch.randn(1, 4, 64, 64, 64).to(unet.device, dtype=torch.float16),
+                    timestep=torch.randint(0, 1000, (1,)).to(unet.device),
                     encoder_hidden_states=encoder_hidden_states
                 )
                 loss = torch.nn.functional.mse_loss(output.sample, torch.randn_like(output.sample))
