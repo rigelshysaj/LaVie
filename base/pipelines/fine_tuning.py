@@ -235,7 +235,7 @@ def train_lora_model(data, video_folder, args):
 
                 print(f"attention_output_transpose shape: {attention_output.shape}, dtype: {attention_output.dtype}")
 
-                attention_output = projection_layer(attention_output).to(torch.float16)
+                #attention_output = projection_layer(attention_output).to(torch.float16)
                 encoder_hidden_states = attention_output
 
                 print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
