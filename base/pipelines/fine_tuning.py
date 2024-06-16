@@ -182,7 +182,7 @@ def train_lora_model(data, video_folder, args):
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(data, video_folder, target_size=(224, 224))
-    dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
     
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
     num_epochs = 3
@@ -240,13 +240,13 @@ def train_lora_model(data, video_folder, args):
 
                 print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
 
-                timestep=torch.randint(0, 1000, (2,)).to(unet.device)
+                timestep=torch.randint(0, 1000, (1,)).to(unet.device)
 
                 print(f"timestep shape: {timestep.shape}, dtype: {timestep.dtype}")
 
                 # Forward pass
                 output = unet(
-                    sample=torch.randn(2, 4, 16, 40, 64).to(unet.device, dtype=torch.float16),
+                    sample=torch.randn(1, 4, 16, 40, 64).to(unet.device, dtype=torch.float16),
                     timestep=timestep,
                     encoder_hidden_states=encoder_hidden_states
                 )
