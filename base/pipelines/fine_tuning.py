@@ -240,11 +240,14 @@ def train_lora_model(data, video_folder, args):
 
                 print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
 
+                timestep=torch.randint(0, 1000, (2,)).to(unet.device)
+
+                print(f"timestep shape: {timestep.shape}, dtype: {timestep.dtype}")
 
                 # Forward pass
                 output = unet(
-                    sample=torch.randn(2, 4, 32, 32, 32).to(unet.device, dtype=torch.float16),
-                    timestep=torch.randint(0, 1000, (2,)).to(unet.device),
+                    sample=torch.randn(2, 4, 16, 40, 64).to(unet.device, dtype=torch.float16),
+                    timestep=timestep,
                     encoder_hidden_states=encoder_hidden_states
                 )
                 loss = torch.nn.functional.mse_loss(output.sample, torch.randn_like(output.sample))
