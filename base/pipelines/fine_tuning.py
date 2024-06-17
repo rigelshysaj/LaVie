@@ -333,7 +333,7 @@ def train_lora_model(data, video_folder, args):
             print(f"Iterazione numero: {conta}")
             conta += 1
 
-            print(f"description: {description.shape}, dtype: {description.dtype}")
+            print(f"description: {description[0].shape}, dtype: {description.dtype}")
 
             with torch.cuda.amp.autocast():
 
