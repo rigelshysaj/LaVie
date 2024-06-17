@@ -337,6 +337,7 @@ def train_lora_model(data, video_folder, args):
 
             with torch.cuda.amp.autocast():
 
+                '''
                 text_features = _encode_prompt(
                     text_encoder=text_encoder,
                     tokenizer=tokenizer,
@@ -347,13 +348,13 @@ def train_lora_model(data, video_folder, args):
                     negative_prompt=None,
                     prompt_embeds=None,
                     negative_prompt_embeds=None,
-                )
+                )'''
 
-                print(f"prompt_embeds shape: {text_features.shape}, dtype: {text_features.dtype}")
+                print(f"description: {description}")
 
-                #text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
-                #text_features = text_encoder(text_inputs)[0].to(torch.float16)
-                #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
+                text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
+                text_features = text_encoder(text_inputs)[0].to(torch.float16)
+                print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
                 image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
                 outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
