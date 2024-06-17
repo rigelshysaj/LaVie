@@ -333,6 +333,8 @@ def train_lora_model(data, video_folder, args):
             print(f"Iterazione numero: {conta}")
             conta += 1
 
+            print(f"description: {description}")
+
             with torch.cuda.amp.autocast():
 
                 text_features = _encode_prompt(
