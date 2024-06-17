@@ -39,8 +39,10 @@ def _encode_prompt(
     ):
         
         if prompt is not None and isinstance(prompt, str):
+            print("stringa-----------------------------------------")
             batch_size = 1
         elif prompt is not None and isinstance(prompt, list):
+            print("lista-------------------------------------------")
             batch_size = len(prompt)
         else:
             batch_size = prompt_embeds.shape[0]
