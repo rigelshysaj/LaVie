@@ -348,13 +348,14 @@ class VideoGenPipeline(DiffusionPipeline):
         prompt_embeds = prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
 
 
+        '''
         # Encode image
         if image_tensor is not None:
             image_features = self.clip_model.get_image_features(image_tensor)
             image_features = image_features.to(dtype=self.text_encoder.dtype, device=device)
             prompt_embeds = torch.cat([prompt_embeds, image_features.unsqueeze(1).repeat(1, prompt_embeds.size(1), 1)], dim=-1)
             #prompt_embeds = torch.cat((prompt_embeds, image_features), dim=1)
-
+        '''
 
         bs_embed, seq_len, _ = prompt_embeds.shape
         # duplicate text embeddings for each generation per prompt, using mps friendly method
