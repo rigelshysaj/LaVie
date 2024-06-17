@@ -333,14 +333,12 @@ def train_lora_model(data, video_folder, args):
             print(f"Iterazione numero: {conta}")
             conta += 1
 
-            print(f"description: {description[0].shape}, dtype: {description.dtype}")
-
             with torch.cuda.amp.autocast():
 
                 text_features = _encode_prompt(
                     text_encoder=text_encoder,
                     tokenizer=tokenizer,
-                    prompt=description,
+                    prompt=description[0],
                     device=device,
                     num_images_per_prompt=1,
                     do_classifier_free_guidance=True,
