@@ -39,10 +39,8 @@ def _encode_prompt(
     ):
         
         if prompt is not None and isinstance(prompt, str):
-            print("stringa-----------------------------------------")
             batch_size = 1
         elif prompt is not None and isinstance(prompt, list):
-            print("lista-------------------------------------------")
             batch_size = len(prompt)
         else:
             batch_size = prompt_embeds.shape[0]
@@ -311,7 +309,7 @@ def train_lora_model(data, video_folder, args):
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(data, video_folder, target_size=(224, 224))
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
     
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
     num_epochs = 3
@@ -337,7 +335,6 @@ def train_lora_model(data, video_folder, args):
 
             with torch.cuda.amp.autocast():
 
-                '''
                 text_features = _encode_prompt(
                     text_encoder=text_encoder,
                     tokenizer=tokenizer,
@@ -348,13 +345,13 @@ def train_lora_model(data, video_folder, args):
                     negative_prompt=None,
                     prompt_embeds=None,
                     negative_prompt_embeds=None,
-                )'''
+                )
 
-                print(f"description: {description}")
+                print(f"prompt_embeds shape: {text_features.shape}, dtype: {text_features.dtype}")
 
-                text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
-                text_features = text_encoder(text_inputs)[0].to(torch.float16)
-                print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
+                #text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
+                #text_features = text_encoder(text_inputs)[0].to(torch.float16)
+                #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
                 image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
                 outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
@@ -385,13 +382,13 @@ def train_lora_model(data, video_folder, args):
 
                 print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
 
-                timestep=torch.randint(0, 1000, (1,)).to(unet.device)
+                timestep=torch.randint(0, 1000, (2,)).to(unet.device)
 
                 print(f"timestep shape: {timestep.shape}, dtype: {timestep.dtype}")
 
                 # Forward pass
                 output = unet(
-                    sample=torch.randn(1, 4, 16, 40, 64).to(unet.device, dtype=torch.float16),
+                    sample=torch.randn(2, 4, 16, 40, 64).to(unet.device, dtype=torch.float16),
                     timestep=timestep,
                     encoder_hidden_states=encoder_hidden_states
                 )
