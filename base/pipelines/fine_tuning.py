@@ -341,7 +341,7 @@ def train_lora_model(data, video_folder, args):
                     prompt=description[0],
                     device=device,
                     num_images_per_prompt=1,
-                    do_classifier_free_guidance=True,
+                    do_classifier_free_guidance=False,
                     negative_prompt=None,
                     prompt_embeds=None,
                     negative_prompt_embeds=None,
