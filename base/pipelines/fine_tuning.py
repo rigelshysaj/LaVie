@@ -315,6 +315,8 @@ def train_lora_model(data, video_folder, args):
     num_epochs = 3
     
     unet.train()
+    unet.enable_xformers_memory_efficient_attention()
+    unet.enable_gradient_checkpointing()
     text_encoder.eval()
     
     conta = 1
@@ -341,13 +343,13 @@ def train_lora_model(data, video_folder, args):
                     prompt=description[0],
                     device=device,
                     num_images_per_prompt=1,
-                    do_classifier_free_guidance=False,
+                    do_classifier_free_guidance=True,
                     negative_prompt=None,
                     prompt_embeds=None,
                     negative_prompt_embeds=None,
                 )
 
-                print(f"prompt_embeds shape: {text_features.shape}, dtype: {text_features.dtype}")
+                print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
                 #text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
                 #text_features = text_encoder(text_inputs)[0].to(torch.float16)
@@ -386,9 +388,12 @@ def train_lora_model(data, video_folder, args):
 
                 print(f"timestep shape: {timestep.shape}, dtype: {timestep.dtype}")
 
+                #sample=torch.randn(2, 4, 16, 40, 64).to(unet.device, dtype=torch.float16)
+                sample=torch.randn(2, 4, 21, 32, 32).to(unet.device, dtype=torch.float16)
+
                 # Forward pass
                 output = unet(
-                    sample=torch.randn(2, 4, 16, 40, 64).to(unet.device, dtype=torch.float16),
+                    sample=sample,
                     timestep=timestep,
                     encoder_hidden_states=encoder_hidden_states
                 )
