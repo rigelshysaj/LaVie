@@ -335,6 +335,8 @@ def train_lora_model(data, video_folder, args):
             print(f"Iterazione numero: {conta}")
             conta += 1
 
+            print(f"description: {description}")
+
             with torch.cuda.amp.autocast():
 
                 text_features = _encode_prompt(
@@ -408,7 +410,7 @@ def train_lora_model(data, video_folder, args):
                 scaler.update()
                 optimizer.zero_grad()
 
-                
+
             del text_features, image_inputs, last_hidden_state, attention_output, encoder_hidden_states
             torch.cuda.empty_cache()
 
