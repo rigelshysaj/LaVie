@@ -407,7 +407,7 @@ def train_lora_model(data, video_folder, args):
                 scaler.update()
                 optimizer.zero_grad()
 
-            del text_inputs, text_features, image_inputs, last_hidden_state, attention_output, encoder_hidden_states
+            del text_features, image_inputs, last_hidden_state, attention_output, encoder_hidden_states
             torch.cuda.empty_cache()
 
             print(f"Epoch {epoch + 1}/{num_epochs} completed with loss: {loss.item()}")
