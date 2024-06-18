@@ -266,22 +266,6 @@ class VideoDatasetMsrvtt(Dataset):
           return None
       return frame
 
-'''
-def get_supported_target_modules(model):
-    supported_modules = (nn.Linear, nn.Embedding, nn.Conv2d, nn.Conv1d)
-    target_modules = []
-    for name, module in model.named_modules():
-        if isinstance(module, supported_modules):
-            target_modules.append(name)
-    return target_modules
-
-
-def my_collate(batch):
-    videos, descriptions, frames = zip(*batch)
-    descriptions = [desc for sublist in descriptions for desc in sublist]
-    return torch.stack(videos), descriptions, torch.stack(frames)
-
-'''
 
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
