@@ -398,7 +398,7 @@ def train_lora_model(data, video_folder, args):
                     encoder_hidden_states=encoder_hidden_states
                 )
                 loss = torch.nn.functional.mse_loss(output.sample, torch.randn_like(output.sample))
-
+            '''
             loss = loss / accumulation_steps
             loss.backward()
 
@@ -406,6 +406,12 @@ def train_lora_model(data, video_folder, args):
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad()
+            '''
+
+            scaler.scale(loss).backward()
+
+            scaler.step(optimizer)
+            scaler.update()
 
             del text_features, image_inputs, last_hidden_state, attention_output, encoder_hidden_states
             torch.cuda.empty_cache()
