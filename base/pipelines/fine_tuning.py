@@ -284,7 +284,7 @@ def train_lora_model(data, video_folder, args):
                     sample=sample,
                     timestep=timestep,
                     encoder_hidden_states=encoder_hidden_states
-                )
+                ).sample
 
                 print(f"output shape: {output.shape}, dtype: {output.dtype}")
 
