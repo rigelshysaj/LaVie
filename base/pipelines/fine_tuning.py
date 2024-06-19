@@ -323,7 +323,7 @@ def train_lora_model(data, video_folder, args):
     unet = get_peft_model(unet, lora_config)
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
-    dataset = VideoDatasetMsvd(data, video_folder, target_size=(224, 224))
+    dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder, target_size=(224, 224))
     dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
     
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
