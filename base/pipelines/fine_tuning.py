@@ -71,12 +71,14 @@ class VideoDatasetMsvd(Dataset):
             frames.append(frame)
         cap.release()
 
+        '''
         # Se il numero di frame è inferiore a fixed_frame_count, ripeti l'ultimo frame
         if len(frames) < self.fixed_frame_count:
             frames += [frames[-1]] * (self.fixed_frame_count - len(frames))  # Ripeti l'ultimo frame
         else:
             # Prendi i primi fixed_frame_count frame
             frames = frames[:self.fixed_frame_count]
+        '''
         
         frames_np = np.array(frames, dtype=np.float32)
         video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
@@ -90,7 +92,7 @@ class VideoDatasetMsvd(Dataset):
         video_id = os.path.splitext(video_file)[0]
         descriptions = self.video_descriptions.get(video_id, [])
 
-        print(f"description of __getitem__: {descriptions}")
+        print(f"description of __getitem__: {descriptions} video_id: {video_id}")
         
         # Applica trasformazioni, se presenti
         if self.transform:
