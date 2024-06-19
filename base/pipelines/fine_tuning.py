@@ -144,12 +144,16 @@ def _encode_prompt(
         return prompt_embeds
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None, target_size=(224, 224), fixed_frame_count=30):
+    def __init__(self, annotations_file, video_dir, tokenizer, text_encoder, clip_model, clip_processor, device, transform=None, target_size=(224, 224), fixed_frame_count=30):
         self.video_dir = video_dir
         self.transform = transform
         self.target_size = target_size
         self.fixed_frame_count = fixed_frame_count
-        
+        self.tokenizer = tokenizer
+        self.text_encoder = text_encoder
+        self.clip_model = clip_model
+        self.clip_processor = clip_processor
+        self.device = device
         # Legge il file annotations.txt e memorizza le descrizioni in un dizionario
         self.video_descriptions = {}
         with open(annotations_file, 'r') as f:
@@ -206,13 +210,25 @@ class VideoDatasetMsvd(Dataset):
         descriptions = self.video_descriptions.get(video_id, [])
 
         print(f"description of __getitem__: {descriptions}")
+
+        text_features = _encode_prompt(
+                    text_encoder=text_encoder,
+                    tokenizer=tokenizer,
+                    prompt=descriptions,
+                    device=device,
+                    num_images_per_prompt=1,
+                    do_classifier_free_guidance=True,
+                    negative_prompt=None,
+                    prompt_embeds=None,
+                    negative_prompt_embeds=None,
+        )
         
         # Applica trasformazioni, se presenti
         if self.transform:
             video = self.transform(video)
             mid_frame = self.transform(mid_frame)
         
-        return video, descriptions, mid_frame
+        return video, text_features, mid_frame
 
 
 
@@ -298,21 +314,12 @@ class CombinedLoss(nn.Module):
         combined_loss = mse_loss + self.perceptual_weight * perceptual_loss
         return combined_loss
 
-def train_lora_model(data, video_folder, args):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+def train_lora_model(data, video_folder, args, tokenizer, text_encoder, clip_model, clip_processor, sd_path, device):
     combined_loss_fn = CombinedLoss(perceptual_weight=0.1).to(device)
-    # Carica il modello UNet e applica LoRA
-    sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
+
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
     state_dict = find_model(args.ckpt_path)
     unet.load_state_dict(state_dict)
-
-    tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
-    text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder", torch_dtype=torch.float16).to(device)
-
-    # Load CLIP model and processor for image conditioning
-    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
-    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
     lora_config = LoraConfig(
         r=8, 
@@ -323,7 +330,7 @@ def train_lora_model(data, video_folder, args):
     unet = get_peft_model(unet, lora_config)
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
-    dataset = VideoDatasetMsvd(data, video_folder, target_size=(224, 224))
+    dataset = VideoDatasetMsvd(data, video_folder, tokenizer, text_encoder, clip_model, clip_processor, device, target_size=(224, 224))
     dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
     
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
@@ -345,26 +352,12 @@ def train_lora_model(data, video_folder, args):
     scaler = torch.cuda.amp.GradScaler()
 
     for epoch in range(num_epochs):
-        for i, (video_path, description, frame_tensor) in enumerate(dataloader):
+        for i, (video_path, text_features, frame_tensor) in enumerate(dataloader):
             optimizer.zero_grad()
             print(f"Iterazione numero: {conta}")
             conta += 1
 
-            print(f"description: {description}")
-
             with torch.cuda.amp.autocast():
-
-                text_features = _encode_prompt(
-                    text_encoder=text_encoder,
-                    tokenizer=tokenizer,
-                    prompt=description[0],
-                    device=device,
-                    num_images_per_prompt=1,
-                    do_classifier_free_guidance=True,
-                    negative_prompt=None,
-                    prompt_embeds=None,
-                    negative_prompt_embeds=None,
-                )
 
                 print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
@@ -444,6 +437,17 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
+    sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
+    text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder", torch_dtype=torch.float16).to(device)
+
+    # Load CLIP model and processor for image conditioning
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
     # Determina se sei su Google Colab
     on_colab = 'COLAB_GPU' in os.environ
 
@@ -458,7 +462,7 @@ if __name__ == "__main__":
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    train_lora_model(data, video_folder, OmegaConf.load(args.config))
+    train_lora_model(data, video_folder, OmegaConf.load(args.config), tokenizer, text_encoder, clip_model, clip_processor, sd_path, device)
 
     '''
     Questa parte commentata serve se devo usare il dataset msrvtt
