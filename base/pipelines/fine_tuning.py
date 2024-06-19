@@ -144,13 +144,11 @@ def _encode_prompt(
         return prompt_embeds
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, text_encoder, tokenizer, device, target_size=(224, 224), fixed_frame_count=30):
+    def __init__(self, annotations_file, video_dir, transform=None, target_size=(224, 224), fixed_frame_count=30):
         self.video_dir = video_dir
+        self.transform = transform
         self.target_size = target_size
         self.fixed_frame_count = fixed_frame_count
-        self.text_encoder = text_encoder
-        self.tokenizer = tokenizer
-        self.device = device
         
         # Legge il file annotations.txt e memorizza le descrizioni in un dizionario
         self.video_descriptions = {}
@@ -208,21 +206,13 @@ class VideoDatasetMsvd(Dataset):
         descriptions = self.video_descriptions.get(video_id, [])
 
         print(f"description of __getitem__: {descriptions}")
-
-        text_features = _encode_prompt(
-                    text_encoder=self.text_encoder,
-                    tokenizer=self.tokenizer,
-                    prompt=descriptions,
-                    device=self.device,
-                    num_images_per_prompt=1,
-                    do_classifier_free_guidance=True,
-                    negative_prompt=None,
-                    prompt_embeds=None,
-                    negative_prompt_embeds=None,
-                )
         
+        # Applica trasformazioni, se presenti
+        if self.transform:
+            video = self.transform(video)
+            mid_frame = self.transform(mid_frame)
         
-        return video, text_features, mid_frame
+        return video, descriptions, mid_frame
 
 
 
@@ -333,7 +323,7 @@ def train_lora_model(data, video_folder, args):
     unet = get_peft_model(unet, lora_config)
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
-    dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder, text_encoder=text_encoder, tokenizer=tokenizer, device=device, target_size=(224, 224))
+    dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder, target_size=(224, 224))
     dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
     
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
@@ -355,20 +345,18 @@ def train_lora_model(data, video_folder, args):
     scaler = torch.cuda.amp.GradScaler()
 
     for epoch in range(num_epochs):
-        for i, (video_path, text_features, frame_tensor) in enumerate(dataloader):
+        for i, (video_path, description, frame_tensor) in enumerate(dataloader):
             optimizer.zero_grad()
             print(f"Iterazione numero: {conta}")
             conta += 1
 
+            print(f"description: {description}")
+
             with torch.cuda.amp.autocast():
 
+                text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
+                text_features = text_encoder(text_inputs)[0].to(torch.float16)
                 print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
-                print(f"frame_tensor len: {len(frame_tensor)}")
-
-
-                #text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
-                #text_features = text_encoder(text_inputs)[0].to(torch.float16)
-                #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
                 image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
                 outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
