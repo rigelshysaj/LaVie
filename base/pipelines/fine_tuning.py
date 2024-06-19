@@ -285,6 +285,9 @@ def train_lora_model(data, video_folder, args):
                     timestep=timestep,
                     encoder_hidden_states=encoder_hidden_states
                 )
+
+                print(f"output shape: {output.shape}, dtype: {output.dtype}")
+
                 loss = combined_loss_fn(output, frame_tensor)  # Usando CombinedLoss
                 loss = loss / accumulation_steps
                 
