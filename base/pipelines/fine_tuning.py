@@ -15,6 +15,7 @@ from download import find_model
 from transformers import CLIPTokenizer, CLIPTextModel
 import torch.nn as nn
 import numpy as np
+import torchvision.models as models
 from diffusers.utils import (
     deprecate,
     is_accelerate_available,
@@ -201,6 +202,8 @@ class VideoDatasetMsvd(Dataset):
         # Ottieni le descrizioni del video
         video_id = os.path.splitext(video_file)[0]
         descriptions = self.video_descriptions.get(video_id, [])
+
+        print(f"description of __getitem__: {descriptions}")
         
         # Applica trasformazioni, se presenti
         if self.transform:
@@ -266,10 +269,36 @@ class VideoDatasetMsrvtt(Dataset):
           return None
       return frame
 
+class PerceptualLoss(nn.Module):
+    def __init__(self):
+        super(PerceptualLoss, self).__init__()
+        vgg = models.vgg19(pretrained=True).features
+        self.layers = nn.Sequential(*list(vgg.children())[:18]).eval()
+        for param in self.layers.parameters():
+            param.requires_grad = False
+
+    def forward(self, x, y):
+        x_features = self.layers(x)
+        y_features = self.layers(y)
+        return nn.functional.mse_loss(x_features, y_features)
+
+# Crea una funzione di perdita combinata
+class CombinedLoss(nn.Module):
+    def __init__(self, perceptual_weight=0.1):
+        super(CombinedLoss, self).__init__()
+        self.mse_loss = nn.MSELoss()
+        self.perceptual_loss = PerceptualLoss()
+        self.perceptual_weight = perceptual_weight
+
+    def forward(self, output, target):
+        mse_loss = self.mse_loss(output, target)
+        perceptual_loss = self.perceptual_loss(output, target)
+        combined_loss = mse_loss + self.perceptual_weight * perceptual_loss
+        return combined_loss
 
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
-
+    combined_loss_fn = CombinedLoss(perceptual_weight=0.1).to(device)
     # Carica il modello UNet e applica LoRA
     sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
@@ -383,8 +412,7 @@ def train_lora_model(data, video_folder, args):
                     timestep=timestep,
                     encoder_hidden_states=encoder_hidden_states
                 )
-                loss = torch.nn.functional.mse_loss(output.sample, torch.randn_like(output.sample))
-                # Normalize the loss
+                loss = combined_loss_fn(output, frame_tensor)  # Usando CombinedLoss
                 loss = loss / accumulation_steps
                 
             scaler.scale(loss).backward()
