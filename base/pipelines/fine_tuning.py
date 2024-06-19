@@ -166,6 +166,8 @@ class VideoDatasetMsvd(Dataset):
         # Ottieni la lista dei file video nella cartella YouTubeClips
         self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
 
+        print(f"dictionary of descriptions : {self.video_descriptions}")
+
     def __len__(self):
         return len(self.video_files)
 
