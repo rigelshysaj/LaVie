@@ -288,7 +288,8 @@ def train_lora_model(data, video_folder, args):
 
                 print(f"output shape: {output.shape}, dtype: {output.dtype}")
 
-                loss = combined_loss_fn(output, frame_tensor)  # Usando CombinedLoss
+                loss = torch.nn.functional.mse_loss(output, torch.randn_like(output))
+
                 loss = loss / accumulation_steps
                 
             scaler.scale(loss).backward()
