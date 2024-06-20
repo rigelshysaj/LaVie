@@ -231,7 +231,7 @@ def train_lora_model(data, video_folder, args):
     scaler = torch.cuda.amp.GradScaler()
 
     for epoch in range(num_epochs):
-        for i, (video_path, description, frame_tensor) in enumerate(dataloader):
+        for i, (video, description, frame_tensor) in enumerate(dataloader):
             optimizer.zero_grad()
             print(f"Iterazione numero: {conta}")
             conta += 1
