@@ -260,7 +260,7 @@ def train_lora_model(data, video_folder, args):
                 assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
 
                 # Calcola l'attenzione
-                attention_output, _ = attention_layer(last_hidden_state, text_features, text_features)
+                attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
 
                 print(f"attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}")
                 
@@ -277,8 +277,6 @@ def train_lora_model(data, video_folder, args):
                 timestep=torch.randint(0, 1000, (2,)).to(unet.device)
 
                 print(f"timestep shape: {timestep.shape}, dtype: {timestep.dtype}")
-
-                encoder_hidden_states = torch.randn((2, 6, 77, 768)).to(device)
 
                 #sample=torch.randn(2, 4, 16, 40, 64).to(unet.device, dtype=torch.float16)
                 sample=torch.randn(2, 4, 21, 32, 32).to(unet.device, dtype=torch.float16)
