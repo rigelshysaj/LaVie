@@ -237,6 +237,7 @@ def train_lora_model(data, video_folder, args):
             conta += 1
 
             print(f"description: {description}")
+            print(f"video shape: {video.shape}, dtype: {video.dtype}")
 
             with torch.cuda.amp.autocast():
 
