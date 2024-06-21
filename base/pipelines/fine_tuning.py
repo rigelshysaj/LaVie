@@ -205,15 +205,17 @@ def decode_latents(latents, vae):
     # Concatena tutte le parti decodificate
     video = torch.cat(decoded_parts, dim=0)
 
-    print(f"video requires grad1: {video.requires_grad}")
+    print(f"video requires grad 1: {video.requires_grad}")
     
     # Riorganizza le dimensioni del video
     video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
+
+    print(f"video requires grad 2: {video.requires_grad}")
     
     # Normalizza e converti a uint8
     video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8)
 
-    print(f"video requires grad2: {video.requires_grad}")
+    print(f"video requires grad 3: {video.requires_grad}")
     
     return video
 
