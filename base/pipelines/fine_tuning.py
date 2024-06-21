@@ -188,7 +188,11 @@ def decode_latents(latents, vae):
         latents_batch = latents[i:i + 1]
         print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}")
         decoded_batch = vae.decode(latents_batch).sample
-        decoded_parts.append(decoded_batch)
+        decoded_parts.append(decoded_batch.cpu())
+
+        # Liberare la memoria GPU
+        del latents_batch, decoded_batch
+        torch.cuda.empty_cache()
 
     video = torch.cat(decoded_parts, dim=0)
     video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
