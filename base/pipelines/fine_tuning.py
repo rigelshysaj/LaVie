@@ -188,13 +188,15 @@ class CombinedLoss(nn.Module):
         return combined_loss
     
 def decode_latents(latents, vae):
-        video_length = latents.shape[2]
-        latents = 1 / 0.18215 * latents
-        latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
-        video = vae.decode(latents).sample
-        video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
-        video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
-        return video
+    video_length = latents.shape[2]
+    latents = 1 / 0.18215 * latents
+    latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
+    latents = latents.to('cpu')  # Move latents to CPU
+    vae.to('cpu')  # Move VAE to CPU
+    video = vae.decode(latents).sample
+    video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
+    video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).contiguous()
+    return video.to('cuda')
 
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
