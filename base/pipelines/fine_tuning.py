@@ -259,6 +259,9 @@ def train_lora_model(data, video_folder, args):
     unet.enable_xformers_memory_efficient_attention()
     unet.enable_gradient_checkpointing()
     text_encoder.eval()
+    vae.eval()
+    for param in vae.parameters():
+        param.requires_grad = True
     
     conta = 1
 
@@ -272,7 +275,7 @@ def train_lora_model(data, video_folder, args):
 
     for epoch in range(num_epochs):
         for i, (video, description, frame_tensor) in enumerate(dataloader):
-            
+
             video = video.to(device)
             optimizer.zero_grad()
             print(f"Iterazione numero: {conta}")
