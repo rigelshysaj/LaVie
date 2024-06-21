@@ -173,35 +173,7 @@ class PerceptualLoss(nn.Module):
         x_features = self.layers(x)
         y_features = self.layers(y)
         return nn.functional.mse_loss(x_features, y_features)
-
-
-def decode_latents(latents, vae):
-    video_length = latents.shape[2]
-    latents = 1 / 0.18215 * latents
-    latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
-    
-    decoded_parts = []
-    batch_size = 1
-
-    print(f"latents shape: {latents.shape}, dtype: {latents.dtype}")
-
-    print(f"latents requires grad: {latents.requires_grad}")
-    for i in range(0, latents.shape[0], batch_size):
-        latents_batch = latents[i:i+batch_size]
-        print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}")
-        print(f"latents_batch requires grad: {latents_batch.requires_grad}")
-        # Usa vae.decode direttamente senza checkpoint
-        decoded_batch = vae.decode(latents_batch).sample
-        print(f"decoded_batch requires grad: {decoded_batch.requires_grad}")
-        
-        decoded_parts.append(decoded_batch)
-    
-    video = torch.cat(decoded_parts, dim=0)
-    video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
-    video = (video / 2 + 0.5).clamp(0, 1)
-    
-    return video
-
+'''
 def decode_latents(latents, vae):
     video_length = latents.shape[2]
     latents = 1 / 0.18215 * latents
@@ -248,6 +220,8 @@ def decode_latents(latents, vae):
     video_length = latents.shape[2]
     latents = 1 / 0.18215 * latents
     latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
+
+    print(f"latents requires grad: {latents.requires_grad}")
     
     # Utilizzare torch.no_grad() per risparmiare memoria
     with torch.no_grad():
@@ -255,9 +229,10 @@ def decode_latents(latents, vae):
 
     video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
     video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
+    print(f"video requires grad: {video.requires_grad}")
     return video
 
-'''
+
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     # Carica il modello UNet e applica LoRA
