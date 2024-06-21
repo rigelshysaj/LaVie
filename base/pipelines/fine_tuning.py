@@ -181,6 +181,8 @@ def decode_latents(latents, vae):
     
     # Decodifica in batch più piccoli
     decoded_parts = []
+
+    print(f"latents shape: {latents.shape}, dtype: {latents.dtype}")
     
     for i in range(0, latents.shape[0], 1):
         latents_batch = latents[i:i + 1]
