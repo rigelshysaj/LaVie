@@ -32,7 +32,7 @@ logger = logging.get_logger(__name__)
 
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None, target_size=(224, 224), fixed_frame_count=10):
+    def __init__(self, annotations_file, video_dir, transform=None, target_size=(112, 112), fixed_frame_count=10):
         self.video_dir = video_dir
         self.transform = transform
         self.target_size = target_size
@@ -187,7 +187,7 @@ class CombinedLoss(nn.Module):
         combined_loss = mse_loss + self.perceptual_weight * perceptual_loss
         return combined_loss
     
-def decode_latents(latents, vae, batch_size=2):
+def decode_latents(latents, vae, batch_size=4):
     video_length = latents.shape[2]
     latents = 1 / 0.18215 * latents
     latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
