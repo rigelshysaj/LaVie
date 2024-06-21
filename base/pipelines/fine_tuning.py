@@ -182,7 +182,7 @@ def decode_latents(latents, vae):
     
     decoded_parts = []
     batch_size = 1
-    
+
     def decode_batch(batch):
         with torch.cuda.amp.autocast():
             return vae.decode(batch).sample
@@ -272,6 +272,8 @@ def train_lora_model(data, video_folder, args):
 
     for epoch in range(num_epochs):
         for i, (video, description, frame_tensor) in enumerate(dataloader):
+            
+            video = video.to(device)
             optimizer.zero_grad()
             print(f"Iterazione numero: {conta}")
             conta += 1
@@ -330,7 +332,7 @@ def train_lora_model(data, video_folder, args):
 
                 output = decode_latents(output, vae)
 
-                output = output.to(torch.float32) 
+                output = output.to(video.dtype) 
 
                 # Riorganizza le dimensioni per combaciare con video
                 output = output.permute(0, 4, 1, 2, 3)
