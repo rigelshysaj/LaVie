@@ -174,29 +174,37 @@ class PerceptualLoss(nn.Module):
         return nn.functional.mse_loss(x_features, y_features)
 
 
-def decode_latents(latents, vae):
+def decode_latents(latents, vae, sub_batch_size=1):
     video_length = latents.shape[2]
     latents = 1 / 0.18215 * latents
     latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
     
-    # Decodifica in batch più piccoli
     decoded_parts = []
 
     print(f"latents shape: {latents.shape}, dtype: {latents.dtype}")
     
-    for i in range(0, latents.shape[0], 1):
-        latents_batch = latents[i:i + 1]
-        print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}")
-        decoded_batch = vae.decode(latents_batch).sample
-        decoded_parts.append(decoded_batch.cpu())
-
+    for i in range(0, latents.shape[0], sub_batch_size):
+        latents_sub_batch = latents[i:i + sub_batch_size].to('cuda', non_blocking=True)  # Trasferimento asincrono su GPU
+        print(f"latents_sub_batch shape: {latents_sub_batch.shape}, dtype: {latents_sub_batch.dtype}")
+        
+        decoded_sub_batch = vae.decode(latents_sub_batch).sample
+        
+        # Spostare il risultato sulla CPU in modo asincrono
+        decoded_parts.append(decoded_sub_batch.cpu().detach())
+        
         # Liberare la memoria GPU
-        del latents_batch, decoded_batch
+        del latents_sub_batch, decoded_sub_batch
         torch.cuda.empty_cache()
-
+    
+    # Concatenare tutte le parti decodificate
     video = torch.cat(decoded_parts, dim=0)
+    
+    # Riorganizzare le dimensioni del video
     video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
-    video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
+    
+    # Normalizzare e convertire a uint8
+    video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).contiguous()
+    
     return video
 
 '''
