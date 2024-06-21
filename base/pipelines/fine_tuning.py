@@ -173,7 +173,7 @@ class PerceptualLoss(nn.Module):
         x_features = self.layers(x)
         y_features = self.layers(y)
         return nn.functional.mse_loss(x_features, y_features)
-'''
+
 def decode_latents(latents, vae):
     video_length = latents.shape[2]
     latents = 1 / 0.18215 * latents
@@ -205,13 +205,15 @@ def decode_latents(latents, vae):
     # Concatena tutte le parti decodificate
     video = torch.cat(decoded_parts, dim=0)
 
-    print(f"video requires grad: {video.requires_grad}")
+    print(f"video requires grad1: {video.requires_grad}")
     
     # Riorganizza le dimensioni del video
     video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
     
     # Normalizza e converti a uint8
     video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8)
+
+    print(f"video requires grad2: {video.requires_grad}")
     
     return video
 
@@ -231,7 +233,7 @@ def decode_latents(latents, vae):
     video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
     print(f"video requires grad: {video.requires_grad}")
     return video
-
+'''
 
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
