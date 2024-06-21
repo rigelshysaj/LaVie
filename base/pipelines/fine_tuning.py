@@ -224,7 +224,7 @@ def train_lora_model(data, video_folder, args):
 
     
     attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
-    #projection_layer = nn.Linear(768, 256).to(unet.device)
+    projection_layer = nn.Linear(64, 224).to(unet.device)
 
     accumulation_steps = 4
 
@@ -278,7 +278,7 @@ def train_lora_model(data, video_folder, args):
 
                 print(f"timestep shape: {timestep.shape}, dtype: {timestep.dtype}")
 
-                sample=torch.randn(2, 4, 16, 40, 224).to(unet.device, dtype=torch.float16)
+                sample=torch.randn(2, 4, 16, 40, 64).to(unet.device, dtype=torch.float16)
                 #sample=torch.randn(2, 4, 21, 32, 32).to(unet.device, dtype=torch.float16)
 
                 # Forward pass
@@ -287,6 +287,8 @@ def train_lora_model(data, video_folder, args):
                     timestep=timestep,
                     encoder_hidden_states=encoder_hidden_states
                 ).sample
+
+                output = projection_layer(output)
 
                 print(f"output shape: {output.shape}, dtype: {output.dtype}")
 
