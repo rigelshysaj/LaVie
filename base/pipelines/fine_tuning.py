@@ -290,7 +290,7 @@ def train_lora_model(data, video_folder, args):
 
                 print(f"output shape: {output.shape}, dtype: {output.dtype}")
 
-                loss = torch.nn.functional.mse_loss(output, torch.randn_like(output))
+                loss = torch.nn.functional.mse_loss(output, video)
 
                 loss = loss / accumulation_steps
                 
