@@ -302,7 +302,7 @@ def train_lora_model(data, video_folder, args):
 
                 print(f"timestep shape: {timestep.shape}, dtype: {timestep.dtype}")
 
-                sample = torch.randn(1, 4, 16, 40, 64).to(unet.device, dtype=torch.float16, requires_grad=True)
+                sample=torch.randn(1, 4, 16, 40, 64).to(unet.device, dtype=torch.float16)
                 #sample=torch.randn(2, 4, 21, 32, 32).to(unet.device, dtype=torch.float16)
 
                 # Forward pass
@@ -314,7 +314,7 @@ def train_lora_model(data, video_folder, args):
 
                 output = decode_latents(output, vae)
 
-                output = output.to(torch.float32)
+                output = output.to(torch.float32).requires_grad_()
 
                 # Riorganizza le dimensioni per combaciare con video
                 output = output.permute(0, 4, 1, 2, 3)
