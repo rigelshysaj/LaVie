@@ -225,6 +225,7 @@ def train_lora_model(data, video_folder, args):
     
     attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
     projection_layer = nn.Linear(64, 224).to(unet.device)
+    projection_layer2 = nn.Linear(40, 224).to(unet.device)
 
     accumulation_steps = 4
 
@@ -289,6 +290,7 @@ def train_lora_model(data, video_folder, args):
                 ).sample
 
                 output = projection_layer(output)
+                output = projection_layer2(output)
 
                 print(f"output shape: {output.shape}, dtype: {output.dtype}")
 
