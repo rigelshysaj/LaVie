@@ -189,7 +189,8 @@ def decode_latents(latents, vae):
         print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}")
         decoded_batch = vae.decode(latents_batch).sample
         decoded_parts.append(decoded_batch)
-        del latents_batch
+
+        del latents_batch, decoded_batch
         torch.cuda.empty_cache()
 
     video = torch.cat(decoded_parts, dim=0)
