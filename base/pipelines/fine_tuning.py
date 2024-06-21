@@ -189,10 +189,10 @@ def decode_latents(latents, vae):
     for i in range(0, latents.shape[0], batch_size):
         latents_batch = latents[i:i+batch_size]
         print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}")
-        
+        print(f"latents_batch requires grad: {latents_batch.requires_grad}")
         # Usa vae.decode direttamente senza checkpoint
         decoded_batch = vae.decode(latents_batch).sample
-        print(f"latents requires grad: {latents.requires_grad}")
+        print(f"decoded_batch requires grad: {decoded_batch.requires_grad}")
         
         decoded_parts.append(decoded_batch)
     
