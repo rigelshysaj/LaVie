@@ -16,6 +16,7 @@ from transformers import CLIPTokenizer, CLIPTextModel
 import torch.nn as nn
 import numpy as np
 import torchvision.models as models
+import torch.nn.functional as F
 from diffusers.utils import (
     deprecate,
     is_accelerate_available,
@@ -224,8 +225,7 @@ def train_lora_model(data, video_folder, args):
 
     
     attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
-    projection_layer = nn.Linear(64, 224).to(unet.device)
-    projection_layer2 = nn.Linear(40, 224).to(unet.device)
+    #projection_layer = nn.Linear(64, 224).to(unet.device)
 
     accumulation_steps = 4
 
@@ -289,8 +289,8 @@ def train_lora_model(data, video_folder, args):
                     encoder_hidden_states=encoder_hidden_states
                 ).sample
 
-                output = projection_layer(output)
-                output = projection_layer2(output)
+                new_shape = (224, 224)
+                output = F.interpolate(output, size=new_shape, mode='bilinear', align_corners=False)
 
                 print(f"output shape: {output.shape}, dtype: {output.dtype}")
 
