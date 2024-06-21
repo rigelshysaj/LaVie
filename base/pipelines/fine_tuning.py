@@ -223,7 +223,7 @@ def train_lora_model(data, video_folder, args):
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder, target_size=(224, 224))
-    dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
     
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
     num_epochs = 3
@@ -239,7 +239,7 @@ def train_lora_model(data, video_folder, args):
     attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
     #projection_layer = nn.Linear(64, 224).to(unet.device)
 
-    accumulation_steps = 4
+    accumulation_steps = 8
 
     scaler = torch.cuda.amp.GradScaler()
 
@@ -287,11 +287,11 @@ def train_lora_model(data, video_folder, args):
 
                 print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
 
-                timestep=torch.randint(0, 1000, (2,)).to(unet.device)
+                timestep=torch.randint(0, 1000, (1,)).to(unet.device)
 
                 print(f"timestep shape: {timestep.shape}, dtype: {timestep.dtype}")
 
-                sample=torch.randn(2, 4, 16, 40, 64).to(unet.device, dtype=torch.float16)
+                sample=torch.randn(1, 4, 16, 40, 64).to(unet.device, dtype=torch.float16)
                 #sample=torch.randn(2, 4, 21, 32, 32).to(unet.device, dtype=torch.float16)
 
                 # Forward pass
