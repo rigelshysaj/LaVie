@@ -193,7 +193,7 @@ def decode_latents(latents, vae):
     latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
     
     # Decodifica in batch più piccoli
-    batch_size = 4  # Scegli un batch size più piccolo
+    batch_size = 2  # Scegli un batch size più piccolo
     decoded_parts = []
     
     for i in range(0, latents.shape[0], batch_size):
