@@ -17,6 +17,7 @@ import torch.nn as nn
 import numpy as np
 import torchvision.models as models
 import torch.nn.functional as F
+import einops
 from diffusers.utils import (
     deprecate,
     is_accelerate_available,
@@ -184,6 +185,15 @@ class CombinedLoss(nn.Module):
         perceptual_loss = self.perceptual_loss(output, target)
         combined_loss = mse_loss + self.perceptual_weight * perceptual_loss
         return combined_loss
+    
+def decode_latents(self, latents):
+        video_length = latents.shape[2]
+        latents = 1 / 0.18215 * latents
+        latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
+        video = self.vae.decode(latents).sample
+        video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
+        video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
+        return video
 
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -289,8 +299,7 @@ def train_lora_model(data, video_folder, args):
                     encoder_hidden_states=encoder_hidden_states
                 ).sample
 
-                new_shape = (224, 224)
-                output = F.interpolate(output, size=new_shape, mode='bilinear', align_corners=False)
+                output = decode_latents(output)
 
                 print(f"output shape: {output.shape}, dtype: {output.dtype}")
 
