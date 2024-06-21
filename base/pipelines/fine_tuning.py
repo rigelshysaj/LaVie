@@ -187,18 +187,14 @@ class CombinedLoss(nn.Module):
         combined_loss = mse_loss + self.perceptual_weight * perceptual_loss
         return combined_loss
     
-def decode_latents(latents, vae, batch_size=1):  
-    video_length = latents.shape[2]
-    latents = 1 / 0.18215 * latents
-    latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
-    all_videos = []
-    for i in range(0, len(latents), batch_size):
-        latents_batch = latents[i:i+batch_size]
-        video = vae.decode(latents_batch).sample
+def decode_latents(latents, vae):
+        video_length = latents.shape[2]
+        latents = 1 / 0.18215 * latents
+        latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
+        video = vae.decode(latents).sample
         video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
-        video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).contiguous()
-        all_videos.append(video)
-    return torch.cat(all_videos, dim=0)
+        video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
+        return video
 
 
 def train_lora_model(data, video_folder, args):
