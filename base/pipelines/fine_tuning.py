@@ -327,7 +327,7 @@ def train_lora_model(data, video_folder, args):
                 output = output.permute(0, 4, 1, 2, 3)
 
                 print(f"output shape: {output.shape}, dtype: {output.dtype}")
-
+                print(f"video shape: {video.shape}, dtype: {video.dtype}")
                 print(f"UNet requires grad: {any(p.requires_grad for p in unet.parameters())}")
                 print(f"VAE requires grad: {any(p.requires_grad for p in vae.parameters())}")
                 print(f"Output requires grad: {output.requires_grad}")
