@@ -202,6 +202,47 @@ def decode_latents(latents, vae):
     
     return video
 
+def decode_latents(latents, vae):
+    video_length = latents.shape[2]
+    latents = 1 / 0.18215 * latents
+    latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
+    
+    decoded_parts = []
+    batch_size = 1  # Puoi aumentare questo valore se la tua GPU lo consente
+
+    def decode_batch(batch):
+        with torch.cuda.amp.autocast():
+            return vae.decode(batch).sample
+
+    print(f"latents requires grad: {latents.requires_grad}")
+    for i in range(0, latents.shape[0], batch_size):
+        latents_batch = latents[i:i+batch_size]
+
+        print(f"latents_batch requires grad: {latents_batch.requires_grad}")
+        
+        # Usa checkpoint per risparmiare memoria
+        decoded_batch = checkpoint(decode_batch, latents_batch)
+        
+        print(f"decoded_batch requires grad: {decoded_batch.requires_grad}")
+
+        decoded_parts.append(decoded_batch)
+        
+        # Libera un po' di memoria
+        torch.cuda.empty_cache()
+    
+    # Concatena tutte le parti decodificate
+    video = torch.cat(decoded_parts, dim=0)
+
+    print(f"video requires grad: {video.requires_grad}")
+    
+    # Riorganizza le dimensioni del video
+    video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
+    
+    # Normalizza e converti a uint8
+    video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8)
+    
+    return video
+
 '''
 def decode_latents(latents, vae):
     video_length = latents.shape[2]
