@@ -174,7 +174,7 @@ class PerceptualLoss(nn.Module):
         y_features = self.layers(y)
         return nn.functional.mse_loss(x_features, y_features)
 
-'''
+
 def decode_latents(latents, vae):
     video_length = latents.shape[2]
     latents = 1 / 0.18215 * latents
@@ -183,11 +183,16 @@ def decode_latents(latents, vae):
     decoded_parts = []
     batch_size = 1
 
+    print(f"latents shape: {latents.shape}, dtype: {latents.dtype}")
+
+    print(f"latents requires grad: {latents.requires_grad}")
     for i in range(0, latents.shape[0], batch_size):
         latents_batch = latents[i:i+batch_size]
+        print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}")
         
         # Usa vae.decode direttamente senza checkpoint
         decoded_batch = vae.decode(latents_batch).sample
+        print(f"latents requires grad: {latents.requires_grad}")
         
         decoded_parts.append(decoded_batch)
     
@@ -211,7 +216,7 @@ def decode_latents(latents, vae):
     video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
     return video
 
-
+'''
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     # Carica il modello UNet e applica LoRA
