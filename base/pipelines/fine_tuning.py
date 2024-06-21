@@ -173,14 +173,14 @@ class PerceptualLoss(nn.Module):
         y_features = self.layers(y)
         return nn.functional.mse_loss(x_features, y_features)
 
-
+'''
 def decode_latents(latents, vae):
     video_length = latents.shape[2]
     latents = 1 / 0.18215 * latents
     latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
     
     # Decodifica in batch più piccoli
-    batch_size = 1  # Scegli un batch size più piccolo
+    batch_size = 4  # Scegli un batch size più piccolo
     decoded_parts = []
     
     for i in range(0, latents.shape[0], batch_size):
@@ -194,6 +194,7 @@ def decode_latents(latents, vae):
     return video
 
 '''
+
 def decode_latents(latents, vae):
     video_length = latents.shape[2]
     latents = 1 / 0.18215 * latents
@@ -206,7 +207,6 @@ def decode_latents(latents, vae):
     video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
     video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
     return video
-'''
 
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -314,7 +314,7 @@ def train_lora_model(data, video_folder, args):
 
                 output = decode_latents(output, vae)
 
-                output = output.to(torch.float32)
+                output = output.to(torch.float32).requires_grad_()
 
                 # Riorganizza le dimensioni per combaciare con video
                 output = output.permute(0, 4, 1, 2, 3)
@@ -326,6 +326,13 @@ def train_lora_model(data, video_folder, args):
                 loss = loss / accumulation_steps
                 
             scaler.scale(loss).backward()
+
+            # Debug dei gradienti
+            for name, param in unet.named_parameters():
+                if param.grad is not None:
+                    print(f"Gradient for {name}: {param.grad.norm()}")
+                else:
+                    print(f"No gradient for {name}")
 
             if (i + 1) % accumulation_steps == 0:
                 try:
