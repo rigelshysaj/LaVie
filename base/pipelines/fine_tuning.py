@@ -187,7 +187,7 @@ class CombinedLoss(nn.Module):
         combined_loss = mse_loss + self.perceptual_weight * perceptual_loss
         return combined_loss
     
-def decode_latents(latents, vae, batch_size=4):
+def decode_latents(latents, vae, batch_size=19):
     video_length = latents.shape[2]
     latents = 1 / 0.18215 * latents
     latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
