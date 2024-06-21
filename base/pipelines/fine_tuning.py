@@ -173,57 +173,7 @@ class PerceptualLoss(nn.Module):
         x_features = self.layers(x)
         y_features = self.layers(y)
         return nn.functional.mse_loss(x_features, y_features)
-
-def decode_latents(latents, vae):
-    video_length = latents.shape[2]
-    latents = 1 / 0.18215 * latents
-    latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
     
-    decoded_parts = []
-    batch_size = 1  # Puoi aumentare questo valore se la tua GPU lo consente
-
-    def decode_batch(batch):
-        with torch.cuda.amp.autocast():
-            return vae.decode(batch).sample
-
-    print(f"latents requires grad: {latents.requires_grad}")
-    for i in range(0, latents.shape[0], batch_size):
-        latents_batch = latents[i:i+batch_size]
-
-        print(f"latents_batch requires grad: {latents_batch.requires_grad}")
-        
-        # Usa checkpoint per risparmiare memoria
-        decoded_batch = checkpoint(decode_batch, latents_batch)
-        
-        print(f"decoded_batch requires grad: {decoded_batch.requires_grad}")
-
-        decoded_parts.append(decoded_batch)
-        
-        # Libera un po' di memoria
-        torch.cuda.empty_cache()
-    
-    # Concatena tutte le parti decodificate
-    video = torch.cat(decoded_parts, dim=0)
-
-    print(f"video requires grad 1: {video.requires_grad}")
-    
-    # Riorganizza le dimensioni del video
-    video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
-
-    print(f"video requires grad 2: {video.requires_grad}")
-    
-    # Normalizza e converti a uint8 senza perdere il tracciamento dei gradienti
-    video = (video / 2 + 0.5) * 255
-    video = video.add(0.5).clamp(0, 255)
-    
-    # Non possiamo convertire direttamente a uint8 mantenendo requires_grad,
-    # quindi useremo un tipo a precisione maggiore e convertiremo solo per la visualizzazione finale
-    video = video.to(dtype=torch.float32)
-
-    print(f"video requires grad 3: {video.requires_grad}")
-    
-    return video
-
 '''
 def decode_latents(latents, vae):
     video_length = latents.shape[2]
@@ -241,6 +191,41 @@ def decode_latents(latents, vae):
     print(f"video requires grad: {video.requires_grad}")
     return video
 '''
+
+def decode_latents(latents, vae):
+    video_length = latents.shape[2]
+    latents = 1 / 0.18215 * latents
+    latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
+    
+    decoded_parts = []
+    batch_size = 1  # Puoi aumentare questo valore se la tua GPU lo consente
+
+    def decode_batch(batch):
+        with torch.cuda.amp.autocast():
+            return vae.decode(batch).sample
+
+    print(f"latents requires grad: {latents.requires_grad}")
+    for i in range(0, latents.shape[0], batch_size):
+        latents_batch = latents[i:i+batch_size]
+
+        # Usa checkpoint per risparmiare memoria
+        decoded_batch = checkpoint(decode_batch, latents_batch)
+        decoded_parts.append(decoded_batch)
+        # Libera un po' di memoria
+        torch.cuda.empty_cache()
+    
+    # Concatena tutte le parti decodificate
+    video = torch.cat(decoded_parts, dim=0)
+    
+    # Riorganizza le dimensioni del video
+    video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
+    
+    # Normalizza e converti a uint8 senza perdere il tracciamento dei gradienti
+    #video = (video / 2 + 0.5) * 255
+    #video = video.add(0.5).clamp(0, 255)
+    
+    return video
+
 
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -297,7 +282,6 @@ def train_lora_model(data, video_folder, args):
             print(f"Iterazione numero: {conta}")
             conta += 1
 
-            print(f"description: {description}")
             print(f"video shape: {video.shape}, dtype: {video.dtype}")
 
             with torch.cuda.amp.autocast():
@@ -330,7 +314,6 @@ def train_lora_model(data, video_folder, args):
 
                 print(f"attention_output_transpose shape: {attention_output.shape}, dtype: {attention_output.dtype}")
 
-                #attention_output = projection_layer(attention_output).to(torch.float16)
                 encoder_hidden_states = attention_output
 
                 print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
@@ -340,7 +323,6 @@ def train_lora_model(data, video_folder, args):
                 print(f"timestep shape: {timestep.shape}, dtype: {timestep.dtype}")
 
                 sample=torch.randn(1, 4, 16, 40, 64).to(unet.device, dtype=torch.float16)
-                #sample=torch.randn(2, 4, 21, 32, 32).to(unet.device, dtype=torch.float16)
 
                 # Forward pass
                 output = unet(
