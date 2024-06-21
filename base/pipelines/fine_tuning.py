@@ -184,6 +184,7 @@ def decode_latents(latents, vae):
     
     for i in range(0, latents.shape[0], 1):
         latents_batch = latents[i:i + 1]
+        print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}")
         decoded_batch = vae.decode(latents_batch).sample
         decoded_parts.append(decoded_batch)
 
@@ -325,13 +326,6 @@ def train_lora_model(data, video_folder, args):
                 loss = loss / accumulation_steps
                 
             scaler.scale(loss).backward()
-
-            # Debug dei gradienti
-            for name, param in unet.named_parameters():
-                if param.grad is not None:
-                    print(f"Gradient for {name}: {param.grad.norm()}")
-                else:
-                    print(f"No gradient for {name}")
 
             if (i + 1) % accumulation_steps == 0:
                 try:
