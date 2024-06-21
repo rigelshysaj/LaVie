@@ -342,6 +342,10 @@ def train_lora_model(data, video_folder, args):
 
                 print(f"output shape: {output.shape}, dtype: {output.dtype}")
 
+                print(f"UNet requires grad: {any(p.requires_grad for p in unet.parameters())}")
+                print(f"VAE requires grad: {any(p.requires_grad for p in vae.parameters())}")
+                print(f"Output requires grad: {output.requires_grad}")
+
                 loss = torch.nn.functional.mse_loss(output, video)
 
                 loss = loss / accumulation_steps
