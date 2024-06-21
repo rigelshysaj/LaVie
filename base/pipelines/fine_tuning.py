@@ -185,12 +185,12 @@ def decode_latents(latents, vae, sub_batch_size=1):
     
     for i in range(0, latents.shape[0], sub_batch_size):
         latents_sub_batch = latents[i:i + sub_batch_size].to('cuda', non_blocking=True)  # Trasferimento asincrono su GPU
-        print(f"latents_sub_batch shape: {latents_sub_batch.shape}, dtype: {latents_sub_batch.dtype}")
+        #print(f"latents_sub_batch shape: {latents_sub_batch.shape}, dtype: {latents_sub_batch.dtype}")
         
         decoded_sub_batch = vae.decode(latents_sub_batch).sample
         
         # Spostare il risultato sulla CPU in modo asincrono
-        decoded_parts.append(decoded_sub_batch.cpu().detach())
+        decoded_parts.append(decoded_sub_batch.cpu())
         
         # Liberare la memoria GPU
         del latents_sub_batch, decoded_sub_batch
@@ -328,7 +328,7 @@ def train_lora_model(data, video_folder, args):
 
                 output = decode_latents(output, vae)
 
-                output = output.to(torch.float32).requires_grad_(True) 
+                output = output.to(torch.float32) 
 
                 # Riorganizza le dimensioni per combaciare con video
                 output = output.permute(0, 4, 1, 2, 3)
