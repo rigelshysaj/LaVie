@@ -174,22 +174,21 @@ class PerceptualLoss(nn.Module):
         return nn.functional.mse_loss(x_features, y_features)
 
 
-def decode_latents(latents, vae):
+def decode_latents(latents, vae, batch_size=1):
     video_length = latents.shape[2]
     latents = 1 / 0.18215 * latents
     latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
     
     # Decodifica in batch più piccoli
     decoded_parts = []
-
-    print(f"latents shape: {latents.shape}, dtype: {latents.dtype}")
     
-    for i in range(0, latents.shape[0], 1):
-        latents_batch = latents[i:i + 1]
-        print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}")
-        decoded_batch = vae.decode(latents_batch).sample
+    for i in range(0, latents.shape[0], batch_size):
+        latents_batch = latents[i:i + batch_size]
+        with torch.no_grad():
+            decoded_batch = vae.decode(latents_batch).sample
         decoded_parts.append(decoded_batch)
-
+        
+        # Libera la memoria dopo ogni batch
         del latents_batch, decoded_batch
         torch.cuda.empty_cache()
 
@@ -317,7 +316,7 @@ def train_lora_model(data, video_folder, args):
                     encoder_hidden_states=encoder_hidden_states
                 ).sample
 
-                output = decode_latents(output, vae)
+                output = decode_latents(output, vae, batch_size=1)
 
                 output = output.to(torch.float32)
 
@@ -332,6 +331,12 @@ def train_lora_model(data, video_folder, args):
                 
             scaler.scale(loss).backward()
 
+            for name, param in unet.named_parameters():
+                if param.grad is not None:
+                    print(f"Gradient for {name}: {param.grad.norm()}")
+                else:
+                    print(f"No gradient for {name}")
+
             if (i + 1) % accumulation_steps == 0:
                 try:
                     scaler.step(optimizer)
@@ -343,6 +348,7 @@ def train_lora_model(data, video_folder, args):
 
             del text_features, image_inputs, last_hidden_state, attention_output, encoder_hidden_states
             torch.cuda.empty_cache()
+            torch.cuda.synchronize()
 
             print(f"Epoch {epoch + 1}/{num_epochs} completed with loss: {loss.item()}")
     
