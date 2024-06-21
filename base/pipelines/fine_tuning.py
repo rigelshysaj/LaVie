@@ -328,7 +328,7 @@ def train_lora_model(data, video_folder, args):
 
                 output = decode_latents(output, vae)
 
-                output = output.to(torch.float32)
+                output = output.to(torch.float32).requires_grad_(True) 
 
                 # Riorganizza le dimensioni per combaciare con video
                 output = output.permute(0, 4, 1, 2, 3)
