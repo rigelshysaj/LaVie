@@ -19,6 +19,7 @@ import torchvision.models as models
 import torch.nn.functional as F
 import einops
 from diffusers.models import AutoencoderKL
+from torch.utils.checkpoint import checkpoint
 from diffusers.utils import (
     deprecate,
     is_accelerate_available,
@@ -174,36 +175,37 @@ class PerceptualLoss(nn.Module):
         return nn.functional.mse_loss(x_features, y_features)
 
 
-def decode_latents(latents, vae, sub_batch_size=1):
+def decode_latents(latents, vae):
     video_length = latents.shape[2]
     latents = 1 / 0.18215 * latents
     latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
     
     decoded_parts = []
-
-    print(f"latents shape: {latents.shape}, dtype: {latents.dtype}")
+    batch_size = 1
     
-    for i in range(0, latents.shape[0], sub_batch_size):
-        latents_sub_batch = latents[i:i + sub_batch_size].to('cuda', non_blocking=True)  # Trasferimento asincrono su GPU
-        #print(f"latents_sub_batch shape: {latents_sub_batch.shape}, dtype: {latents_sub_batch.dtype}")
+    def decode_batch(batch):
+        with torch.cuda.amp.autocast():
+            return vae.decode(batch).sample
+
+    for i in range(0, latents.shape[0], batch_size):
+        latents_batch = latents[i:i+batch_size]
         
-        decoded_sub_batch = vae.decode(latents_sub_batch).sample
+        # Usa checkpoint per risparmiare memoria
+        decoded_batch = checkpoint(decode_batch, latents_batch)
         
-        # Spostare il risultato sulla CPU in modo asincrono
-        decoded_parts.append(decoded_sub_batch.cpu())
+        decoded_parts.append(decoded_batch)
         
-        # Liberare la memoria GPU
-        del latents_sub_batch, decoded_sub_batch
+        # Libera un po' di memoria
         torch.cuda.empty_cache()
     
-    # Concatenare tutte le parti decodificate
+    # Concatena tutte le parti decodificate
     video = torch.cat(decoded_parts, dim=0)
     
-    # Riorganizzare le dimensioni del video
+    # Riorganizza le dimensioni del video
     video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
     
-    # Normalizzare e convertire a uint8
-    video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).contiguous()
+    # Normalizza e converti a uint8
+    video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8)
     
     return video
 
