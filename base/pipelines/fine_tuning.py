@@ -212,8 +212,13 @@ def decode_latents(latents, vae):
 
     print(f"video requires grad 2: {video.requires_grad}")
     
-    # Normalizza e converti a uint8
-    video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8)
+    # Normalizza e converti a uint8 senza perdere il tracciamento dei gradienti
+    video = (video / 2 + 0.5) * 255
+    video = video.add(0.5).clamp(0, 255)
+    
+    # Non possiamo convertire direttamente a uint8 mantenendo requires_grad,
+    # quindi useremo un tipo a precisione maggiore e convertiremo solo per la visualizzazione finale
+    video = video.to(dtype=torch.float32)
 
     print(f"video requires grad 3: {video.requires_grad}")
     
