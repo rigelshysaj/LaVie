@@ -192,8 +192,22 @@ def decode_latents(latents, vae):
     latents = 1 / 0.18215 * latents
     latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
     
+    # Utilizzare torch.no_grad() per risparmiare memoria
+    with torch.no_grad():
+        video = vae.decode(latents).sample
+
+    video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
+    video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
+    return video
+
+'''
+def decode_latents(latents, vae):
+    video_length = latents.shape[2]
+    latents = 1 / 0.18215 * latents
+    latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
+    
     # Decodifica in batch più piccoli
-    batch_size = 2  # Scegli un batch size più piccolo
+    batch_size = 4  # Scegli un batch size più piccolo
     decoded_parts = []
     
     for i in range(0, latents.shape[0], batch_size):
@@ -206,7 +220,7 @@ def decode_latents(latents, vae):
     video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
     return video
 
-
+'''
 
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
