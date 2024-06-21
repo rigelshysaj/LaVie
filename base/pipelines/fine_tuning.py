@@ -32,7 +32,7 @@ logger = logging.get_logger(__name__)
 
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None, target_size=(224, 224), fixed_frame_count=10):
+    def __init__(self, annotations_file, video_dir, transform=None, target_size=(320, 512), fixed_frame_count=16):
         self.video_dir = video_dir
         self.transform = transform
         self.target_size = target_size
@@ -173,20 +173,7 @@ class PerceptualLoss(nn.Module):
         y_features = self.layers(y)
         return nn.functional.mse_loss(x_features, y_features)
 
-# Crea una funzione di perdita combinata
-class CombinedLoss(nn.Module):
-    def __init__(self, perceptual_weight=0.1):
-        super(CombinedLoss, self).__init__()
-        self.mse_loss = nn.MSELoss()
-        self.perceptual_loss = PerceptualLoss()
-        self.perceptual_weight = perceptual_weight
 
-    def forward(self, output, target):
-        mse_loss = self.mse_loss(output, target)
-        perceptual_loss = self.perceptual_loss(output, target)
-        combined_loss = mse_loss + self.perceptual_weight * perceptual_loss
-        return combined_loss
-    
 def decode_latents(latents, vae):
     video_length = latents.shape[2]
     latents = 1 / 0.18215 * latents
@@ -224,7 +211,6 @@ def decode_latents(latents, vae):
 
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    combined_loss_fn = CombinedLoss(perceptual_weight=0.1).to(device)
     # Carica il modello UNet e applica LoRA
     sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
