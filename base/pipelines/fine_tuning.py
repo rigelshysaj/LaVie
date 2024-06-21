@@ -32,7 +32,7 @@ logger = logging.get_logger(__name__)
 
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None, target_size=(112, 112), fixed_frame_count=10):
+    def __init__(self, annotations_file, video_dir, transform=None, target_size=(224, 224), fixed_frame_count=10):
         self.video_dir = video_dir
         self.transform = transform
         self.target_size = target_size
@@ -187,12 +187,10 @@ class CombinedLoss(nn.Module):
         combined_loss = mse_loss + self.perceptual_weight * perceptual_loss
         return combined_loss
     
-def decode_latents(latents, vae, batch_size=4):
+def decode_latents(latents, vae, batch_size=2):  # Ridotto da 4 a 2
     video_length = latents.shape[2]
     latents = 1 / 0.18215 * latents
     latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
-    #latents = latents.to('cpu')  # Move latents to CPU
-    #vae.to('cpu')  # Move VAE to CPU
     all_videos = []
     for i in range(0, len(latents), batch_size):
         latents_batch = latents[i:i+batch_size]
@@ -201,6 +199,7 @@ def decode_latents(latents, vae, batch_size=4):
         video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).contiguous()
         all_videos.append(video)
     return torch.cat(all_videos, dim=0)
+
 
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
