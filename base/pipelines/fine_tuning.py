@@ -18,6 +18,7 @@ import numpy as np
 import torchvision.models as models
 import torch.nn.functional as F
 import einops
+from diffusers.models import AutoencoderKL
 from diffusers.utils import (
     deprecate,
     is_accelerate_available,
@@ -186,11 +187,11 @@ class CombinedLoss(nn.Module):
         combined_loss = mse_loss + self.perceptual_weight * perceptual_loss
         return combined_loss
     
-def decode_latents(self, latents):
+def decode_latents(latents, vae):
         video_length = latents.shape[2]
         latents = 1 / 0.18215 * latents
         latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
-        video = self.vae.decode(latents).sample
+        video = vae.decode(latents).sample
         video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
         video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
         return video
@@ -206,6 +207,7 @@ def train_lora_model(data, video_folder, args):
 
     tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
     text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder", torch_dtype=torch.float16).to(device)
+    vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae", torch_dtype=torch.float16).to(device)
 
     # Load CLIP model and processor for image conditioning
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
@@ -299,7 +301,7 @@ def train_lora_model(data, video_folder, args):
                     encoder_hidden_states=encoder_hidden_states
                 ).sample
 
-                output = decode_latents(output)
+                output = decode_latents(output, vae)
 
                 print(f"output shape: {output.shape}, dtype: {output.dtype}")
 
