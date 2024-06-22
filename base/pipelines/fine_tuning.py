@@ -20,6 +20,8 @@ import torch.nn.functional as F
 import einops
 from diffusers.models import AutoencoderKL
 from torch.utils.checkpoint import checkpoint
+from diffusers.schedulers import DDIMScheduler, DDPMScheduler
+from transformers import get_cosine_schedule_with_warmup
 from diffusers.utils import (
     deprecate,
     is_accelerate_available,
@@ -260,6 +262,13 @@ def train_lora_model(data, video_folder, args):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
     
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
+
+    lr_scheduler = get_cosine_schedule_with_warmup(
+        optimizer=optimizer,
+        num_warmup_steps=100,
+        num_training_steps=(len(dataloader) * args.num_epochs),
+    )
+
     num_epochs = 3
     
     unet.train()
@@ -277,6 +286,9 @@ def train_lora_model(data, video_folder, args):
     accumulation_steps = 8
 
     scaler = torch.cuda.amp.GradScaler()
+
+    noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
+
 
     for epoch in range(num_epochs):
         for i, (video, description, frame_tensor) in enumerate(dataloader):
@@ -311,25 +323,25 @@ def train_lora_model(data, video_folder, args):
                 #print(f"attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
                 
                 # Ritorna alle dimensioni originali
-                attention_output = attention_output.transpose(0, 1)
+                encoder_hidden_states = attention_output.transpose(0, 1)
 
-                #print(f"attention_output_transpose shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[1, 10, 768] torch.float16
+                #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
 
-                encoder_hidden_states = attention_output
+                latents = vae.encode(video).latent_dist.sample()
+                latents = latents * vae.config.scaling_factor
 
-                timestep=torch.randint(0, 1000, (1,)).to(unet.device)
-
-                #print(f"timestep shape: {timestep.shape}, dtype: {timestep.dtype}") #[1] torch.int64
-
-                sample=torch.randn(1, 4, 16, 40, 64).to(unet.device, dtype=torch.float16)
+                noise = torch.randn_like(latents)
+                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (latents.shape[0],), device=latents.device)
+                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
                 # Forward pass
                 output = unet(
-                    sample=sample,
-                    timestep=timestep,
+                    sample=noisy_latents,
+                    timestep=timesteps,
                     encoder_hidden_states=encoder_hidden_states
                 ).sample
 
+                loss = F.mse_loss(output, noise)
 
                 #print(f"output shape: {output.shape}, dtype: {output.dtype}") #[1, 4, 16, 40, 64] torch.float16
 
@@ -340,7 +352,7 @@ def train_lora_model(data, video_folder, args):
                 output = output.to(video.dtype) 
 
                 # Riorganizza le dimensioni per combaciare con video
-                output = output.permute(0, 4, 1, 2, 3)
+                output = output.permute(0, 4, 1, 2, 3) # da b f h w c diventa b c f h w 
 
                 #print(f"output shape: {output.shape}, dtype: {output.dtype}") #[1, 3, 16, 320, 512] torch.float32
                 #print(f"video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
@@ -354,6 +366,7 @@ def train_lora_model(data, video_folder, args):
             if (i + 1) % accumulation_steps == 0:
                 try:
                     scaler.step(optimizer)
+                    scaler.step(lr_scheduler)
                     scaler.update()
                 except ValueError as e:
                     print(f"Skipping scaler step due to error: {e}")
