@@ -183,11 +183,6 @@ def encode_latents(video, vae):
     # Riarrangia il video in una serie di immagini
     video = einops.rearrange(video, "b c f h w -> (b f) c h w")
     
-    # Normalizza i valori dei pixel se necessario
-    # Se i tuoi valori sono già nel range [-1, 1], puoi omettere questa linea
-    video = (video / 255.0) * 2 - 1 if video.max() > 1 else video
-    
-
     encode_parts = []
     batch_size = 1  # Puoi aumentare questo valore se la tua GPU lo consente
 
@@ -197,18 +192,19 @@ def encode_latents(video, vae):
     
     for i in range(0, video.shape[0], batch_size):
         latents_batch = video[i:i+batch_size]
+        print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}") 
 
         # Usa checkpoint per risparmiare memoria
         encoded_batch = checkpoint(encode_batch, latents_batch)
+
+        print(f"encoded_batch shape: {encoded_batch.shape}, dtype: {encoded_batch.dtype}") 
+
         encode_parts.append(encoded_batch)
         # Libera un po' di memoria
         torch.cuda.empty_cache()
 
     latents = torch.cat(encode_parts, dim=0)
-    
-    # Applica il fattore di scala
-    latents = latents * 0.18215
-    
+        
     # Riarrangia i latents per reintrodurre la dimensione temporale
     latents = einops.rearrange(latents, "(b f) c h w -> b c f h w", b=b)
     
