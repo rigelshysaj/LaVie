@@ -194,7 +194,7 @@ def decode_latents(latents, vae):
 
 def decode_latents(latents, vae):
     video_length = latents.shape[2]
-    latents = 1 / 0.18215 * latents
+    #latents = 1 / 0.18215 * latents
     latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
     
     decoded_parts = []
@@ -204,7 +204,8 @@ def decode_latents(latents, vae):
         with torch.cuda.amp.autocast():
             return vae.decode(batch).sample
 
-    print(f"latents requires grad: {latents.requires_grad}")
+    print(f"latents shape: {latents.shape}, dtype: {latents.dtype}")
+    
     for i in range(0, latents.shape[0], batch_size):
         latents_batch = latents[i:i+batch_size]
 
@@ -214,6 +215,9 @@ def decode_latents(latents, vae):
         # Libera un po' di memoria
         torch.cuda.empty_cache()
     
+    print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}")
+
+
     # Concatena tutte le parti decodificate
     video = torch.cat(decoded_parts, dim=0)
     
@@ -282,45 +286,40 @@ def train_lora_model(data, video_folder, args):
             print(f"Iterazione numero: {conta}")
             conta += 1
 
-            print(f"video shape: {video.shape}, dtype: {video.dtype}")
+            #print(f"video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
 
             with torch.cuda.amp.autocast():
 
                 text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
                 text_features = text_encoder(text_inputs)[0].to(torch.float16)
-                print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
+                #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
                 image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
                 outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
                 last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
-                print(f"last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}")
+                #print(f"last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
                 
                 # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
                 text_features = text_features.transpose(0, 1)
                 last_hidden_state = last_hidden_state.transpose(0, 1)
-
-                print(f"text_features_transpose shape: {text_features.shape}, dtype: {text_features.dtype}")
-                print(f"last_hidden_state_transpose shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}")
 
                 assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
 
                 # Calcola l'attenzione
                 attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
 
-                print(f"attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}")
+                #print(f"attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
                 
                 # Ritorna alle dimensioni originali
                 attention_output = attention_output.transpose(0, 1)
 
-                print(f"attention_output_transpose shape: {attention_output.shape}, dtype: {attention_output.dtype}")
+                #print(f"attention_output_transpose shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[1, 10, 768] torch.float16
 
                 encoder_hidden_states = attention_output
 
-                print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
-
                 timestep=torch.randint(0, 1000, (1,)).to(unet.device)
 
-                print(f"timestep shape: {timestep.shape}, dtype: {timestep.dtype}")
+                #print(f"timestep shape: {timestep.shape}, dtype: {timestep.dtype}") #[1] torch.int64
 
                 sample=torch.randn(1, 4, 16, 40, 64).to(unet.device, dtype=torch.float16)
 
@@ -338,12 +337,9 @@ def train_lora_model(data, video_folder, args):
                 # Riorganizza le dimensioni per combaciare con video
                 output = output.permute(0, 4, 1, 2, 3)
 
-                print(f"output shape: {output.shape}, dtype: {output.dtype}")
-                print(f"video shape: {video.shape}, dtype: {video.dtype}")
-                print(f"UNet requires grad: {any(p.requires_grad for p in unet.parameters())}")
-                print(f"VAE requires grad: {any(p.requires_grad for p in vae.parameters())}")
-                print(f"Output requires grad: {output.requires_grad}")
-
+                #print(f"output shape: {output.shape}, dtype: {output.dtype}") #[1, 3, 16, 320, 512] torch.float32
+                #print(f"video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
+   
                 loss = torch.nn.functional.mse_loss(output, video)
 
                 loss = loss / accumulation_steps
