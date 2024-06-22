@@ -189,7 +189,7 @@ def encode_latents(video, vae):
 
     def encode_batch(batch):
         with torch.cuda.amp.autocast():
-            vae.encode(batch).sample
+            return vae.encode(batch).latent_dist.sample()
     
     for i in range(0, video.shape[0], batch_size):
         latents_batch = video[i:i+batch_size]
