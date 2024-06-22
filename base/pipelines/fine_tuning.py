@@ -187,8 +187,24 @@ def encode_latents(video, vae):
     # Se i tuoi valori sono già nel range [-1, 1], puoi omettere questa linea
     video = (video / 255.0) * 2 - 1 if video.max() > 1 else video
     
-    # Codifica con il VAE
-    latents = vae.encode(video).latent_dist.sample()
+
+    encode_parts = []
+    batch_size = 1  # Puoi aumentare questo valore se la tua GPU lo consente
+
+    def encode_batch(batch):
+        with torch.cuda.amp.autocast():
+            vae.encode(video).latent_dist.sample()
+    
+    for i in range(0, video.shape[0], batch_size):
+        latents_batch = video[i:i+batch_size]
+
+        # Usa checkpoint per risparmiare memoria
+        encoded_batch = checkpoint(encode_batch, latents_batch)
+        encode_parts.append(encoded_batch)
+        # Libera un po' di memoria
+        torch.cuda.empty_cache()
+
+    latents = torch.cat(encode_parts, dim=0)
     
     # Applica il fattore di scala
     latents = latents * 0.18215
