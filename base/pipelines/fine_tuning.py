@@ -204,7 +204,7 @@ def decode_latents(latents, vae):
         with torch.cuda.amp.autocast():
             return vae.decode(batch).sample
 
-    print(f"latents shape: {latents.shape}, dtype: {latents.dtype}")
+    #print(f"latents shape: {latents.shape}, dtype: {latents.dtype}") #[16, 4, 40, 64] torch.float16
     
     for i in range(0, latents.shape[0], batch_size):
         latents_batch = latents[i:i+batch_size]
@@ -215,7 +215,7 @@ def decode_latents(latents, vae):
         # Libera un po' di memoria
         torch.cuda.empty_cache()
     
-    print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}")
+    #print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}") #[1, 4, 40, 64] torch.float16
 
 
     # Concatena tutte le parti decodificate
@@ -330,7 +330,10 @@ def train_lora_model(data, video_folder, args):
                     encoder_hidden_states=encoder_hidden_states
                 ).sample
 
+
+                print(f"output shape: {output.shape}, dtype: {output.dtype}")
                 output = decode_latents(output, vae)
+                print(f"output shape: {output.shape}, dtype: {output.dtype}")
 
                 output = output.to(video.dtype) 
 
