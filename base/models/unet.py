@@ -390,6 +390,9 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         # The overall upsampling factor is equal to 2 ** (# num of upsampling layears).
         # However, the upsampling interpolation output size can be forced to fit any upsampling size
         # on the fly if necessary.
+
+        print(f"sample1 shape: {sample.shape}, dtype: {sample.dtype}")
+
         default_overall_up_factor = 2**self.num_upsamplers
 
         # upsample size should be forwarded when sample is not a multiple of `default_overall_up_factor`
@@ -423,21 +426,15 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             timesteps = timesteps[None].to(sample.device)
 
         # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
-        timesteps = timesteps.expand(sample.shape[0])
+        timesteps = timesteps.expand(sample.shape[0]) #torch.Size([1]), dtype: torch.int64
 
-        print(f"timestep unet forward: {timesteps.shape}, dtype: {timesteps.dtype}")
-
-        t_emb = self.time_proj(timesteps)
-
-        print(f"t_emb unet forward: {t_emb.shape}, dtype: {t_emb.dtype}")
+        t_emb = self.time_proj(timesteps) #torch.Size([1, 320]), dtype: torch.float32
 
         # timesteps does not contain any weights and will always return f32 tensors
         # but time_embedding might actually be running in fp16. so we need to cast here.
         # there might be better ways to encapsulate this.
         t_emb = t_emb.to(dtype=self.dtype)
-        emb = self.time_embedding(t_emb)
-
-        print(f"emb unet forward: {emb.shape}, dtype: {emb.dtype}")
+        emb = self.time_embedding(t_emb) #torch.Size([1, 1280]), dtype: torch.float16
 
         if self.class_embedding is not None:
             if class_labels is None:
@@ -456,10 +453,10 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         else:
             frame_rel_pos_bias = None
 
-        # pre-process
-        sample = self.conv_in(sample)
+        print(f"sample2 shape: {sample.shape}, dtype: {sample.dtype}")
 
-        print(f"sample unet forward conv_in: {sample.shape}, dtype: {sample.dtype}")
+        # pre-process
+        sample = self.conv_in(sample) #torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
 
         # down
         down_block_res_samples = (sample,)
@@ -477,15 +474,15 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
 
             down_block_res_samples += res_samples
 
-        print(f"sample unet forward after downsample_block: {sample.shape}, dtype: {sample.dtype}")
-        print(f"downsample_block type: {downsample_block.type}")
+        #sample: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
+        #downsample_block type: bound method Module.type
 
         # mid
         sample = self.mid_block(
             sample, emb, encoder_hidden_states=encoder_hidden_states, attention_mask=attention_mask, use_image_num=use_image_num,
         )
 
-        print(f"sample unet forward after mid_block: {sample.shape}, dtype: {sample.dtype}")
+        #sample: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
 
         # up
         for i, upsample_block in enumerate(self.up_blocks):
@@ -528,15 +525,15 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
                 sample = upsample_block(
                     hidden_states=sample, temb=emb, res_hidden_states_tuple=res_samples, upsample_size=upsample_size
                 )
-        print(f"sample unet forward after up_blocks: {sample.shape}, dtype: {sample.dtype}")
+        #sample: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
             
         # post-process
         sample = self.conv_norm_out(sample)
-        print(f"sample unet forward after conv_norm_out: {sample.shape}, dtype: {sample.dtype}")
+        #sample: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float32
         sample = self.conv_act(sample)
-        print(f"sample unet forward after conv_act: {sample.shape}, dtype: {sample.dtype}")
+        #sample: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float32
         sample = self.conv_out(sample)
-        print(f"sample unet forward after conv_out: {sample.shape}, dtype: {sample.dtype}")
+        #sample: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float16
 
         # print(sample.shape)
 
