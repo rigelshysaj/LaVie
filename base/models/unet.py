@@ -425,13 +425,19 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
         timesteps = timesteps.expand(sample.shape[0])
 
+        print(f"timestep unet forward: {timesteps.shape}, dtype: {timesteps.dtype}")
+
         t_emb = self.time_proj(timesteps)
+
+        print(f"t_emb unet forward: {t_emb.shape}, dtype: {t_emb.dtype}")
 
         # timesteps does not contain any weights and will always return f32 tensors
         # but time_embedding might actually be running in fp16. so we need to cast here.
         # there might be better ways to encapsulate this.
         t_emb = t_emb.to(dtype=self.dtype)
         emb = self.time_embedding(t_emb)
+
+        print(f"emb unet forward: {emb.shape}, dtype: {emb.dtype}")
 
         if self.class_embedding is not None:
             if class_labels is None:
@@ -453,6 +459,8 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         # pre-process
         sample = self.conv_in(sample)
 
+        print(f"sample unet forward conv_in: {sample.shape}, dtype: {sample.dtype}")
+
         # down
         down_block_res_samples = (sample,)
         for downsample_block in self.down_blocks:
@@ -469,10 +477,15 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
 
             down_block_res_samples += res_samples
 
+        print(f"sample unet forward after downsample_block: {sample.shape}, dtype: {sample.dtype}")
+        print(f"downsample_block unet forward downsample_block: {downsample_block.shape}, dtype: {downsample_block.dtype}")
+
         # mid
         sample = self.mid_block(
             sample, emb, encoder_hidden_states=encoder_hidden_states, attention_mask=attention_mask, use_image_num=use_image_num,
         )
+
+        print(f"sample unet forward after mid_block: {sample.shape}, dtype: {sample.dtype}")
 
         # up
         for i, upsample_block in enumerate(self.up_blocks):
@@ -481,10 +494,15 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             res_samples = down_block_res_samples[-len(upsample_block.resnets) :]
             down_block_res_samples = down_block_res_samples[: -len(upsample_block.resnets)]
 
+            print(f"res_samples unet forward: {res_samples.shape}, dtype: {res_samples.dtype}")
+            print(f"down_block_res_samples unet forward: {down_block_res_samples.shape}, dtype: {down_block_res_samples.dtype}")
+
             # if we have not reached the final block and need to forward the
             # upsample size, we do it here
             if not is_final_block and forward_upsample_size:
                 upsample_size = down_block_res_samples[-1].shape[2:]
+                print(f"upsample_size unet forward: {upsample_size.shape}, dtype: {upsample_size.dtype}")
+
 
             if hasattr(upsample_block, "has_cross_attention") and upsample_block.has_cross_attention:
                 sample = upsample_block(
@@ -500,10 +518,16 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
                 sample = upsample_block(
                     hidden_states=sample, temb=emb, res_hidden_states_tuple=res_samples, upsample_size=upsample_size
                 )
+        print(f"sample unet forward after up_blocks: {sample.shape}, dtype: {sample.dtype}")
+            
         # post-process
         sample = self.conv_norm_out(sample)
+        print(f"sample unet forward after conv_norm_out: {sample.shape}, dtype: {sample.dtype}")
         sample = self.conv_act(sample)
+        print(f"sample unet forward after conv_act: {sample.shape}, dtype: {sample.dtype}")
         sample = self.conv_out(sample)
+        print(f"sample unet forward after conv_out: {sample.shape}, dtype: {sample.dtype}")
+
         # print(sample.shape)
 
         if not return_dict:

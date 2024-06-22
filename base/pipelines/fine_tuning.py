@@ -331,9 +331,11 @@ def train_lora_model(data, video_folder, args):
                 ).sample
 
 
-                print(f"output shape: {output.shape}, dtype: {output.dtype}")
+                #print(f"output shape: {output.shape}, dtype: {output.dtype}") #[1, 4, 16, 40, 64] torch.float16
+
                 output = decode_latents(output, vae)
-                print(f"output shape: {output.shape}, dtype: {output.dtype}")
+
+                #print(f"output shape: {output.shape}, dtype: {output.dtype}") #[1, 16, 320, 512, 3] torch.float16
 
                 output = output.to(video.dtype) 
 
