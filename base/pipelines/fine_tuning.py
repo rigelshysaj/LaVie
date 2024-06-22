@@ -176,6 +176,28 @@ class PerceptualLoss(nn.Module):
         y_features = self.layers(y)
         return nn.functional.mse_loss(x_features, y_features)
     
+def encode_latents(video, vae):
+    # video ha forma [b, c, f, h, w]
+    b, c, f, h, w = video.shape
+    
+    # Riarrangia il video in una serie di immagini
+    video = einops.rearrange(video, "b c f h w -> (b f) c h w")
+    
+    # Normalizza i valori dei pixel se necessario
+    # Se i tuoi valori sono già nel range [-1, 1], puoi omettere questa linea
+    video = (video / 255.0) * 2 - 1 if video.max() > 1 else video
+    
+    # Codifica con il VAE
+    latents = vae.encode(video).latent_dist.sample()
+    
+    # Applica il fattore di scala
+    latents = latents * 0.18215
+    
+    # Riarrangia i latents per reintrodurre la dimensione temporale
+    latents = einops.rearrange(latents, "(b f) c h w -> b c f h w", b=b)
+    
+    return latents
+    
 '''
 def decode_latents(latents, vae):
     video_length = latents.shape[2]
@@ -329,7 +351,7 @@ def train_lora_model(data, video_folder, args):
 
                 #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
 
-                latents = vae.encode(video).latent_dist.sample()
+                latents = encode_latents(video, vae)
                 latents = latents * vae.config.scaling_factor
 
                 noise = torch.randn_like(latents)
