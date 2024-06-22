@@ -494,8 +494,18 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             res_samples = down_block_res_samples[-len(upsample_block.resnets) :]
             down_block_res_samples = down_block_res_samples[: -len(upsample_block.resnets)]
 
-            print(f"res_samples[0] unet forward: {res_samples[0].shape}, dtype: {res_samples[0].dtype}")
-            print(f"down_block_res_samples[0] unet forward: {down_block_res_samples[0].shape}, dtype: {down_block_res_samples[0].dtype}")
+            #print(f"res_samples[0] unet forward: {res_samples[0].shape}, dtype: {res_samples[0].dtype}")
+            #print(f"down_block_res_samples[0] unet forward: {down_block_res_samples[0].shape}, dtype: {down_block_res_samples[0].dtype}")
+
+            '''
+            res_samples[0] unet forward: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
+            down_block_res_samples[0] unet forward: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
+            res_samples[0] unet forward: torch.Size([1, 640, 16, 10, 16]), dtype: torch.float16
+            down_block_res_samples[0] unet forward: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
+            res_samples[0] unet forward: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float16
+            down_block_res_samples[0] unet forward: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
+            res_samples[0] unet forward: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
+            '''
 
             # if we have not reached the final block and need to forward the
             # upsample size, we do it here
