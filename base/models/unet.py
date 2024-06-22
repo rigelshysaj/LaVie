@@ -191,9 +191,19 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             output_channel = block_out_channels[i]
             is_final_block = i == len(block_out_channels) - 1
 
-            print(f"input_channel down_block_types: {input_channel}")
-            print(f"output_channel down_block_types: {output_channel}")
+            #print(f"input_channel down_block_types: {input_channel}")
+            #print(f"output_channel down_block_types: {output_channel}")
 
+            '''
+            input_channel down_block_types: 320
+            output_channel down_block_types: 320
+            input_channel down_block_types: 320
+            output_channel down_block_types: 640
+            input_channel down_block_types: 640
+            output_channel down_block_types: 1280
+            input_channel down_block_types: 1280
+            output_channel down_block_types: 1280
+            '''
 
             down_block = get_down_block(
                 down_block_type,
@@ -256,8 +266,19 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             output_channel = reversed_block_out_channels[i]
             input_channel = reversed_block_out_channels[min(i + 1, len(block_out_channels) - 1)]
 
-            print(f"input_channel up_block_types: {input_channel}")
-            print(f"output_channel up_block_types: {output_channel}")
+            #print(f"input_channel up_block_types: {input_channel}")
+            #print(f"output_channel up_block_types: {output_channel}")
+
+            '''
+            input_channel up_block_types: 1280
+            output_channel up_block_types: 1280
+            input_channel up_block_types: 640
+            output_channel up_block_types: 1280
+            input_channel up_block_types: 320
+            output_channel up_block_types: 640
+            input_channel up_block_types: 320
+            output_channel up_block_types: 320
+            '''
 
             # add upsample block for all BUT final layer
             if not is_final_block:
