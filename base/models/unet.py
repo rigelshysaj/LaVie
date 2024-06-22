@@ -478,7 +478,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             down_block_res_samples += res_samples
 
         print(f"sample unet forward after downsample_block: {sample.shape}, dtype: {sample.dtype}")
-        print(f"dtype: {downsample_block.dtype}")
+        print(f"downsample_block type: {downsample_block.type}")
 
         # mid
         sample = self.mid_block(
