@@ -191,6 +191,10 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             output_channel = block_out_channels[i]
             is_final_block = i == len(block_out_channels) - 1
 
+            print(f"input_channel down_block_types: {input_channel}")
+            print(f"output_channel down_block_types: {output_channel}")
+
+
             down_block = get_down_block(
                 down_block_type,
                 num_layers=layers_per_block,
@@ -251,6 +255,9 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             prev_output_channel = output_channel
             output_channel = reversed_block_out_channels[i]
             input_channel = reversed_block_out_channels[min(i + 1, len(block_out_channels) - 1)]
+
+            print(f"input_channel up_block_types: {input_channel}")
+            print(f"output_channel up_block_types: {output_channel}")
 
             # add upsample block for all BUT final layer
             if not is_final_block:
@@ -391,7 +398,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         # However, the upsampling interpolation output size can be forced to fit any upsampling size
         # on the fly if necessary.
 
-        print(f"sample1 shape: {sample.shape}, dtype: {sample.dtype}")
+        #sample: shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float16
 
         default_overall_up_factor = 2**self.num_upsamplers
 
@@ -453,10 +460,12 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         else:
             frame_rel_pos_bias = None
 
-        print(f"sample2 shape: {sample.shape}, dtype: {sample.dtype}")
+        
 
+        #sample: shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float16
         # pre-process
-        sample = self.conv_in(sample) #torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
+        sample = self.conv_in(sample) 
+        #sample: shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
 
         # down
         down_block_res_samples = (sample,)
@@ -474,7 +483,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
 
             down_block_res_samples += res_samples
 
-        #sample: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
+        #sample: shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
         #downsample_block type: bound method Module.type
 
         # mid
@@ -482,7 +491,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             sample, emb, encoder_hidden_states=encoder_hidden_states, attention_mask=attention_mask, use_image_num=use_image_num,
         )
 
-        #sample: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
+        #sample: shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
 
         # up
         for i, upsample_block in enumerate(self.up_blocks):
@@ -525,15 +534,15 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
                 sample = upsample_block(
                     hidden_states=sample, temb=emb, res_hidden_states_tuple=res_samples, upsample_size=upsample_size
                 )
-        #sample: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
+        #sample: shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
             
         # post-process
         sample = self.conv_norm_out(sample)
-        #sample: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float32
+        #sample: shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float32
         sample = self.conv_act(sample)
-        #sample: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float32
+        #sample: shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float32
         sample = self.conv_out(sample)
-        #sample: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float16
+        #sample: shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float16
 
         # print(sample.shape)
 
