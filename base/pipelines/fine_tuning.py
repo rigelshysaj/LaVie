@@ -55,7 +55,7 @@ class VideoDatasetMsvd(Dataset):
         # Ottieni la lista dei file video nella cartella YouTubeClips
         self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
 
-        print(f"dictionary of descriptions : {self.video_descriptions}")
+        #print(f"dictionary of descriptions : {self.video_descriptions}")
 
     def __len__(self):
         return len(self.video_files)
@@ -95,7 +95,7 @@ class VideoDatasetMsvd(Dataset):
         video_id = os.path.splitext(video_file)[0]
         descriptions = self.video_descriptions.get(video_id, [])
 
-        print(f"description of __getitem__: {descriptions} video_id: {video_id}")
+        #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
         
         # Applica trasformazioni, se presenti
         if self.transform:
