@@ -186,9 +186,10 @@ def encode_latents(video, vae):
     encode_parts = []
     batch_size = 1  # Puoi aumentare questo valore se la tua GPU lo consente
 
+
     def encode_batch(batch):
         with torch.cuda.amp.autocast():
-            vae.encode(video).latent_dist.sample()
+            vae.encode(batch).latent_dist.sample()
     
     for i in range(0, video.shape[0], batch_size):
         latents_batch = video[i:i+batch_size]
