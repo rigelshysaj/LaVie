@@ -256,6 +256,8 @@ def train_lora_model(data, video_folder, args):
     )
 
     unet = get_peft_model(unet, lora_config)
+
+    batch_size=1
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
@@ -266,7 +268,7 @@ def train_lora_model(data, video_folder, args):
     lr_scheduler = get_cosine_schedule_with_warmup(
         optimizer=optimizer,
         num_warmup_steps=100,
-        num_training_steps=(len(dataloader) * args.num_epochs),
+        num_training_steps=(len(dataloader) * batch_size),
     )
 
     num_epochs = 3
@@ -345,19 +347,19 @@ def train_lora_model(data, video_folder, args):
 
                 #print(f"output shape: {output.shape}, dtype: {output.dtype}") #[1, 4, 16, 40, 64] torch.float16
 
-                output = decode_latents(output, vae)
+                #output = decode_latents(output, vae)
 
                 #print(f"output shape: {output.shape}, dtype: {output.dtype}") #[1, 16, 320, 512, 3] torch.float16
 
-                output = output.to(video.dtype) 
+                #output = output.to(video.dtype) 
 
                 # Riorganizza le dimensioni per combaciare con video
-                output = output.permute(0, 4, 1, 2, 3) # da b f h w c diventa b c f h w 
+                #output = output.permute(0, 4, 1, 2, 3) # da b f h w c diventa b c f h w 
 
                 #print(f"output shape: {output.shape}, dtype: {output.dtype}") #[1, 3, 16, 320, 512] torch.float32
                 #print(f"video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
    
-                loss = torch.nn.functional.mse_loss(output, video)
+                #loss = torch.nn.functional.mse_loss(output, video)
 
                 loss = loss / accumulation_steps
                 
