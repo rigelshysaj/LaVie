@@ -494,8 +494,8 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             res_samples = down_block_res_samples[-len(upsample_block.resnets) :]
             down_block_res_samples = down_block_res_samples[: -len(upsample_block.resnets)]
 
-            print(f"res_samples unet forward : {res_samples}")
-            print(f"down_block_res_samples unet forward: {down_block_res_samples}")
+            print(f"res_samples[0] unet forward: {res_samples[0].shape}, dtype: {res_samples[0].dtype}")
+            print(f"down_block_res_samples[0] unet forward: {down_block_res_samples[0].shape}, dtype: {down_block_res_samples[0].dtype}")
 
             # if we have not reached the final block and need to forward the
             # upsample size, we do it here
