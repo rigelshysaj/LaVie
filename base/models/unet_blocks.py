@@ -531,6 +531,9 @@ class CrossAttnUpBlock3D(nn.Module):
         attention_mask=None,
         use_image_num=None,
     ):
+        
+        print(f"hidden_states0 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 40, 64]), dtype: torch.float16
+
         for resnet, attn in zip(self.resnets, self.attentions):
             # pop res hidden states
             res_hidden_states = res_hidden_states_tuple[-1]
