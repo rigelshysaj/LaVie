@@ -533,7 +533,6 @@ class CrossAttnUpBlock3D(nn.Module):
     ):
         for resnet, attn in zip(self.resnets, self.attentions):
             # pop res hidden states
-            print(f"res_hidden_states_tuple shape: {res_hidden_states_tuple.shape}, dtype: {res_hidden_states_tuple.dtype}")
             res_hidden_states = res_hidden_states_tuple[-1]
             print(f"res_hidden_states shape: {res_hidden_states.shape}, dtype: {res_hidden_states.dtype}")
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
