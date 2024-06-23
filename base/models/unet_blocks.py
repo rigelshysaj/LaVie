@@ -534,12 +534,12 @@ class CrossAttnUpBlock3D(nn.Module):
         for resnet, attn in zip(self.resnets, self.attentions):
             # pop res hidden states
             res_hidden_states = res_hidden_states_tuple[-1]
-            print(f"res_hidden_states shape: {res_hidden_states.shape}, dtype: {res_hidden_states.dtype}")
+            #print(f"res_hidden_states shape: {res_hidden_states.shape}, dtype: {res_hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
-            print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 40, 64]), dtype: torch.float16
 
-
+            print(f"self.training: {self.training}, self.gradient_checkpointing: {self.gradient_checkpointing}")
             if self.training and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
