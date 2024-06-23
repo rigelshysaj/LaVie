@@ -533,9 +533,14 @@ class CrossAttnUpBlock3D(nn.Module):
     ):
         for resnet, attn in zip(self.resnets, self.attentions):
             # pop res hidden states
+            print(f"res_hidden_states_tuple shape: {res_hidden_states_tuple.shape}, dtype: {res_hidden_states_tuple.dtype}")
             res_hidden_states = res_hidden_states_tuple[-1]
+            print(f"res_hidden_states shape: {res_hidden_states.shape}, dtype: {res_hidden_states.dtype}")
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
+            print(f"res_hidden_states_tuple shape: {res_hidden_states_tuple.shape}, dtype: {res_hidden_states_tuple.dtype}")
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
+            print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
 
             if self.training and self.gradient_checkpointing:
 
@@ -565,11 +570,17 @@ class CrossAttnUpBlock3D(nn.Module):
                 )[0]
             else:
                 hidden_states = resnet(hidden_states, temb)
+                print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
                 hidden_states = attn(hidden_states, encoder_hidden_states=encoder_hidden_states, use_image_num=use_image_num).sample
+                print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         if self.upsamplers is not None:
             for upsampler in self.upsamplers:
                 hidden_states = upsampler(hidden_states, upsample_size)
+                print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
+        print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         return hidden_states
 
