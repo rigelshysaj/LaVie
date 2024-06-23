@@ -536,7 +536,6 @@ class CrossAttnUpBlock3D(nn.Module):
             res_hidden_states = res_hidden_states_tuple[-1]
             print(f"res_hidden_states shape: {res_hidden_states.shape}, dtype: {res_hidden_states.dtype}")
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
-            print(f"res_hidden_states_tuple shape: {res_hidden_states_tuple.shape}, dtype: {res_hidden_states_tuple.dtype}")
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
             print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
