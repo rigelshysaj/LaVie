@@ -365,16 +365,16 @@ def train_lora_model(data, video_folder, args):
                 #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
 
                 latents = encode_latents(video, vae)
-                print(f"latents1 shape: {latents.shape}, dtype: {latents.dtype}") 
+                #print(f"latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
                 latents = latents * vae.config.scaling_factor
-                print(f"latents2 shape: {latents.shape}, dtype: {latents.dtype}") 
+                #print(f"latents2 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
                 noise = torch.randn_like(latents)
                 timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (latents.shape[0],), device=latents.device)
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
-                print(f"noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") 
+                #print(f"noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
                 # Forward pass
                 output = unet(
@@ -385,7 +385,7 @@ def train_lora_model(data, video_folder, args):
 
                 loss = F.mse_loss(output, noise)
 
-                print(f"output shape: {output.shape}, dtype: {output.dtype}") #[1, 4, 16, 40, 64] torch.float16
+                #print(f"output shape: {output.shape}, dtype: {output.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float16
 
                 #output = decode_latents(output, vae)
 
