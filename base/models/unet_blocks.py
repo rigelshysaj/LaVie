@@ -380,7 +380,7 @@ class CrossAttnDownBlock3D(nn.Module):
 
             output_states += (hidden_states,)
         
-        print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         return hidden_states, output_states
 
