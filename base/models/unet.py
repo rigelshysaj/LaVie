@@ -518,8 +518,8 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         for i, upsample_block in enumerate(self.up_blocks):
             is_final_block = i == len(self.up_blocks) - 1
 
-            res_samples = down_block_res_samples[-len(upsample_block.resnets) :]
-            down_block_res_samples = down_block_res_samples[: -len(upsample_block.resnets)]
+            res_samples = down_block_res_samples[-len(upsample_block.resnets) :] #prende gli ultimi len(upsample_block.resnets) elementi della tupla
+            down_block_res_samples = down_block_res_samples[: -len(upsample_block.resnets)] #prende tutti gli elementi della tupla eccetto gli ultimi len(upsample_block.resnets).
 
             #print(f"res_samples[0] unet forward: {res_samples[0].shape}, dtype: {res_samples[0].dtype}")
             #print(f"down_block_res_samples[0] unet forward: {down_block_res_samples[0].shape}, dtype: {down_block_res_samples[0].dtype}")
