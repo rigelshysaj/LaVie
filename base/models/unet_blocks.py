@@ -320,6 +320,10 @@ class CrossAttnDownBlock3D(nn.Module):
     def forward(self, hidden_states, temb=None, encoder_hidden_states=None, attention_mask=None, use_image_num=None):
         output_states = ()
 
+        print(f"hidden_states shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
+
+
         for resnet, attn in zip(self.resnets, self.attentions):
             if self.training and self.gradient_checkpointing:
 
@@ -342,20 +346,29 @@ class CrossAttnDownBlock3D(nn.Module):
                     return custom_forward
 
                 hidden_states = torch.utils.checkpoint.checkpoint(create_custom_forward(resnet), hidden_states, temb)
+                print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
                 hidden_states = torch.utils.checkpoint.checkpoint(
                     create_custom_forward_attn(attn, return_dict=False, use_image_num=use_image_num),
                     hidden_states,
                     encoder_hidden_states,
                 )[0]
+                print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
             else:
                 hidden_states = resnet(hidden_states, temb)
+                print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
                 hidden_states = attn(hidden_states, encoder_hidden_states=encoder_hidden_states, use_image_num=use_image_num).sample
+                print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
 
             output_states += (hidden_states,)
 
         if self.downsamplers is not None:
             for downsampler in self.downsamplers:
                 hidden_states = downsampler(hidden_states)
+                print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
 
             output_states += (hidden_states,)
 
