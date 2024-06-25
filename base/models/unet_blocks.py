@@ -327,8 +327,8 @@ class CrossAttnDownBlock3D(nn.Module):
     def forward(self, hidden_states, temb=None, encoder_hidden_states=None, attention_mask=None, use_image_num=None):
         output_states = ()
 
-        print(f"hidden_states shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
-        print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #shape: torch.Size([1, 8, 768]), dtype: torch.float16
+        #print(f"hidden_states shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
+        #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #shape: torch.Size([1, 8, 768]), dtype: torch.float16
 
         #Però quando il shape di hidden_states è [1, 320, 16, 20, 32] le dimensioni di sotto cambiano, diventano: encoder_hidden_states shape: torch.Size([1, 8, 768]), dtype: torch.float16, hidden_states1 shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16, hidden_states2 shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16, hidden_states1 shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16, hidden_states2 shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16, hidden_states5 shape: torch.Size([1, 640, 16, 10, 16]), dtype: torch.float16, hidden_states shape: torch.Size([1, 640, 16, 10, 16]), dtype: torch.float16, encoder_hidden_states shape: torch.Size([1, 8, 768]), dtype: torch.float16, hidden_states1 shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16, hidden_states2 shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16, hidden_states1 shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16, hidden_states2 shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16, hidden_states5 shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
 
@@ -354,20 +354,20 @@ class CrossAttnDownBlock3D(nn.Module):
                     return custom_forward
 
                 hidden_states = torch.utils.checkpoint.checkpoint(create_custom_forward(resnet), hidden_states, temb)
-                print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
+                #print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
 
                 hidden_states = torch.utils.checkpoint.checkpoint(
                     create_custom_forward_attn(attn, return_dict=False, use_image_num=use_image_num),
                     hidden_states,
                     encoder_hidden_states,
                 )[0]
-                print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
+                #print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
 
             else:
                 hidden_states = resnet(hidden_states, temb)
-                print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+                #print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
                 hidden_states = attn(hidden_states, encoder_hidden_states=encoder_hidden_states, use_image_num=use_image_num).sample
-                print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+                #print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
 
             output_states += (hidden_states,)
@@ -375,12 +375,12 @@ class CrossAttnDownBlock3D(nn.Module):
         if self.downsamplers is not None:
             for downsampler in self.downsamplers:
                 hidden_states = downsampler(hidden_states)
-                print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float16
+                #print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float16
 
 
             output_states += (hidden_states,)
         
-        print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float16
 
         return hidden_states, output_states
 
@@ -668,11 +668,14 @@ class UpBlock3D(nn.Module):
         self.gradient_checkpointing = False
 
     def forward(self, hidden_states, res_hidden_states_tuple, temb=None, upsample_size=None):
+        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         for resnet in self.resnets:
             # pop res hidden states
             res_hidden_states = res_hidden_states_tuple[-1]
+            print(f"res_hidden_states shape: {res_hidden_states.shape}, dtype: {res_hidden_states.dtype}")
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
+            print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
             if self.training and self.gradient_checkpointing:
 
@@ -683,11 +686,16 @@ class UpBlock3D(nn.Module):
                     return custom_forward
 
                 hidden_states = torch.utils.checkpoint.checkpoint(create_custom_forward(resnet), hidden_states, temb)
+                print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             else:
                 hidden_states = resnet(hidden_states, temb)
+                print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         if self.upsamplers is not None:
             for upsampler in self.upsamplers:
                 hidden_states = upsampler(hidden_states, upsample_size)
+                print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
+        print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         return hidden_states
