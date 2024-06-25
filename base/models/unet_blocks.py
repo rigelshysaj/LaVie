@@ -563,12 +563,15 @@ class CrossAttnUpBlock3D(nn.Module):
                     return custom_forward
 
                 hidden_states = torch.utils.checkpoint.checkpoint(create_custom_forward(resnet), hidden_states, temb)
+                print(f"hidden_states1 shape (after resnet with checkpoint): {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
                 hidden_states = torch.utils.checkpoint.checkpoint(
                     create_custom_forward_attn(attn, return_dict=False, use_image_num=use_image_num),
                     hidden_states,
                     encoder_hidden_states,
                 )[0]
-                print(f"hidden_states1____ shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+                print(f"hidden_states1 shape (after attn): {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
             else:
                 hidden_states = resnet(hidden_states, temb)
                 print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
