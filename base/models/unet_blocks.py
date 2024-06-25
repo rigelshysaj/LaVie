@@ -532,15 +532,15 @@ class CrossAttnUpBlock3D(nn.Module):
         use_image_num=None,
     ):
         
-        print(f"hidden_states0 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
-
+        #print(f"hidden_states0 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
+        #In questo caso la seconda dimensione è 1280, però cambia, i tre valori sono 320, 640 e 1280. Ovviamente, in base al valore della seconda dimensione cambiano anche i valori dei print di sotto, per esempio, se è 320, il valore 2560 di sotto sarà 640.
         for resnet, attn in zip(self.resnets, self.attentions):
             # pop res hidden states
             res_hidden_states = res_hidden_states_tuple[-1]
-            print(f"res_hidden_states shape: {res_hidden_states.shape}, dtype: {res_hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
+            #print(f"res_hidden_states shape: {res_hidden_states.shape}, dtype: {res_hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
-            print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 2560, 16, 10, 16]), dtype: torch.float16
+            #print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 2560, 16, 10, 16]), dtype: torch.float16
 
             if self.training and self.gradient_checkpointing:
 
@@ -563,28 +563,29 @@ class CrossAttnUpBlock3D(nn.Module):
                     return custom_forward
 
                 hidden_states = torch.utils.checkpoint.checkpoint(create_custom_forward(resnet), hidden_states, temb)
-                print(f"hidden_states1 shape (after resnet with checkpoint): {hidden_states.shape}, dtype: {hidden_states.dtype}")
+                #print(f"hidden_states1 shape (after resnet with checkpoint): {hidden_states.shape}, dtype: {hidden_states.dtype}") #torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
 
                 hidden_states = torch.utils.checkpoint.checkpoint(
                     create_custom_forward_attn(attn, return_dict=False, use_image_num=use_image_num),
                     hidden_states,
                     encoder_hidden_states,
                 )[0]
-                print(f"hidden_states1 shape (after attn): {hidden_states.shape}, dtype: {hidden_states.dtype}")
+                #print(f"hidden_states1 shape (after attn): {hidden_states.shape}, dtype: {hidden_states.dtype}") #torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
+                #Se noti che hidden_states non mantiene le sue dimensioni aggiornate quando entra nel contesto del checkpointing, potrebbe essere dovuto al modo in cui il checkpointing ricalcola i tensori intermedi durante il backward pass. Questo significa che le operazioni forward all'interno del checkpointing non vengono eseguite immediatamente, e quindi hidden_states potrebbe sembrare riportato a una dimensione iniziale
 
             else:
                 hidden_states = resnet(hidden_states, temb)
-                print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+                #print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
                 hidden_states = attn(hidden_states, encoder_hidden_states=encoder_hidden_states, use_image_num=use_image_num).sample
-                print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+                #print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         if self.upsamplers is not None:
             for upsampler in self.upsamplers:
                 hidden_states = upsampler(hidden_states, upsample_size)
-                print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+                #print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 20, 32]), dtype: torch.float16
 
-        print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 20, 32]), dtype: torch.float16
 
         return hidden_states
 
