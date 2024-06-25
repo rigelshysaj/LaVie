@@ -568,6 +568,7 @@ class CrossAttnUpBlock3D(nn.Module):
                     hidden_states,
                     encoder_hidden_states,
                 )[0]
+                print(f"hidden_states1____ shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             else:
                 hidden_states = resnet(hidden_states, temb)
                 print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
