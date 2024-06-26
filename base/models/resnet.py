@@ -176,31 +176,51 @@ class ResnetBlock3D(nn.Module):
 
     def forward(self, input_tensor, temb):
         hidden_states = input_tensor
+        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         hidden_states = self.norm1(hidden_states)
+
+        print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
         hidden_states = self.nonlinearity(hidden_states)
 
+        print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
         hidden_states = self.conv1(hidden_states)
+
+        print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         if temb is not None:
             temb = self.time_emb_proj(self.nonlinearity(temb))[:, :, None, None, None]
 
         if temb is not None and self.time_embedding_norm == "default":
             hidden_states = hidden_states + temb
+            print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         hidden_states = self.norm2(hidden_states)
+
+        print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         if temb is not None and self.time_embedding_norm == "scale_shift":
             scale, shift = torch.chunk(temb, 2, dim=1)
             hidden_states = hidden_states * (1 + scale) + shift
+            print(f"hidden_states7 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         hidden_states = self.nonlinearity(hidden_states)
 
+        print(f"hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
         hidden_states = self.dropout(hidden_states)
+
+        print(f"hidden_states9 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
         hidden_states = self.conv2(hidden_states)
+
+        print(f"hidden_states10 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         if self.conv_shortcut is not None:
             input_tensor = self.conv_shortcut(input_tensor)
+            print(f"input_tensor shape: {input_tensor.shape}, dtype: {input_tensor.dtype}")
 
         output_tensor = (input_tensor + hidden_states) / self.output_scale_factor
 

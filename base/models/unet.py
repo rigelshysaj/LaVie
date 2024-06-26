@@ -538,7 +538,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             # upsample size, we do it here
             if not is_final_block and forward_upsample_size:
                 upsample_size = down_block_res_samples[-1].shape[2:]
-                print(f"upsample_size unet forward: {upsample_size.shape}, dtype: {upsample_size.dtype}")
+                #print(f"upsample_size unet forward: {upsample_size.shape}, dtype: {upsample_size.dtype}")
 
 
             if hasattr(upsample_block, "has_cross_attention") and upsample_block.has_cross_attention:
