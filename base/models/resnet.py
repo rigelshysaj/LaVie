@@ -105,9 +105,18 @@ class Downsample3D(nn.Module):
             raise NotImplementedError
 
         assert hidden_states.shape[1] == self.channels
-        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         hidden_states = self.conv(hidden_states)
-        print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
+        '''
+        hidden_states1 shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
+        hidden_states2 shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float16
+        hidden_states1 shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
+        hidden_states2 shape: torch.Size([1, 640, 16, 10, 16]), dtype: torch.float16
+        hidden_states1 shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
+        hidden_states2 shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
+        '''
 
 
         return hidden_states

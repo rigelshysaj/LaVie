@@ -361,7 +361,9 @@ class Transformer3DModel(ModelMixin, ConfigMixin):
 
         video_length = hidden_states.shape[2]
         hidden_states = rearrange(hidden_states, "b c f h w -> (b f) c h w").contiguous()
+        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         encoder_hidden_states = repeat(encoder_hidden_states, 'b n c -> (b f) n c', f=video_length).contiguous()
+        print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
 
         batch, channel, height, weight = hidden_states.shape
         residual = hidden_states
@@ -369,12 +371,16 @@ class Transformer3DModel(ModelMixin, ConfigMixin):
         hidden_states = self.norm(hidden_states)
         if not self.use_linear_projection:
             hidden_states = self.proj_in(hidden_states)
+            print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             inner_dim = hidden_states.shape[1]
             hidden_states = hidden_states.permute(0, 2, 3, 1).reshape(batch, height * weight, inner_dim)
+            print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         else:
             inner_dim = hidden_states.shape[1]
             hidden_states = hidden_states.permute(0, 2, 3, 1).reshape(batch, height * weight, inner_dim)
+            print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             hidden_states = self.proj_in(hidden_states)
+            print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         # Blocks
         for block in self.transformer_blocks:
@@ -385,22 +391,32 @@ class Transformer3DModel(ModelMixin, ConfigMixin):
                 video_length=video_length,
                 use_image_num=use_image_num,
             )
+            print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         # Output
         if not self.use_linear_projection:
             hidden_states = (
                 hidden_states.reshape(batch, height, weight, inner_dim).permute(0, 3, 1, 2).contiguous()
             )
+            print(f"hidden_states7 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             hidden_states = self.proj_out(hidden_states)
+            print(f"hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         else:
             hidden_states = self.proj_out(hidden_states)
+            print(f"hidden_states9 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             hidden_states = (
                 hidden_states.reshape(batch, height, weight, inner_dim).permute(0, 3, 1, 2).contiguous()
             )
+            print(f"hidden_states10 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         output = hidden_states + residual
 
+        print(f"output1 shape: {output.shape}, dtype: {output.dtype}")
+
         output = rearrange(output, "(b f) c h w -> b c f h w", f=video_length + use_image_num).contiguous()
+
+        print(f"output2 shape: {output.shape}, dtype: {output.dtype}")
+        
         if not return_dict:
             return (output,)
 
