@@ -361,9 +361,9 @@ class Transformer3DModel(ModelMixin, ConfigMixin):
 
         video_length = hidden_states.shape[2]
         hidden_states = rearrange(hidden_states, "b c f h w -> (b f) c h w").contiguous()
-        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #torch.Size([16, 320, 40, 64]), dtype: torch.float16
         encoder_hidden_states = repeat(encoder_hidden_states, 'b n c -> (b f) n c', f=video_length).contiguous()
-        print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
+        #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #shape: torch.Size([16, 10, 768]), dtype: torch.float16
 
         batch, channel, height, weight = hidden_states.shape
         residual = hidden_states
@@ -371,16 +371,16 @@ class Transformer3DModel(ModelMixin, ConfigMixin):
         hidden_states = self.norm(hidden_states)
         if not self.use_linear_projection:
             hidden_states = self.proj_in(hidden_states)
-            print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 320, 40, 64]), dtype: torch.float16
             inner_dim = hidden_states.shape[1]
             hidden_states = hidden_states.permute(0, 2, 3, 1).reshape(batch, height * weight, inner_dim)
-            print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 2560, 320]), dtype: torch.float16
         else:
             inner_dim = hidden_states.shape[1]
             hidden_states = hidden_states.permute(0, 2, 3, 1).reshape(batch, height * weight, inner_dim)
-            print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             hidden_states = self.proj_in(hidden_states)
-            print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         # Blocks
         for block in self.transformer_blocks:
@@ -391,16 +391,16 @@ class Transformer3DModel(ModelMixin, ConfigMixin):
                 video_length=video_length,
                 use_image_num=use_image_num,
             )
-            print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 2560, 320]), dtype: torch.float16
 
         # Output
         if not self.use_linear_projection:
             hidden_states = (
                 hidden_states.reshape(batch, height, weight, inner_dim).permute(0, 3, 1, 2).contiguous()
             )
-            print(f"hidden_states7 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states7 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 320, 40, 64]), dtype: torch.float16
             hidden_states = self.proj_out(hidden_states)
-            print(f"hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 320, 40, 64]), dtype: torch.float16
         else:
             hidden_states = self.proj_out(hidden_states)
             print(f"hidden_states9 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
@@ -411,12 +411,12 @@ class Transformer3DModel(ModelMixin, ConfigMixin):
 
         output = hidden_states + residual
 
-        print(f"output1 shape: {output.shape}, dtype: {output.dtype}")
+        #print(f"output1 shape: {output.shape}, dtype: {output.dtype}") #shape: torch.Size([16, 320, 40, 64]), dtype: torch.float16
 
         output = rearrange(output, "(b f) c h w -> b c f h w", f=video_length + use_image_num).contiguous()
 
-        print(f"output2 shape: {output.shape}, dtype: {output.dtype}")
-        
+        #print(f"output2 shape: {output.shape}, dtype: {output.dtype}") #shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
+
         if not return_dict:
             return (output,)
 
@@ -525,53 +525,77 @@ class BasicTransformerBlock(nn.Module):
             # self.attn_temp._use_memory_efficient_attention_xformers = use_memory_efficient_attention_xformers
 
     def forward(self, hidden_states, encoder_hidden_states=None, timestep=None, attention_mask=None, video_length=None, use_image_num=None):
+        
+        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
+
         # SparseCausal-Attention
         norm_hidden_states = (
             self.norm1(hidden_states, timestep) if self.use_ada_layer_norm else self.norm1(hidden_states)
         )
+        print(f"norm_hidden_states1 shape: {norm_hidden_states.shape}, dtype: {norm_hidden_states.dtype}")
 
         if self.only_cross_attention:
             hidden_states = (
                 self.attn1(norm_hidden_states, encoder_hidden_states, attention_mask=attention_mask) + hidden_states
             )
+            print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         else:
             hidden_states = self.attn1(norm_hidden_states, attention_mask=attention_mask, use_image_num=use_image_num) + hidden_states
- 
+            print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
         if self.attn2 is not None:
             # Cross-Attention
             norm_hidden_states = (
                 self.norm2(hidden_states, timestep) if self.use_ada_layer_norm else self.norm2(hidden_states)
             )
+            print(f"norm_hidden_states2 shape: {norm_hidden_states.shape}, dtype: {norm_hidden_states.dtype}")
             hidden_states = (
                 self.attn2(
                     norm_hidden_states, encoder_hidden_states=encoder_hidden_states, attention_mask=attention_mask
                 )
                 + hidden_states
             )
+            print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         # Temporal Attention
         if self.training:
             d = hidden_states.shape[1]
             hidden_states = rearrange(hidden_states, "(b f) d c -> (b d) f c", f=video_length + use_image_num).contiguous()
+            print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             hidden_states_video = hidden_states[:, :video_length, :]
+            print(f"hidden_states_video1 shape: {hidden_states_video.shape}, dtype: {hidden_states_video.dtype}")
             hidden_states_image = hidden_states[:, video_length:, :]
+            print(f"hidden_states_image shape: {hidden_states_image.shape}, dtype: {hidden_states_image.dtype}")
             norm_hidden_states_video = (
                 self.norm_temp(hidden_states_video, timestep) if self.use_ada_layer_norm else self.norm_temp(hidden_states_video)
             )
+            print(f"norm_hidden_states_video shape: {norm_hidden_states_video.shape}, dtype: {norm_hidden_states_video.dtype}")
             hidden_states_video = self.attn_temp(norm_hidden_states_video) + hidden_states_video
+            print(f"hidden_states_video2 shape: {hidden_states_video.shape}, dtype: {hidden_states_video.dtype}")
             hidden_states = torch.cat([hidden_states_video, hidden_states_image], dim=1)
+            print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             hidden_states = rearrange(hidden_states, "(b d) f c -> (b f) d c", d=d).contiguous()
+            print(f"hidden_states7 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         else:
             d = hidden_states.shape[1]
             hidden_states = rearrange(hidden_states, "(b f) d c -> (b d) f c", f=video_length + use_image_num).contiguous()
+            print(f"hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             norm_hidden_states = (
                 self.norm_temp(hidden_states, timestep) if self.use_ada_layer_norm else self.norm_temp(hidden_states)
             )
+            print(f"norm_hidden_states3 shape: {norm_hidden_states.shape}, dtype: {norm_hidden_states.dtype}")
             hidden_states = self.attn_temp(norm_hidden_states) + hidden_states
+            print(f"hidden_states9 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             hidden_states = rearrange(hidden_states, "(b d) f c -> (b f) d c", d=d).contiguous()
+            print(f"hidden_states10 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
+        print(f"hidden_states11 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         # Feed-forward
         hidden_states = self.ff(self.norm3(hidden_states)) + hidden_states
+
+        print(f"hidden_states12 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         
         return hidden_states
 
