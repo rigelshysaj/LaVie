@@ -109,7 +109,10 @@ class VideoDatasetMsvd(Dataset):
             return video, descriptions, mid_frame
         
         except Exception as e:
+            print("--------------------------------------------------------------------------------------------------")
             print(f"Skipping video {video_file} due to error: {e}")
+            print("--------------------------------------------------------------------------------------------------")
+
             return None, None, None
 
 
