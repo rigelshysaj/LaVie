@@ -636,29 +636,29 @@ class TemporalAttention(CrossAttention):
         
         if self.added_kv_proj_dim is not None:
             key = self.to_k(hidden_states)
-            print(f"key1 shape: {key.shape}, dtype: {key.dtype}")
+            #print(f"key1 shape: {key.shape}, dtype: {key.dtype}")
             value = self.to_v(hidden_states)
-            print(f"value1 shape: {value.shape}, dtype: {value.dtype}")
+            #print(f"value1 shape: {value.shape}, dtype: {value.dtype}")
             encoder_hidden_states_key_proj = self.add_k_proj(encoder_hidden_states)
-            print(f"encoder_hidden_states_key_proj1 shape: {encoder_hidden_states_key_proj.shape}, dtype: {encoder_hidden_states_key_proj.dtype}")
+            #print(f"encoder_hidden_states_key_proj1 shape: {encoder_hidden_states_key_proj.shape}, dtype: {encoder_hidden_states_key_proj.dtype}")
             encoder_hidden_states_value_proj = self.add_v_proj(encoder_hidden_states)
-            print(f"encoder_hidden_states_value_proj1 shape: {encoder_hidden_states_value_proj.shape}, dtype: {encoder_hidden_states_value_proj.dtype}")
+            #print(f"encoder_hidden_states_value_proj1 shape: {encoder_hidden_states_value_proj.shape}, dtype: {encoder_hidden_states_value_proj.dtype}")
 
             key = self.reshape_heads_to_batch_dim(key)
-            print(f"key2 shape: {key.shape}, dtype: {key.dtype}")
+            #print(f"key2 shape: {key.shape}, dtype: {key.dtype}")
             value = self.reshape_heads_to_batch_dim(value)
-            print(f"value2 shape: {value.shape}, dtype: {value.dtype}")
+            #print(f"value2 shape: {value.shape}, dtype: {value.dtype}")
             encoder_hidden_states_key_proj = self.reshape_heads_to_batch_dim(encoder_hidden_states_key_proj)
-            print(f"encoder_hidden_states_key_proj2 shape: {encoder_hidden_states_key_proj.shape}, dtype: {encoder_hidden_states_key_proj.dtype}")
+            #print(f"encoder_hidden_states_key_proj2 shape: {encoder_hidden_states_key_proj.shape}, dtype: {encoder_hidden_states_key_proj.dtype}")
 
             encoder_hidden_states_value_proj = self.reshape_heads_to_batch_dim(encoder_hidden_states_value_proj)
-            print(f"encoder_hidden_states_value_proj2 shape: {encoder_hidden_states_value_proj.shape}, dtype: {encoder_hidden_states_value_proj.dtype}")
+            #print(f"encoder_hidden_states_value_proj2 shape: {encoder_hidden_states_value_proj.shape}, dtype: {encoder_hidden_states_value_proj.dtype}")
 
 
             key = torch.concat([encoder_hidden_states_key_proj, key], dim=1)
-            print(f"key3 shape: {key.shape}, dtype: {key.dtype}")
+            #print(f"key3 shape: {key.shape}, dtype: {key.dtype}")
             value = torch.concat([encoder_hidden_states_value_proj, value], dim=1)
-            print(f"value3 shape: {value.shape}, dtype: {value.dtype}")
+            #print(f"value3 shape: {value.shape}, dtype: {value.dtype}")
 
         else:
             encoder_hidden_states = encoder_hidden_states if encoder_hidden_states is not None else hidden_states
@@ -674,17 +674,17 @@ class TemporalAttention(CrossAttention):
                 target_length = query.shape[1]
                 attention_mask = F.pad(attention_mask, (0, target_length), value=0.0)
                 attention_mask = attention_mask.repeat_interleave(self.heads, dim=0)
-                print(f"attention_mask1 shape: {attention_mask.shape}, dtype: {attention_mask.dtype}")
+                #print(f"attention_mask1 shape: {attention_mask.shape}, dtype: {attention_mask.dtype}")
 
 
         # attention, what we cannot get enough of
         if self._use_memory_efficient_attention_xformers:
             hidden_states = self._memory_efficient_attention_xformers(query, key, value, attention_mask)
-            print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
             # Some versions of xformers return output in fp32, cast it back to the dtype of the input
             hidden_states = hidden_states.to(query.dtype)
-            print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         else:
             if self._slice_size is None or query.shape[0] // self._slice_size == 1:
@@ -693,7 +693,7 @@ class TemporalAttention(CrossAttention):
 
             else:
                 hidden_states = self._sliced_attention(query, key, value, sequence_length, dim, attention_mask)
-                print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+                #print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
 
         # linear proj
@@ -708,30 +708,46 @@ class TemporalAttention(CrossAttention):
         return hidden_states
 
     def _attention(self, query, key, value, attention_mask=None, time_rel_pos_bias=None):
+
+        print(f"query1 shape: {query.shape}, dtype: {query.dtype}")
+        print(f"key1 shape: {key.shape}, dtype: {key.dtype}")
+        print(f"value1 shape: {value.shape}, dtype: {value.dtype}")
+
         if self.upcast_attention:
             query = query.float()
             key = key.float()
 
         # reshape for adding time positional bais
         query = self.scale * rearrange(query, 'b f (h d) -> b h f d', h=self.heads) # d: dim_head; n: heads
+        print(f"query2 shape: {query.shape}, dtype: {query.dtype}")
         key = rearrange(key, 'b f (h d) -> b h f d', h=self.heads) # d: dim_head; n: heads
+        print(f"key2 shape: {key.shape}, dtype: {key.dtype}")
         value = rearrange(value, 'b f (h d) -> b h f d', h=self.heads) # d: dim_head; n: heads
+        print(f"value2 shape: {value.shape}, dtype: {value.dtype}")
 
         if exists(self.rotary_emb):
             query = self.rotary_emb.rotate_queries_or_keys(query)
+            print(f"query3 shape: {query.shape}, dtype: {query.dtype}")
             key = self.rotary_emb.rotate_queries_or_keys(key)
+            print(f"key3 shape: {key.shape}, dtype: {key.dtype}")
 
         attention_scores = torch.einsum('... h i d, ... h j d -> ... h i j', query, key)
+        print(f"attention_scores1 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
 
         attention_scores = attention_scores + time_rel_pos_bias
+        print(f"attention_scores2 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
 
         if attention_mask is not None:
             # add attention mask
             attention_scores = attention_scores + attention_mask
+            print(f"attention_mask1 shape: {attention_mask.shape}, dtype: {attention_mask.dtype}")
+            print(f"attention_scores3 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
 
         attention_scores = attention_scores - attention_scores.amax(dim = -1, keepdim = True).detach()
+        print(f"attention_scores4 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
 
         attention_probs = nn.functional.softmax(attention_scores, dim=-1)
+        print(f"attention_probs1 shape: {attention_probs.shape}, dtype: {attention_probs.dtype}")
         # print(attention_probs[0][0])
 
         # cast back to the original dtype
@@ -739,7 +755,9 @@ class TemporalAttention(CrossAttention):
 
         # compute attention output 
         hidden_states = torch.einsum('... h i j, ... h j d -> ... h i d', attention_probs, value)
+        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         hidden_states = rearrange(hidden_states, 'b h f d -> b f (h d)')
+        print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         return hidden_states
     
 class RelativePositionBias(nn.Module):
