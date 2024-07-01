@@ -709,9 +709,9 @@ class TemporalAttention(CrossAttention):
 
     def _attention(self, query, key, value, attention_mask=None, time_rel_pos_bias=None):
 
-        print(f"query1 shape: {query.shape}, dtype: {query.dtype}")
-        print(f"key1 shape: {key.shape}, dtype: {key.dtype}")
-        print(f"value1 shape: {value.shape}, dtype: {value.dtype}")
+        #print(f"query1 shape: {query.shape}, dtype: {query.dtype}") #torch.Size([640, 16, 640]), dtype: torch.float16
+        #print(f"key1 shape: {key.shape}, dtype: {key.dtype}") #torch.Size([640, 16, 640]), dtype: torch.float16
+        #print(f"value1 shape: {value.shape}, dtype: {value.dtype}") #torch.Size([640, 16, 640]), dtype: torch.float16
 
         if self.upcast_attention:
             query = query.float()
@@ -719,35 +719,35 @@ class TemporalAttention(CrossAttention):
 
         # reshape for adding time positional bais
         query = self.scale * rearrange(query, 'b f (h d) -> b h f d', h=self.heads) # d: dim_head; n: heads
-        print(f"query2 shape: {query.shape}, dtype: {query.dtype}")
+        #print(f"query2 shape: {query.shape}, dtype: {query.dtype}") #shape: torch.Size([640, 8, 16, 80]), dtype: torch.float16
         key = rearrange(key, 'b f (h d) -> b h f d', h=self.heads) # d: dim_head; n: heads
-        print(f"key2 shape: {key.shape}, dtype: {key.dtype}")
+        #print(f"key2 shape: {key.shape}, dtype: {key.dtype}") #shape: torch.Size([640, 8, 16, 80]), dtype: torch.float16
         value = rearrange(value, 'b f (h d) -> b h f d', h=self.heads) # d: dim_head; n: heads
-        print(f"value2 shape: {value.shape}, dtype: {value.dtype}")
+        #print(f"value2 shape: {value.shape}, dtype: {value.dtype}") #shape: torch.Size([640, 8, 16, 80]), dtype: torch.float16
 
         if exists(self.rotary_emb):
             query = self.rotary_emb.rotate_queries_or_keys(query)
-            print(f"query3 shape: {query.shape}, dtype: {query.dtype}")
+            #print(f"query3 shape: {query.shape}, dtype: {query.dtype}") #shape: torch.Size([640, 8, 16, 80]), dtype: torch.float16
             key = self.rotary_emb.rotate_queries_or_keys(key)
-            print(f"key3 shape: {key.shape}, dtype: {key.dtype}")
+            #print(f"key3 shape: {key.shape}, dtype: {key.dtype}") #shape: torch.Size([640, 8, 16, 80]), dtype: torch.float16
 
         attention_scores = torch.einsum('... h i d, ... h j d -> ... h i j', query, key)
-        print(f"attention_scores1 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
+        #print(f"attention_scores1 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}") #shape: torch.Size([640, 8, 16, 16]), dtype: torch.float16
 
         attention_scores = attention_scores + time_rel_pos_bias
-        print(f"attention_scores2 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
+        #print(f"attention_scores2 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}") #shape: torch.Size([640, 8, 16, 16]), dtype: torch.float16
 
         if attention_mask is not None:
             # add attention mask
             attention_scores = attention_scores + attention_mask
-            print(f"attention_mask1 shape: {attention_mask.shape}, dtype: {attention_mask.dtype}")
-            print(f"attention_scores3 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
+            #print(f"attention_mask1 shape: {attention_mask.shape}, dtype: {attention_mask.dtype}")
+            #print(f"attention_scores3 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
 
         attention_scores = attention_scores - attention_scores.amax(dim = -1, keepdim = True).detach()
-        print(f"attention_scores4 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
+        #print(f"attention_scores4 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}") #shape: torch.Size([640, 8, 16, 16]), dtype: torch.float16
 
         attention_probs = nn.functional.softmax(attention_scores, dim=-1)
-        print(f"attention_probs1 shape: {attention_probs.shape}, dtype: {attention_probs.dtype}")
+        #print(f"attention_probs1 shape: {attention_probs.shape}, dtype: {attention_probs.dtype}") #shape: torch.Size([640, 8, 16, 16]), dtype: torch.float32
         # print(attention_probs[0][0])
 
         # cast back to the original dtype
@@ -755,9 +755,9 @@ class TemporalAttention(CrossAttention):
 
         # compute attention output 
         hidden_states = torch.einsum('... h i j, ... h j d -> ... h i d', attention_probs, value)
-        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([640, 8, 16, 80]), dtype: torch.float16
         hidden_states = rearrange(hidden_states, 'b h f d -> b f (h d)')
-        print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([640, 16, 640]), dtype: torch.float16
         return hidden_states
     
 class RelativePositionBias(nn.Module):
