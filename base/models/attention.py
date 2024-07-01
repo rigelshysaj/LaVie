@@ -330,13 +330,13 @@ class CrossAttention(nn.Module):
         query = query.contiguous()
         key = key.contiguous()
         value = value.contiguous()
-        print(f"key shape: {key.shape}, dtype: {key.dtype}")
-        print(f"query shape: {query.shape}, dtype: {query.dtype}")
-        print(f"value shape: {value.shape}, dtype: {value.dtype}")
+        #print(f"key shape: {key.shape}, dtype: {key.dtype}") #shape: torch.Size([128, 10, 160]), dtype: torch.float16
+        #print(f"query shape: {query.shape}, dtype: {query.dtype}") #shape: torch.Size([128, 160, 160]), dtype: torch.float16
+        #print(f"value shape: {value.shape}, dtype: {value.dtype}") #shape: torch.Size([128, 10, 160]), dtype: torch.float16
         hidden_states = xformers.ops.memory_efficient_attention(query, key, value, attn_bias=attention_mask)
-        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([128, 160, 160]), dtype: torch.float16
         hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
-        print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 160, 1280]), dtype: torch.float16
         return hidden_states
 
 
