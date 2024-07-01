@@ -403,11 +403,11 @@ class Transformer3DModel(ModelMixin, ConfigMixin):
             #print(f"hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 320, 40, 64]), dtype: torch.float16
         else:
             hidden_states = self.proj_out(hidden_states)
-            print(f"hidden_states9 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states9 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             hidden_states = (
                 hidden_states.reshape(batch, height, weight, inner_dim).permute(0, 3, 1, 2).contiguous()
             )
-            print(f"hidden_states10 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states10 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         output = hidden_states + residual
 
@@ -526,76 +526,76 @@ class BasicTransformerBlock(nn.Module):
 
     def forward(self, hidden_states, encoder_hidden_states=None, timestep=None, attention_mask=None, video_length=None, use_image_num=None):
         
-        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
-        print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
+        #print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 160, 1280]), dtype: torch.float16
+        #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #shape: torch.Size([16, 8, 768]), dtype: torch.float16
 
         # SparseCausal-Attention
         norm_hidden_states = (
             self.norm1(hidden_states, timestep) if self.use_ada_layer_norm else self.norm1(hidden_states)
         )
-        print(f"norm_hidden_states1 shape: {norm_hidden_states.shape}, dtype: {norm_hidden_states.dtype}")
+        #print(f"norm_hidden_states1 shape: {norm_hidden_states.shape}, dtype: {norm_hidden_states.dtype}") #shape: torch.Size([16, 160, 1280]), dtype: torch.float32
 
         if self.only_cross_attention:
             hidden_states = (
                 self.attn1(norm_hidden_states, encoder_hidden_states, attention_mask=attention_mask) + hidden_states
             )
-            print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         else:
             hidden_states = self.attn1(norm_hidden_states, attention_mask=attention_mask, use_image_num=use_image_num) + hidden_states
-            print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #torch.Size([16, 160, 1280]), dtype: torch.float16
 
         if self.attn2 is not None:
             # Cross-Attention
             norm_hidden_states = (
                 self.norm2(hidden_states, timestep) if self.use_ada_layer_norm else self.norm2(hidden_states)
             )
-            print(f"norm_hidden_states2 shape: {norm_hidden_states.shape}, dtype: {norm_hidden_states.dtype}")
+            #print(f"norm_hidden_states2 shape: {norm_hidden_states.shape}, dtype: {norm_hidden_states.dtype}") #shape: torch.Size([16, 160, 1280]), dtype: torch.float32
             hidden_states = (
                 self.attn2(
                     norm_hidden_states, encoder_hidden_states=encoder_hidden_states, attention_mask=attention_mask
                 )
                 + hidden_states
             )
-            print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 160, 1280]), dtype: torch.float16
 
         # Temporal Attention
         if self.training:
             d = hidden_states.shape[1]
             hidden_states = rearrange(hidden_states, "(b f) d c -> (b d) f c", f=video_length + use_image_num).contiguous()
-            print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([160, 16, 1280]), dtype: torch.float16
             hidden_states_video = hidden_states[:, :video_length, :]
-            print(f"hidden_states_video1 shape: {hidden_states_video.shape}, dtype: {hidden_states_video.dtype}")
+            #print(f"hidden_states_video1 shape: {hidden_states_video.shape}, dtype: {hidden_states_video.dtype}") #shape: torch.Size([160, 16, 1280]), dtype: torch.float16
             hidden_states_image = hidden_states[:, video_length:, :]
-            print(f"hidden_states_image shape: {hidden_states_image.shape}, dtype: {hidden_states_image.dtype}")
+            #print(f"hidden_states_image shape: {hidden_states_image.shape}, dtype: {hidden_states_image.dtype}") #shape: torch.Size([160, 0, 1280]), dtype: torch.float16
             norm_hidden_states_video = (
                 self.norm_temp(hidden_states_video, timestep) if self.use_ada_layer_norm else self.norm_temp(hidden_states_video)
             )
-            print(f"norm_hidden_states_video shape: {norm_hidden_states_video.shape}, dtype: {norm_hidden_states_video.dtype}")
+            #print(f"norm_hidden_states_video shape: {norm_hidden_states_video.shape}, dtype: {norm_hidden_states_video.dtype}") #shape: torch.Size([160, 16, 1280]), dtype: torch.float32
             hidden_states_video = self.attn_temp(norm_hidden_states_video) + hidden_states_video
-            print(f"hidden_states_video2 shape: {hidden_states_video.shape}, dtype: {hidden_states_video.dtype}")
+            #print(f"hidden_states_video2 shape: {hidden_states_video.shape}, dtype: {hidden_states_video.dtype}") #shape: torch.Size([160, 16, 1280]), dtype: torch.float16
             hidden_states = torch.cat([hidden_states_video, hidden_states_image], dim=1)
-            print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([160, 16, 1280]), dtype: torch.float16
             hidden_states = rearrange(hidden_states, "(b d) f c -> (b f) d c", d=d).contiguous()
-            print(f"hidden_states7 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states7 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 160, 1280]), dtype: torch.float16
         else:
             d = hidden_states.shape[1]
             hidden_states = rearrange(hidden_states, "(b f) d c -> (b d) f c", f=video_length + use_image_num).contiguous()
-            print(f"hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             norm_hidden_states = (
                 self.norm_temp(hidden_states, timestep) if self.use_ada_layer_norm else self.norm_temp(hidden_states)
             )
-            print(f"norm_hidden_states3 shape: {norm_hidden_states.shape}, dtype: {norm_hidden_states.dtype}")
+            #print(f"norm_hidden_states3 shape: {norm_hidden_states.shape}, dtype: {norm_hidden_states.dtype}")
             hidden_states = self.attn_temp(norm_hidden_states) + hidden_states
-            print(f"hidden_states9 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states9 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             hidden_states = rearrange(hidden_states, "(b d) f c -> (b f) d c", d=d).contiguous()
-            print(f"hidden_states10 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states10 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
-        print(f"hidden_states11 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states11 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 160, 1280]), dtype: torch.float16
 
         # Feed-forward
         hidden_states = self.ff(self.norm3(hidden_states)) + hidden_states
 
-        print(f"hidden_states12 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states12 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 160, 1280]), dtype: torch.float16
         
         return hidden_states
 
@@ -621,54 +621,90 @@ class TemporalAttention(CrossAttention):
         time_rel_pos_bias = self.time_rel_pos_bias(hidden_states.shape[1], device=hidden_states.device)
         batch_size, sequence_length, _ = hidden_states.shape
 
+        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        print(f"encoder_hidden_states1 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
+
         encoder_hidden_states = encoder_hidden_states
 
         if self.group_norm is not None:
             hidden_states = self.group_norm(hidden_states.transpose(1, 2)).transpose(1, 2)
+            print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         query = self.to_q(hidden_states) # [b (h w)] f (nd * d)
+        print(f"query1 shape: {query.shape}, dtype: {query.dtype}")
         dim = query.shape[-1]
         
         if self.added_kv_proj_dim is not None:
             key = self.to_k(hidden_states)
+            print(f"key1 shape: {key.shape}, dtype: {key.dtype}")
             value = self.to_v(hidden_states)
+            print(f"value1 shape: {value.shape}, dtype: {value.dtype}")
             encoder_hidden_states_key_proj = self.add_k_proj(encoder_hidden_states)
+            print(f"encoder_hidden_states_key_proj1 shape: {encoder_hidden_states_key_proj.shape}, dtype: {encoder_hidden_states_key_proj.dtype}")
             encoder_hidden_states_value_proj = self.add_v_proj(encoder_hidden_states)
+            print(f"encoder_hidden_states_value_proj1 shape: {encoder_hidden_states_value_proj.shape}, dtype: {encoder_hidden_states_value_proj.dtype}")
 
             key = self.reshape_heads_to_batch_dim(key)
+            print(f"key2 shape: {key.shape}, dtype: {key.dtype}")
             value = self.reshape_heads_to_batch_dim(value)
+            print(f"value2 shape: {value.shape}, dtype: {value.dtype}")
             encoder_hidden_states_key_proj = self.reshape_heads_to_batch_dim(encoder_hidden_states_key_proj)
+            print(f"encoder_hidden_states_key_proj2 shape: {encoder_hidden_states_key_proj.shape}, dtype: {encoder_hidden_states_key_proj.dtype}")
+
             encoder_hidden_states_value_proj = self.reshape_heads_to_batch_dim(encoder_hidden_states_value_proj)
+            print(f"encoder_hidden_states_value_proj2 shape: {encoder_hidden_states_value_proj.shape}, dtype: {encoder_hidden_states_value_proj.dtype}")
+
 
             key = torch.concat([encoder_hidden_states_key_proj, key], dim=1)
+            print(f"key3 shape: {key.shape}, dtype: {key.dtype}")
             value = torch.concat([encoder_hidden_states_value_proj, value], dim=1)
+            print(f"value3 shape: {value.shape}, dtype: {value.dtype}")
+
         else:
             encoder_hidden_states = encoder_hidden_states if encoder_hidden_states is not None else hidden_states
+            print(f"encoder_hidden_states2 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
             key = self.to_k(encoder_hidden_states)
+            print(f"key4 shape: {key.shape}, dtype: {key.dtype}")
             value = self.to_v(encoder_hidden_states)
+            print(f"value4 shape: {value.shape}, dtype: {value.dtype}")
+
             
         if attention_mask is not None:
             if attention_mask.shape[-1] != query.shape[1]:
                 target_length = query.shape[1]
                 attention_mask = F.pad(attention_mask, (0, target_length), value=0.0)
                 attention_mask = attention_mask.repeat_interleave(self.heads, dim=0)
+                print(f"attention_mask1 shape: {attention_mask.shape}, dtype: {attention_mask.dtype}")
+
 
         # attention, what we cannot get enough of
         if self._use_memory_efficient_attention_xformers:
             hidden_states = self._memory_efficient_attention_xformers(query, key, value, attention_mask)
+            print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
             # Some versions of xformers return output in fp32, cast it back to the dtype of the input
             hidden_states = hidden_states.to(query.dtype)
+            print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
         else:
             if self._slice_size is None or query.shape[0] // self._slice_size == 1:
                 hidden_states = self._attention(query, key, value, attention_mask, time_rel_pos_bias)
+                print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
             else:
                 hidden_states = self._sliced_attention(query, key, value, sequence_length, dim, attention_mask)
+                print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
 
         # linear proj
         hidden_states = self.to_out[0](hidden_states)
+        print(f"hidden_states7 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
 
         # dropout
         hidden_states = self.to_out[1](hidden_states)
+        print(f"hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
         return hidden_states
 
     def _attention(self, query, key, value, attention_mask=None, time_rel_pos_bias=None):
