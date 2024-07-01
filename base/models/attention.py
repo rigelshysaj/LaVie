@@ -146,63 +146,92 @@ class CrossAttention(nn.Module):
     def forward(self, hidden_states, encoder_hidden_states=None, attention_mask=None, use_image_num=None):
         batch_size, sequence_length, _ = hidden_states.shape
 
+        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        print(f"encoder_hidden_states1 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
         encoder_hidden_states = encoder_hidden_states
 
         if self.group_norm is not None:
             hidden_states = self.group_norm(hidden_states.transpose(1, 2)).transpose(1, 2)
+            print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         query = self.to_q(hidden_states) # [b (h w)] f (nd * d)
+        print(f"query1 shape: {query.shape}, dtype: {query.dtype}")
 
         # print('before reshpape query shape', query.shape)
         dim = query.shape[-1]
         if not self.use_relative_position:
             query = self.reshape_heads_to_batch_dim(query) # [b (h w) nd] f d
+            print(f"query2 shape: {query.shape}, dtype: {query.dtype}")
         # print('after reshape query shape', query.shape)
 
         if self.added_kv_proj_dim is not None:
             key = self.to_k(hidden_states)
+            print(f"key1 shape: {key.shape}, dtype: {key.dtype}")
             value = self.to_v(hidden_states)
+            print(f"value1 shape: {value.shape}, dtype: {value.dtype}")
             encoder_hidden_states_key_proj = self.add_k_proj(encoder_hidden_states)
+            print(f"encoder_hidden_states_key_proj1 shape: {encoder_hidden_states_key_proj.shape}, dtype: {encoder_hidden_states_key_proj.dtype}")
             encoder_hidden_states_value_proj = self.add_v_proj(encoder_hidden_states)
+            print(f"encoder_hidden_states_value_proj1 shape: {encoder_hidden_states_value_proj.shape}, dtype: {encoder_hidden_states_value_proj.dtype}")
 
             key = self.reshape_heads_to_batch_dim(key)
+            print(f"key2 shape: {key.shape}, dtype: {key.dtype}")
             value = self.reshape_heads_to_batch_dim(value)
+            print(f"value2 shape: {value.shape}, dtype: {value.dtype}")
             encoder_hidden_states_key_proj = self.reshape_heads_to_batch_dim(encoder_hidden_states_key_proj)
+            print(f"encoder_hidden_states_key_proj2 shape: {encoder_hidden_states_key_proj.shape}, dtype: {encoder_hidden_states_key_proj.dtype}")
+
             encoder_hidden_states_value_proj = self.reshape_heads_to_batch_dim(encoder_hidden_states_value_proj)
+            print(f"encoder_hidden_states_value_proj2 shape: {encoder_hidden_states_value_proj.shape}, dtype: {encoder_hidden_states_value_proj.dtype}")
+
 
             key = torch.concat([encoder_hidden_states_key_proj, key], dim=1)
+            print(f"key3 shape: {key.shape}, dtype: {key.dtype}")
             value = torch.concat([encoder_hidden_states_value_proj, value], dim=1)
+            print(f"value3 shape: {value.shape}, dtype: {value.dtype}")
         else:
             encoder_hidden_states = encoder_hidden_states if encoder_hidden_states is not None else hidden_states
+            print(f"encoder_hidden_states2 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
+
             key = self.to_k(encoder_hidden_states)
+            print(f"key4 shape: {key.shape}, dtype: {key.dtype}")
             value = self.to_v(encoder_hidden_states)
-            
+            print(f"value4 shape: {value.shape}, dtype: {value.dtype}")
             if not self.use_relative_position:
                 key = self.reshape_heads_to_batch_dim(key)
+                print(f"key5 shape: {key.shape}, dtype: {key.dtype}")
                 value = self.reshape_heads_to_batch_dim(value)
+                print(f"value5 shape: {value.shape}, dtype: {value.dtype}")
 
         if attention_mask is not None:
             if attention_mask.shape[-1] != query.shape[1]:
                 target_length = query.shape[1]
                 attention_mask = F.pad(attention_mask, (0, target_length), value=0.0)
                 attention_mask = attention_mask.repeat_interleave(self.heads, dim=0)
+                print(f"attention_mask shape: {attention_mask.shape}, dtype: {attention_mask.dtype}")
 
         # attention, what we cannot get enough of
         if self._use_memory_efficient_attention_xformers:
             hidden_states = self._memory_efficient_attention_xformers(query, key, value, attention_mask)
+            print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             # Some versions of xformers return output in fp32, cast it back to the dtype of the input
             hidden_states = hidden_states.to(query.dtype)
+            print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         else:
             if self._slice_size is None or query.shape[0] // self._slice_size == 1:
                 hidden_states = self._attention(query, key, value, attention_mask)
+                print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             else:
                 hidden_states = self._sliced_attention(query, key, value, sequence_length, dim, attention_mask)
+                print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         # linear proj
         hidden_states = self.to_out[0](hidden_states)
+        print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         # dropout
         hidden_states = self.to_out[1](hidden_states)
+        print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         return hidden_states
 
 
