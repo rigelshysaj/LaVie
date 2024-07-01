@@ -621,17 +621,17 @@ class TemporalAttention(CrossAttention):
         time_rel_pos_bias = self.time_rel_pos_bias(hidden_states.shape[1], device=hidden_states.device)
         batch_size, sequence_length, _ = hidden_states.shape
 
-        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
-        #print(f"encoder_hidden_states1 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
+        #print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([640, 16, 640]), dtype: torch.float32. Il shape di hidden_states all'inizio può essere anche [160, 16, 1280] o [40, 16, 1280 o [2560, 16, 320] etc..
+        #print(f"encoder_hidden_states1 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #None type
 
         encoder_hidden_states = encoder_hidden_states
 
         if self.group_norm is not None:
             hidden_states = self.group_norm(hidden_states.transpose(1, 2)).transpose(1, 2)
-            print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            #print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         query = self.to_q(hidden_states) # [b (h w)] f (nd * d)
-        print(f"query1 shape: {query.shape}, dtype: {query.dtype}")
+        #print(f"query1 shape: {query.shape}, dtype: {query.dtype}") #shape: torch.Size([640, 16, 640]), dtype: torch.float16
         dim = query.shape[-1]
         
         if self.added_kv_proj_dim is not None:
@@ -662,11 +662,11 @@ class TemporalAttention(CrossAttention):
 
         else:
             encoder_hidden_states = encoder_hidden_states if encoder_hidden_states is not None else hidden_states
-            print(f"encoder_hidden_states2 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
+            #print(f"encoder_hidden_states2 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #shape: torch.Size([640, 16, 640]), dtype: torch.float32
             key = self.to_k(encoder_hidden_states)
-            print(f"key4 shape: {key.shape}, dtype: {key.dtype}")
+            #print(f"key4 shape: {key.shape}, dtype: {key.dtype}") #shape: torch.Size([640, 16, 640]), dtype: torch.float16
             value = self.to_v(encoder_hidden_states)
-            print(f"value4 shape: {value.shape}, dtype: {value.dtype}")
+            #print(f"value4 shape: {value.shape}, dtype: {value.dtype}") #shape: torch.Size([640, 16, 640]), dtype: torch.float16
 
             
         if attention_mask is not None:
@@ -689,7 +689,7 @@ class TemporalAttention(CrossAttention):
         else:
             if self._slice_size is None or query.shape[0] // self._slice_size == 1:
                 hidden_states = self._attention(query, key, value, attention_mask, time_rel_pos_bias)
-                print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+                #print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([640, 16, 640]), dtype: torch.float16
 
             else:
                 hidden_states = self._sliced_attention(query, key, value, sequence_length, dim, attention_mask)
@@ -698,12 +698,12 @@ class TemporalAttention(CrossAttention):
 
         # linear proj
         hidden_states = self.to_out[0](hidden_states)
-        print(f"hidden_states7 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states7 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([640, 16, 640]), dtype: torch.float16
 
 
         # dropout
         hidden_states = self.to_out[1](hidden_states)
-        print(f"hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([640, 16, 640]), dtype: torch.float16
 
         return hidden_states
 
