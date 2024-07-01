@@ -147,7 +147,7 @@ class CrossAttention(nn.Module):
         batch_size, sequence_length, _ = hidden_states.shape
 
         print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
-        print(f"encoder_hidden_states1 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
+        #print(f"encoder_hidden_states1 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #None type
         encoder_hidden_states = encoder_hidden_states
 
         if self.group_norm is not None:
