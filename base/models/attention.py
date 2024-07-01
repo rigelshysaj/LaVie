@@ -146,7 +146,7 @@ class CrossAttention(nn.Module):
     def forward(self, hidden_states, encoder_hidden_states=None, attention_mask=None, use_image_num=None):
         batch_size, sequence_length, _ = hidden_states.shape
 
-        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 2560, 320]), dtype: torch.float32
         #print(f"encoder_hidden_states1 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #None type
         encoder_hidden_states = encoder_hidden_states
 
@@ -213,25 +213,25 @@ class CrossAttention(nn.Module):
         # attention, what we cannot get enough of
         if self._use_memory_efficient_attention_xformers:
             hidden_states = self._memory_efficient_attention_xformers(query, key, value, attention_mask)
-            print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             # Some versions of xformers return output in fp32, cast it back to the dtype of the input
             hidden_states = hidden_states.to(query.dtype)
-            print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         else:
             if self._slice_size is None or query.shape[0] // self._slice_size == 1:
                 hidden_states = self._attention(query, key, value, attention_mask)
-                print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+                print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             else:
                 hidden_states = self._sliced_attention(query, key, value, sequence_length, dim, attention_mask)
-                print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+                print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         # linear proj
         hidden_states = self.to_out[0](hidden_states)
-        print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        print(f"hidden_states7 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         # dropout
         hidden_states = self.to_out[1](hidden_states)
-        print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        print(f"hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         return hidden_states
 
 
