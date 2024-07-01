@@ -147,6 +147,7 @@ class CrossAttention(nn.Module):
         batch_size, sequence_length, _ = hidden_states.shape
 
         #print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 2560, 320]), dtype: torch.float32
+        #hidden states può avere shape [16, 160, 1280] o [16, 640, 640] o 16, 40, 1280] etc..
         #print(f"encoder_hidden_states1 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #None type
         encoder_hidden_states = encoder_hidden_states
 
