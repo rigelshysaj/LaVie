@@ -242,9 +242,9 @@ class CrossAttention(nn.Module):
             query = query.float()
             key = key.float()
 
-        print(f"query1 shape: {query.shape}, dtype: {query.dtype}")
-        print(f"key1 shape: {key.shape}, dtype: {key.dtype}")
-        print(f"value1 shape: {value.shape}, dtype: {value.dtype}")
+        #print(f"query1 shape: {query.shape}, dtype: {query.dtype}")
+        #print(f"key1 shape: {key.shape}, dtype: {key.dtype}")
+        #print(f"value1 shape: {value.shape}, dtype: {value.dtype}")
         attention_scores = torch.baddbmm(
             torch.empty(query.shape[0], query.shape[1], key.shape[1], dtype=query.dtype, device=query.device),
             query,
@@ -253,29 +253,29 @@ class CrossAttention(nn.Module):
             alpha=self.scale,
         )
 
-        print(f"attention_score1 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
+        #print(f"attention_score1 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
 
         if attention_mask is not None:
             attention_scores = attention_scores + attention_mask
-            print(f"attention_scores2 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
+            #print(f"attention_scores2 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
 
         if self.upcast_softmax:
             attention_scores = attention_scores.float()
-            print(f"attention_scores3 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
+            #print(f"attention_scores3 shape: {attention_scores.shape}, dtype: {attention_scores.dtype}")
 
         attention_probs = attention_scores.softmax(dim=-1)
 
         # cast back to the original dtype
         attention_probs = attention_probs.to(value.dtype)
-        print(f"attention_probs1 shape: {attention_probs.shape}, dtype: {attention_probs.dtype}")
+        #print(f"attention_probs1 shape: {attention_probs.shape}, dtype: {attention_probs.dtype}")
 
         # compute attention output
         hidden_states = torch.bmm(attention_probs, value)
-        print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         # reshape hidden_states
         hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
-        print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        #print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         return hidden_states
 
@@ -320,6 +320,9 @@ class CrossAttention(nn.Module):
 
         # reshape hidden_states
         hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
+
+        print(f"hidden_states shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
         return hidden_states
 
     def _memory_efficient_attention_xformers(self, query, key, value, attention_mask):
