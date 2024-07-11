@@ -55,7 +55,28 @@ class VideoDatasetMsvd(Dataset):
                 #self.video_descriptions[video_id].append(description)
         
         # Ottieni la lista dei file video nella cartella YouTubeClips
-        self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
+        #self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
+
+        # Filtra i video problematici
+        self.video_files = []
+        for f in os.listdir(video_dir):
+            if f.endswith('.avi'):
+                try:
+                    video_path = os.path.join(video_dir, f)
+                    cap = cv2.VideoCapture(video_path)
+                    if cap.isOpened():
+                        ret, frame = cap.read()
+                        if ret:
+                            self.video_files.append(f)
+                        else:
+                            print(f"Skipping video {f} because it has no frames")
+                    else:
+                        print(f"Skipping video {f} because it cannot be opened")
+                    cap.release()
+                except Exception as e:
+                    print(f"Skipping video {f} due to error: {e}")
+
+        print(f"Loaded {len(self.video_files)} valid videos out of {len(os.listdir(video_dir))} total files")
 
         #print(f"dictionary of descriptions : {self.video_descriptions}")
 
@@ -66,54 +87,45 @@ class VideoDatasetMsvd(Dataset):
         video_file = self.video_files[idx]
         video_path = os.path.join(self.video_dir, video_file)
 
-        try:
+        # Carica il video utilizzando OpenCV
+        cap = cv2.VideoCapture(video_path)
+        frames = []
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frame = cv2.resize(frame, self.target_size)
+            frames.append(frame)
+        cap.release()
+
         
-            # Carica il video utilizzando OpenCV
-            cap = cv2.VideoCapture(video_path)
-            frames = []
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                frame = cv2.resize(frame, self.target_size)
-                frames.append(frame)
-            cap.release()
-
-            
-            # Se il numero di frame è inferiore a fixed_frame_count, ripeti l'ultimo frame
-            if len(frames) < self.fixed_frame_count:
-                frames += [frames[-1]] * (self.fixed_frame_count - len(frames))  # Ripeti l'ultimo frame
-            else:
-                # Prendi i primi fixed_frame_count frame
-                frames = frames[:self.fixed_frame_count]
-            
-            frames_np = np.array(frames, dtype=np.float32)
-            video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
-            
-            # Estrarre un frame centrale
-            mid_frame = frames[len(frames) // 2]
-            mid_frame_np = np.array(mid_frame, dtype=np.float32)
-            mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
-            
-            # Ottieni le descrizioni del video
-            video_id = os.path.splitext(video_file)[0]
-            descriptions = self.video_descriptions.get(video_id, [])
-
-            #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
-            
-            # Applica trasformazioni, se presenti
-            if self.transform:
-                video = self.transform(video)
-                mid_frame = self.transform(mid_frame)
-            
-            return video, descriptions, mid_frame
+        # Se il numero di frame è inferiore a fixed_frame_count, ripeti l'ultimo frame
+        if len(frames) < self.fixed_frame_count:
+            frames += [frames[-1]] * (self.fixed_frame_count - len(frames))  # Ripeti l'ultimo frame
+        else:
+            # Prendi i primi fixed_frame_count frame
+            frames = frames[:self.fixed_frame_count]
         
-        except Exception as e:
-            print("--------------------------------------------------------------------------------------------------")
-            print(f"Skipping video {video_file} due to error: {e}")
-            print("--------------------------------------------------------------------------------------------------")
+        frames_np = np.array(frames, dtype=np.float32)
+        video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
+        
+        # Estrarre un frame centrale
+        mid_frame = frames[len(frames) // 2]
+        mid_frame_np = np.array(mid_frame, dtype=np.float32)
+        mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
+        
+        # Ottieni le descrizioni del video
+        video_id = os.path.splitext(video_file)[0]
+        descriptions = self.video_descriptions.get(video_id, [])
 
-            return None, None, None
+        #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
+        
+        # Applica trasformazioni, se presenti
+        if self.transform:
+            video = self.transform(video)
+            mid_frame = self.transform(mid_frame)
+        
+        return video, descriptions, mid_frame
 
 
 
