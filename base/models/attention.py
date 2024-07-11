@@ -408,6 +408,9 @@ class Transformer3DModel(ModelMixin, ConfigMixin):
         # Input
         assert hidden_states.dim() == 5, f"Expected hidden_states to have ndim=5, but got ndim={hidden_states.dim()}."
 
+        #print(f"hidden_states shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
+        #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #shape: torch.Size([1, 10, 768]), dtype: torch.float16
+
         video_length = hidden_states.shape[2]
         hidden_states = rearrange(hidden_states, "b c f h w -> (b f) c h w").contiguous()
         #print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #torch.Size([16, 320, 40, 64]), dtype: torch.float16

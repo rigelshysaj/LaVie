@@ -172,6 +172,7 @@ class VideoDatasetMsrvtt(Dataset):
           return None
       return frame
 
+'''
 class PerceptualLoss(nn.Module):
     def __init__(self):
         super(PerceptualLoss, self).__init__()
@@ -184,7 +185,8 @@ class PerceptualLoss(nn.Module):
         x_features = self.layers(x)
         y_features = self.layers(y)
         return nn.functional.mse_loss(x_features, y_features)
-    
+'''
+
 def encode_latents(video, vae):
     # video ha forma [b, c, f, h, w]
     b, c, f, h, w = video.shape
@@ -296,7 +298,11 @@ def train_lora_model(data, video_folder, args):
     lora_config = LoraConfig(
         r=8, 
         lora_alpha=16,
-        target_modules=["attn1.to_q", "attn1.to_k", "attn1.to_v", "attn2.to_q", "attn2.to_k", "attn2.to_v"]
+        target_modules = [
+            "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
+            "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
+            "attn_temp.to_q", "attn_temp.to_k", "attn_temp.to_v", "attn_temp.to_out.0",
+            "ff.net.0.proj", "ff.net.2"]
     )
 
     unet = get_peft_model(unet, lora_config)
@@ -396,22 +402,6 @@ def train_lora_model(data, video_folder, args):
                 ).sample
 
                 loss = F.mse_loss(output, noise)
-
-                #print(f"output shape: {output.shape}, dtype: {output.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float16
-
-                #output = decode_latents(output, vae)
-
-                #print(f"output shape: {output.shape}, dtype: {output.dtype}") #[1, 16, 320, 512, 3] torch.float16
-
-                #output = output.to(video.dtype) 
-
-                # Riorganizza le dimensioni per combaciare con video
-                #output = output.permute(0, 4, 1, 2, 3) # da b f h w c diventa b c f h w 
-
-                #print(f"output shape: {output.shape}, dtype: {output.dtype}") #[1, 3, 16, 320, 512] torch.float32
-                #print(f"video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
-   
-                #loss = torch.nn.functional.mse_loss(output, video)
 
                 loss = loss / accumulation_steps
                 
