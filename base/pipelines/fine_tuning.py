@@ -55,8 +55,9 @@ class VideoDatasetMsvd(Dataset):
                 #self.video_descriptions[video_id].append(description)
         
         # Ottieni la lista dei file video nella cartella YouTubeClips
-        #self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
+        self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
 
+        '''
         # Filtra i video problematici
         self.video_files = []
         for f in os.listdir(video_dir):
@@ -77,6 +78,7 @@ class VideoDatasetMsvd(Dataset):
                     print(f"Skipping video {f} due to error: {e}")
 
         print(f"Loaded {len(self.video_files)} valid videos out of {len(os.listdir(video_dir))} total files")
+        '''
 
         #print(f"dictionary of descriptions : {self.video_descriptions}")
 
@@ -184,20 +186,6 @@ class VideoDatasetMsrvtt(Dataset):
           return None
       return frame
 
-'''
-class PerceptualLoss(nn.Module):
-    def __init__(self):
-        super(PerceptualLoss, self).__init__()
-        vgg = models.vgg19(pretrained=True).features
-        self.layers = nn.Sequential(*list(vgg.children())[:18]).eval()
-        for param in self.layers.parameters():
-            param.requires_grad = False
-
-    def forward(self, x, y):
-        x_features = self.layers(x)
-        y_features = self.layers(y)
-        return nn.functional.mse_loss(x_features, y_features)
-'''
 
 def encode_latents(video, vae):
     # video ha forma [b, c, f, h, w]
