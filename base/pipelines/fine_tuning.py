@@ -89,45 +89,55 @@ class VideoDatasetMsvd(Dataset):
         video_file = self.video_files[idx]
         video_path = os.path.join(self.video_dir, video_file)
 
-        # Carica il video utilizzando OpenCV
-        cap = cv2.VideoCapture(video_path)
-        frames = []
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-            frame = cv2.resize(frame, self.target_size)
-            frames.append(frame)
-        cap.release()
+        try:
 
-        
-        # Se il numero di frame è inferiore a fixed_frame_count, ripeti l'ultimo frame
-        if len(frames) < self.fixed_frame_count:
-            frames += [frames[-1]] * (self.fixed_frame_count - len(frames))  # Ripeti l'ultimo frame
-        else:
-            # Prendi i primi fixed_frame_count frame
-            frames = frames[:self.fixed_frame_count]
-        
-        frames_np = np.array(frames, dtype=np.float32)
-        video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
-        
-        # Estrarre un frame centrale
-        mid_frame = frames[len(frames) // 2]
-        mid_frame_np = np.array(mid_frame, dtype=np.float32)
-        mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
-        
-        # Ottieni le descrizioni del video
-        video_id = os.path.splitext(video_file)[0]
-        descriptions = self.video_descriptions.get(video_id, [])
+            # Carica il video utilizzando OpenCV
+            cap = cv2.VideoCapture(video_path)
+            frames = []
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                frame = cv2.resize(frame, self.target_size)
+                frames.append(frame)
+            cap.release()
 
-        #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
+            
+            # Se il numero di frame è inferiore a fixed_frame_count, ripeti l'ultimo frame
+            if len(frames) < self.fixed_frame_count:
+                frames += [frames[-1]] * (self.fixed_frame_count - len(frames))  # Ripeti l'ultimo frame
+            else:
+                # Prendi i primi fixed_frame_count frame
+                frames = frames[:self.fixed_frame_count]
+            
+            frames_np = np.array(frames, dtype=np.float32)
+            video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
+            
+            # Estrarre un frame centrale
+            mid_frame = frames[len(frames) // 2]
+            mid_frame_np = np.array(mid_frame, dtype=np.float32)
+            mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
+            
+            # Ottieni le descrizioni del video
+            video_id = os.path.splitext(video_file)[0]
+            descriptions = self.video_descriptions.get(video_id, [])
+
+            if descriptions is None or descriptions == "":
+                print(f"No description found for video {video_id}")
+                return None, None, None
+
+            #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
+            
+            # Applica trasformazioni, se presenti
+            if self.transform:
+                video = self.transform(video)
+                mid_frame = self.transform(mid_frame)
+            
+            return video, descriptions, mid_frame
         
-        # Applica trasformazioni, se presenti
-        if self.transform:
-            video = self.transform(video)
-            mid_frame = self.transform(mid_frame)
-        
-        return video, descriptions, mid_frame
+        except Exception as e:
+            print(f"Skipping video {video_file} due to error: {e}")
+            return None, None, None
 
 
 
