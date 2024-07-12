@@ -290,6 +290,12 @@ def decode_latents(latents, vae):
     
     return video
 
+def custom_collate(batch):
+    batch = list(filter(lambda x: x[0] is not None and x[1] is not None and x[2] is not None, batch))
+    if len(batch) == 0:
+        return None, None, None
+    return torch.utils.data.dataloader.default_collate(batch)
+
 
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -323,7 +329,7 @@ def train_lora_model(data, video_folder, args):
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
     
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
 
@@ -370,12 +376,14 @@ def train_lora_model(data, video_folder, args):
 
 
     for epoch in range(num_epochs):
-        for i, (video, description, frame_tensor) in enumerate(dataloader):
+        for i, batch in enumerate(dataloader):
 
-            if i < start_iteration:
+            if batch[0] is None:
                 continue
 
-            if video is None or description is None or frame_tensor is None:
+            video, description, frame_tensor = batch
+
+            if i < start_iteration:
                 continue
 
             video = video.to(device)
