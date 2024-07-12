@@ -334,6 +334,21 @@ def train_lora_model(data, video_folder, args):
     )
 
     num_epochs = 3
+    checkpoint_dir = "/content/drive/My Drive/checkpoints"
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    checkpoint_interval = 100  # Salva un checkpoint ogni 100 iterazioni
+
+    start_epoch = 0
+    start_iteration = 0
+    if os.path.exists(os.path.join(checkpoint_dir, "latest_checkpoint.pth")):
+        checkpoint = torch.load(os.path.join(checkpoint_dir, "latest_checkpoint.pth"))
+        unet.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
+        start_epoch = checkpoint['epoch']
+        start_iteration = checkpoint['iteration']
+        print(f"Ripresa dell'addestramento dall'epoca {start_epoch}, iterazione {start_iteration}")
+
     
     unet.train()
     unet.enable_xformers_memory_efficient_attention()
@@ -341,7 +356,7 @@ def train_lora_model(data, video_folder, args):
     text_encoder.eval()
     vae.eval()
 
-    conta = 1
+    conta = start_iteration + 1
 
     
     attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
@@ -357,13 +372,15 @@ def train_lora_model(data, video_folder, args):
     for epoch in range(num_epochs):
         for i, (video, description, frame_tensor) in enumerate(dataloader):
 
+            if i < start_iteration:
+                continue
+
             if video is None or description is None or frame_tensor is None:
                 continue
 
             video = video.to(device)
             optimizer.zero_grad()
             print(f"Iterazione numero: {conta}")
-            conta += 1
 
             #print(f"video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
 
@@ -433,6 +450,34 @@ def train_lora_model(data, video_folder, args):
             torch.cuda.empty_cache()
 
             print(f"Epoch {epoch + 1}/{num_epochs} completed with loss: {loss.item()}")
+
+            # Salva un checkpoint
+            if conta % checkpoint_interval == 0:
+                checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch{epoch+1}_iter{conta}.pth")
+                torch.save({
+                    'epoch': epoch,
+                    'iteration': conta,
+                    'model_state_dict': unet.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'lr_scheduler_state_dict': lr_scheduler.state_dict(),
+                    'loss': loss.item(),
+                }, checkpoint_path)
+                print(f"Checkpoint salvato: {checkpoint_path}")
+
+                # Aggiorna il checkpoint più recente
+                torch.save({
+                    'epoch': epoch,
+                    'iteration': conta,
+                    'model_state_dict': unet.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'lr_scheduler_state_dict': lr_scheduler.state_dict(),
+                    'loss': loss.item(),
+                }, os.path.join(checkpoint_dir, "latest_checkpoint.pth"))
+
+            conta += 1
+
+        # Resetta start_iteration dopo ogni epoca
+        start_iteration = 0
     
             
     unet.save_pretrained("/content/drive/My Drive/finetuned_lora_unet")
