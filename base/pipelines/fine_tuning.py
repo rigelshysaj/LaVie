@@ -638,12 +638,13 @@ if __name__ == "__main__":
     # Definisci la trasformazione
     transform = transforms.Compose([
         transforms.Resize((320, 512)),  # Ridimensiona l'immagine a 320x512
-        transforms.ToTensor(),  # Converte l'immagine in un tensore
-        transforms.Unsqueeze(0)  # Aggiunge una dimensione per il batch
+        transforms.ToTensor()  # Converte l'immagine in un tensore
     ])
 
     # Applica la trasformazione all'immagine
     input_image = transform(image)
+
+    image_tensor = input_image.unsqueeze(0)  # Aggiunge una dimensione per il batch
 
     print(f"input_image shape: {input_image.shape}, dtype: {input_image.dtype}")
 
