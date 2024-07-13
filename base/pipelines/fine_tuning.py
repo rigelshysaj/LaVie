@@ -9,6 +9,7 @@ from transformers import CLIPProcessor, CLIPModel
 from peft import LoraConfig, get_peft_model
 import argparse
 from omegaconf import OmegaConf
+import imageio
 import sys
 sys.path.append(os.path.split(sys.path[0])[0])
 from models import get_models
@@ -656,7 +657,10 @@ if __name__ == "__main__":
 
     print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
 
-    generated_video = inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, image_tensor, device, guidance_scale=7.5)
+    video = generated_video = inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, image_tensor, device, guidance_scale=7.5).video
+    imageio.mimwrite(args.output_folder + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+
+    print('save path {}'.format(args.output_folder))
     
 
     '''
