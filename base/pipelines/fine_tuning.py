@@ -630,9 +630,8 @@ def main(args):
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
-    sd_path = "path/to/stable-diffusion-v1-4"
 
-    unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler = load_model_for_inference(checkpoint_dir, device, OmegaConf.load(args.config))
+    unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler = load_model_for_inference(checkpoint_dir, device, args)
 
     description = "A beautiful sunset over the ocean"
 
