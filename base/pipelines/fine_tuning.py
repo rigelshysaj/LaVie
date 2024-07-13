@@ -164,7 +164,7 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
 
         print(f"latents3 shape: {latents.shape}, dtype: {latents.dtype}")
 
-        video = decode_latents(latents, vae).sample
+        video = decode_latents(latents, vae)
         
     return StableDiffusionPipelineOutput(video=video)
 
