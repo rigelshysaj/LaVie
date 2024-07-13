@@ -4,6 +4,7 @@ import torch
 import cv2
 import os
 import json
+from tqdm import tqdm
 from transformers import CLIPProcessor, CLIPModel
 from peft import LoraConfig, get_peft_model
 import argparse
@@ -22,6 +23,7 @@ from diffusers.models import AutoencoderKL
 from torch.utils.checkpoint import checkpoint
 from diffusers.schedulers import DDIMScheduler, DDPMScheduler
 from transformers import get_cosine_schedule_with_warmup
+from dataclasses import dataclass
 from diffusers.utils import (
     deprecate,
     is_accelerate_available,
@@ -31,7 +33,107 @@ from diffusers.utils import (
     replace_example_docstring,
     BaseOutput,
 )
+
 logger = logging.get_logger(__name__)
+
+@dataclass
+class StableDiffusionPipelineOutput(BaseOutput):
+    video: torch.Tensor
+
+def load_model_for_inference(checkpoint_dir, args, device):
+
+    sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
+
+    # Carica il modello UNet e applica LoRA
+    unet = get_models(args, sd_path).to(device, dtype=torch.float16)
+    
+    # Carica l'ultimo checkpoint
+    checkpoint_path = os.path.join(checkpoint_dir, "latest_checkpoint.pth")
+    if os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path)
+        unet.load_state_dict(checkpoint['model_state_dict'])
+        print(f"Caricato checkpoint dall'epoca {checkpoint['epoch']}, iterazione {checkpoint['iteration']}")
+    else:
+        print("Nessun checkpoint trovato. Utilizzo del modello non addestrato.")
+
+    
+    lora_config = LoraConfig(
+        r=8, 
+        lora_alpha=16,
+        target_modules = [
+            "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
+            "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
+            "attn_temp.to_q", "attn_temp.to_k", "attn_temp.to_v", "attn_temp.to_out.0",
+            "ff.net.0.proj", "ff.net.2"]
+    )
+
+    unet = get_peft_model(unet, lora_config)
+    
+    unet.eval()
+    
+    # Carica gli altri componenti necessari
+    tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
+    text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder", torch_dtype=torch.float16).to(device)
+    vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae", torch_dtype=torch.float16).to(device)
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
+    
+    return unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler
+
+
+def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, video, device, guidance_scale=7.5):
+    with torch.no_grad():
+        # Preparazione del testo
+        text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(device)
+        text_features = text_encoder(text_inputs)[0].to(torch.float16)
+        
+        # Preparazione del video/immagine
+        frame_tensor = video[0]  # Assumiamo che video sia già un tensore di frame
+        image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(device)
+        outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
+        last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
+        
+        # Calcolo dell'attenzione (come nel training)
+        attention_layer = torch.nn.MultiheadAttention(embed_dim=768, num_heads=8).to(device)
+        text_features = text_features.transpose(0, 1)
+        last_hidden_state = last_hidden_state.transpose(0, 1)
+        attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
+        encoder_hidden_states = attention_output.transpose(0, 1)
+        
+        # Generazione dell'output
+        latents = torch.randn((1, 4, 16, 40, 64), device=device)
+        
+        noise_scheduler.set_timesteps(50)
+        
+        for t in tqdm(noise_scheduler.timesteps):
+            latent_model_input = noise_scheduler.scale_model_input(latents, t)
+            
+            # Predict the noise residual
+            noise_pred = unet(
+                sample=latent_model_input,
+                timestep=t,
+                encoder_hidden_states=encoder_hidden_states
+            ).sample
+            
+            # Perform guidance
+            noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+            noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+            
+            # Compute the previous noisy sample x_t -> x_t-1
+            latents = noise_scheduler.step(noise_pred, t, latents).prev_sample
+
+        # Use only the conditioned latents
+        latents = latents[1:2]
+        
+        # Decodifica dei latents in immagine
+        latents = 1 / vae.config.scaling_factor * latents
+
+        video = decode_latents(latents, vae).sample
+        
+    return StableDiffusionPipelineOutput(video=video)
+
+
 
 
 class VideoDatasetMsvd(Dataset):
@@ -283,8 +385,8 @@ def decode_latents(latents, vae):
     video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
     
     # Normalizza e converti a uint8 senza perdere il tracciamento dei gradienti
-    #video = (video / 2 + 0.5) * 255
-    #video = video.add(0.5).clamp(0, 255)
+    video = (video / 2 + 0.5) * 255
+    video = video.add(0.5).clamp(0, 255)
     
     return video
 
@@ -511,6 +613,22 @@ if __name__ == "__main__":
     data = os.path.join(dataset_path, 'annotations.txt')
     
     train_lora_model(data, video_folder, OmegaConf.load(args.config))
+
+    '''
+
+    #inference
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    checkpoint_dir = "/content/drive/My Drive/checkpoints"
+    sd_path = "path/to/stable-diffusion-v1-4"
+
+    unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler = load_model_for_inference(checkpoint_dir, args, device)
+
+    description = "A beautiful sunset over the ocean"
+    input_video = torch.randn((1, 3, 16, 320, 512))  # Esempio di input video
+
+    generated_video = inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, input_video, device, guidance_scale=7.5)
+    '''
 
     '''
     Questa parte commentata serve se devo usare il dataset msrvtt
