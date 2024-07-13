@@ -40,7 +40,7 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
-def load_model_for_inference(checkpoint_dir, args, device):
+def load_model_for_inference(checkpoint_dir, device, args):
 
     sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
 
@@ -483,7 +483,7 @@ def train_lora_model(data, video_folder, args):
 
             video, description, frame_tensor = batch
 
-            print(f"video shape: {video.shape}, dtype: {video.dtype}")
+            print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
             if i < start_iteration:
                 continue
@@ -625,7 +625,7 @@ if __name__ == "__main__":
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     sd_path = "path/to/stable-diffusion-v1-4"
 
-    unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler = load_model_for_inference(checkpoint_dir, args, device)
+    unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler = load_model_for_inference(checkpoint_dir, device, OmegaConf.load(args.config))
 
     description = "A beautiful sunset over the ocean"
     input_video = torch.randn((1, 3, 16, 320, 512))  # Esempio di input video
