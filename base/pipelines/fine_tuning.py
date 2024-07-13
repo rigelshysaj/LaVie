@@ -53,6 +53,16 @@ def load_model_for_inference(checkpoint_dir, device, args):
     
     # Carica l'ultimo checkpoint
     checkpoint_path = os.path.join(checkpoint_dir, "latest_checkpoint.pth")
+
+    '''
+    if os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path)
+        unet.load_state_dict(checkpoint['model_state_dict'])
+        print(f"Caricato checkpoint dall'epoca {checkpoint['epoch']}, iterazione {checkpoint['iteration']}")
+    else:
+        print("Nessun checkpoint trovato. Utilizzo del modello non addestrato.")
+    '''
+    
     if os.path.exists(checkpoint_path):
         checkpoint = torch.load(checkpoint_path)
         state_dict = checkpoint['model_state_dict']
@@ -160,31 +170,6 @@ class VideoDatasetMsvd(Dataset):
         
         # Ottieni la lista dei file video nella cartella YouTubeClips
         self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
-
-        '''
-        # Filtra i video problematici
-        self.video_files = []
-        for f in os.listdir(video_dir):
-            if f.endswith('.avi'):
-                try:
-                    video_path = os.path.join(video_dir, f)
-                    cap = cv2.VideoCapture(video_path)
-                    if cap.isOpened():
-                        ret, frame = cap.read()
-                        if ret:
-                            self.video_files.append(f)
-                        else:
-                            print(f"Skipping video {f} because it has no frames")
-                    else:
-                        print(f"Skipping video {f} because it cannot be opened")
-                    cap.release()
-                except Exception as e:
-                    print(f"Skipping video {f} due to error: {e}")
-
-        print(f"Loaded {len(self.video_files)} valid videos out of {len(os.listdir(video_dir))} total files")
-        '''
-
-        #print(f"dictionary of descriptions : {self.video_descriptions}")
 
     def __len__(self):
         return len(self.video_files)
