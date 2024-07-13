@@ -629,7 +629,7 @@ if __name__ == "__main__":
     # Applica la trasformazione all'immagine
     input_image = transform(image)
 
-    image_tensor = input_image.unsqueeze(0)  # Aggiunge una dimensione per il batch
+    image_tensor = input_image.unsqueeze(0).to(torch.float16)  # Aggiunge una dimensione per il batch
 
     print(f"input_image shape: {input_image.shape}, dtype: {input_image.dtype}")
 
