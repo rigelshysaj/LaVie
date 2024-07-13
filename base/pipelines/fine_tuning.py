@@ -24,6 +24,7 @@ from torch.utils.checkpoint import checkpoint
 from diffusers.schedulers import DDIMScheduler, DDPMScheduler
 from transformers import get_cosine_schedule_with_warmup
 from dataclasses import dataclass
+from peft import PeftModel, LoraConfig
 from PIL import Image
 from torchvision import transforms
 
@@ -53,24 +54,12 @@ def load_model_for_inference(checkpoint_dir, device, args):
     # Carica l'ultimo checkpoint
     checkpoint_path = os.path.join(checkpoint_dir, "latest_checkpoint.pth")
     if os.path.exists(checkpoint_path):
-        checkpoint = torch.load(checkpoint_path)
-        unet.load_state_dict(checkpoint['model_state_dict'])
-        print(f"Caricato checkpoint dall'epoca {checkpoint['epoch']}, iterazione {checkpoint['iteration']}")
+        # Carica il modello LoRA
+        unet = PeftModel.from_pretrained(unet, checkpoint_path)
+        print(f"Caricato checkpoint LoRA")
     else:
         print("Nessun checkpoint trovato. Utilizzo del modello non addestrato.")
 
-    
-    lora_config = LoraConfig(
-        r=8, 
-        lora_alpha=16,
-        target_modules = [
-            "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
-            "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
-            "attn_temp.to_q", "attn_temp.to_k", "attn_temp.to_v", "attn_temp.to_out.0",
-            "ff.net.0.proj", "ff.net.2"]
-    )
-
-    unet = get_peft_model(unet, lora_config)
     
     unet.eval()
     
