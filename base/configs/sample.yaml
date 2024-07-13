@@ -1,6 +1,6 @@
 # path:
 ckpt_path: "../pretrained_models/lavie_base.pt"
-output_folder: "../res/base/"
+output_folder: "/content/drive/My Drive/"
 pretrained_path: "../pretrained_models"
 
 # model config: 
