@@ -125,6 +125,10 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
         
         for t in tqdm(noise_scheduler.timesteps):
             latent_model_input = noise_scheduler.scale_model_input(latents, t)
+
+            latent_model_input = latent_model_input.to(torch.float16)
+            unet = unet.to(torch.float16)
+            encoder_hidden_states = encoder_hidden_states.to(torch.float16)
             
             # Predict the noise residual
             noise_pred = unet(
