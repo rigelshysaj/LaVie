@@ -598,6 +598,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
+    '''
     # Determina se sei su Google Colab
     on_colab = 'COLAB_GPU' in os.environ
 
@@ -628,7 +629,7 @@ if __name__ == "__main__":
     input_video = torch.randn((1, 3, 16, 320, 512))  # Esempio di input video
 
     generated_video = inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, input_video, device, guidance_scale=7.5)
-    '''
+    
 
     '''
     Questa parte commentata serve se devo usare il dataset msrvtt
