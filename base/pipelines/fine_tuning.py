@@ -155,9 +155,9 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
 
 
         # Use only the conditioned latents
-        latents = latents[1:2]
+        #latents = latents[1:2]
 
-        print(f"latents2 shape: {latents.shape}, dtype: {latents.dtype}")
+        #print(f"latents2 shape: {latents.shape}, dtype: {latents.dtype}")
         
         # Decodifica dei latents in immagine
         latents = 1 / vae.config.scaling_factor * latents
