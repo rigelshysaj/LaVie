@@ -24,6 +24,9 @@ from torch.utils.checkpoint import checkpoint
 from diffusers.schedulers import DDIMScheduler, DDPMScheduler
 from transformers import get_cosine_schedule_with_warmup
 from dataclasses import dataclass
+from PIL import Image
+from torchvision import transforms
+
 from diffusers.utils import (
     deprecate,
     is_accelerate_available,
@@ -82,15 +85,14 @@ def load_model_for_inference(checkpoint_dir, device, args):
     return unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler
 
 
-def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, video, device, guidance_scale=7.5):
+def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, input_image, device, guidance_scale=7.5):
     with torch.no_grad():
         # Preparazione del testo
         text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(device)
         text_features = text_encoder(text_inputs)[0].to(torch.float16)
         
         # Preparazione del video/immagine
-        frame_tensor = video[0]  # Assumiamo che video sia già un tensore di frame
-        image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(device)
+        image_inputs = clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
         outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
         last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
         
@@ -483,7 +485,7 @@ def train_lora_model(data, video_folder, args):
 
             video, description, frame_tensor = batch
 
-            print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
+            #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
             if i < start_iteration:
                 continue
@@ -600,7 +602,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
-    
+    '''
     # Determina se sei su Google Colab
     on_colab = 'COLAB_GPU' in os.environ
 
@@ -628,10 +630,25 @@ if __name__ == "__main__":
     unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler = load_model_for_inference(checkpoint_dir, device, OmegaConf.load(args.config))
 
     description = "A beautiful sunset over the ocean"
-    input_video = torch.randn((1, 3, 16, 320, 512))  # Esempio di input video
 
-    generated_video = inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, input_video, device, guidance_scale=7.5)
-    '''
+    image_path = "/Users/rigels/Desktop/img.jpeg"
+
+    image = Image.open(image_path)
+
+    # Definisci la trasformazione
+    transform = transforms.Compose([
+        transforms.Resize((320, 512)),  # Ridimensiona l'immagine a 320x512
+        transforms.ToTensor(),  # Converte l'immagine in un tensore
+        transforms.Unsqueeze(0)  # Aggiunge una dimensione per il batch
+    ])
+
+    # Applica la trasformazione all'immagine
+    input_image = transform(image)
+
+    print(f"input_image shape: {input_image.shape}, dtype: {input_image.dtype}")
+
+    generated_video = inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, input_image, device, guidance_scale=7.5)
+    
 
     '''
     Questa parte commentata serve se devo usare il dataset msrvtt
