@@ -631,7 +631,7 @@ if __name__ == "__main__":
 
     description = "A beautiful sunset over the ocean"
 
-    image_path = "/Users/rigels/Desktop/img.jpeg"
+    image_path = "/content/drive/My Drive/img.jpeg"
 
     image = Image.open(image_path)
 
