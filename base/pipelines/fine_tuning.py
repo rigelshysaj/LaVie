@@ -102,9 +102,13 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
         text_features = text_encoder(text_inputs)[0].to(torch.float16)
         
         # Preparazione del video/immagine
-        image_inputs = clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
+        image_inputs = clip_processor(images=input_image, return_tensors="pt").pixel_values.to(unet.device)
         outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
         last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
+
+        # Verifica dei tipi di dati
+        assert text_features.dtype == torch.float16, f"text_features has dtype {text_features.dtype}"
+        assert last_hidden_state.dtype == torch.float16, f"last_hidden_state has dtype {last_hidden_state.dtype}"
         
         # Calcolo dell'attenzione (come nel training)
         attention_layer = torch.nn.MultiheadAttention(embed_dim=768, num_heads=8).to(device)
