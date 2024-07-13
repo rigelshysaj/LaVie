@@ -606,11 +606,7 @@ def train_lora_model(data, video_folder, args):
     return unet
     
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="")
-    args = parser.parse_args()
-
+def main(args):
     '''
     # Determina se sei su Google Colab
     on_colab = 'COLAB_GPU' in os.environ
@@ -692,3 +688,10 @@ if __name__ == "__main__":
     train_lora_model(data, video_folder, OmegaConf.load(args.config))
 
     '''
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="")
+    args = parser.parse_args()
+
+    main(OmegaConf.load(args.config))
