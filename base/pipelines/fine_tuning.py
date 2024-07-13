@@ -631,9 +631,9 @@ if __name__ == "__main__":
 
     image_tensor = input_image.unsqueeze(0).to(torch.float16)  # Aggiunge una dimensione per il batch
 
-    print(f"input_image shape: {input_image.shape}, dtype: {input_image.dtype}")
+    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
 
-    generated_video = inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, input_image, device, guidance_scale=7.5)
+    generated_video = inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, image_tensor, device, guidance_scale=7.5)
     
 
     '''
