@@ -151,11 +151,18 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
             # Compute the previous noisy sample x_t -> x_t-1
             latents = noise_scheduler.step(noise_pred, t, latents).prev_sample
 
+        print(f"latents1 shape: {latents.shape}, dtype: {latents.dtype}")
+
+
         # Use only the conditioned latents
         latents = latents[1:2]
+
+        print(f"latents2 shape: {latents.shape}, dtype: {latents.dtype}")
         
         # Decodifica dei latents in immagine
         latents = 1 / vae.config.scaling_factor * latents
+
+        print(f"latents3 shape: {latents.shape}, dtype: {latents.dtype}")
 
         video = decode_latents(latents, vae).sample
         
