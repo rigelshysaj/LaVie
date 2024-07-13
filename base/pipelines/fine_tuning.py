@@ -127,7 +127,7 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
             latent_model_input = noise_scheduler.scale_model_input(latents, t)
 
             latent_model_input = latent_model_input.to(torch.float16)
-            unet = unet.to(torch.float16)
+            #unet = unet.to(torch.float16)
             encoder_hidden_states = encoder_hidden_states.to(torch.float16)
             
             # Predict the noise residual
@@ -137,6 +137,10 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
                 encoder_hidden_states=encoder_hidden_states
             ).sample
             
+
+            print(f"noise_pred shape: {noise_pred.shape}")
+            print(f"noise_pred type: {type(noise_pred)}")
+
             # Perform guidance
             noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
             noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
