@@ -165,7 +165,7 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
 
         print(f"latents3 shape: {latents.shape}, dtype: {latents.dtype}")
 
-        video = decode_latents(latents, vae)
+        video = decode_latents(latents, vae, gradient=False)
         
     return StableDiffusionPipelineOutput(video=video)
 
@@ -363,7 +363,7 @@ def decode_latents(latents, vae):
     return video
 '''
 
-def decode_latents(latents, vae):
+def decode_latents(latents, vae, gradient=True):
     video_length = latents.shape[2]
     #latents = 1 / 0.18215 * latents
     latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
@@ -395,9 +395,13 @@ def decode_latents(latents, vae):
     # Riorganizza le dimensioni del video
     video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
     
-    # Normalizza e converti a uint8 senza perdere il tracciamento dei gradienti
-    video = (video / 2 + 0.5) * 255
-    video = video.add(0.5).clamp(0, 255)
+    if(gradient):
+        # Normalizza e converti a uint8 senza perdere il tracciamento dei gradienti
+        video = (video / 2 + 0.5) * 255
+        video = video.add(0.5).clamp(0, 255)
+    else:
+        video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
+
     
     return video
 
