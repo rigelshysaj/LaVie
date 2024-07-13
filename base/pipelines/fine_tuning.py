@@ -54,9 +54,20 @@ def load_model_for_inference(checkpoint_dir, device, args):
     # Carica l'ultimo checkpoint
     checkpoint_path = os.path.join(checkpoint_dir, "latest_checkpoint.pth")
     if os.path.exists(checkpoint_path):
-        # Carica il modello LoRA
-        unet = PeftModel.from_pretrained(unet, checkpoint_path)
-        print(f"Caricato checkpoint LoRA")
+        checkpoint = torch.load(checkpoint_path)
+        state_dict = checkpoint['model_state_dict']
+        
+        # Rimuovi il prefisso "base_model.model." dalle chiavi
+        new_state_dict = {}
+        for key, value in state_dict.items():
+            if key.startswith("base_model.model."):
+                new_key = key.replace("base_model.model.", "")
+                new_state_dict[new_key] = value
+            else:
+                new_state_dict[key] = value
+        
+        unet.load_state_dict(new_state_dict, strict=False)
+        print(f"Caricato checkpoint dall'epoca {checkpoint['epoch']}, iterazione {checkpoint['iteration']}")
     else:
         print("Nessun checkpoint trovato. Utilizzo del modello non addestrato.")
 
