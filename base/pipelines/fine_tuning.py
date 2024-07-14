@@ -51,6 +51,20 @@ def load_model_for_inference(checkpoint_dir, device, args):
 
     # Carica il modello UNet e applica LoRA
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
+
+    lora_config = LoraConfig(
+        r=8,
+        lora_alpha=16,
+        target_modules=[
+            "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
+            "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
+            "attn_temp.to_q", "attn_temp.to_k", "attn_temp.to_v", "attn_temp.to_out.0",
+            "ff.net.0.proj", "ff.net.2"
+        ]
+    )
+    
+    # Applica LoRA al modello
+    unet = get_peft_model(unet, lora_config)
     
     # Carica l'ultimo checkpoint
     checkpoint_path = os.path.join(checkpoint_dir, "latest_checkpoint.pth")
@@ -153,17 +167,11 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
             latents = noise_scheduler.step(noise_pred, t, latents).prev_sample
 
         print(f"latents1 shape: {latents.shape}, dtype: {latents.dtype}")
-
-
-        # Use only the conditioned latents
-        #latents = latents[1:2]
-
-        #print(f"latents2 shape: {latents.shape}, dtype: {latents.dtype}")
         
         # Decodifica dei latents in immagine
         latents = 1 / vae.config.scaling_factor * latents
 
-        print(f"latents3 shape: {latents.shape}, dtype: {latents.dtype}")
+        print(f"latents2 shape: {latents.shape}, dtype: {latents.dtype}")
 
         video = decode_latents(latents, vae, gradient=False)
         
