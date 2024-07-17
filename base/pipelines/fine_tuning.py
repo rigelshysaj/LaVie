@@ -243,9 +243,13 @@ class VideoDatasetMsvd(Dataset):
             video_id = os.path.splitext(video_file)[0]
             descriptions = self.video_descriptions.get(video_id, [])
 
-            if not descriptions or descriptions == []:
-                print(f"No description found for video {video_id}")
-                return None, None, None
+            print("----------------begin----------------------")
+            print(descriptions)
+            print("-----------------end------------------------ ")
+
+            #if not descriptions or descriptions == []:
+                #print(f"No description found for video {video_id}")
+                #return None, None, None
 
             #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
             
@@ -452,8 +456,10 @@ def train_lora_model(data, video_folder, args):
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
-    
+    #dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+
+
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
 
     lr_scheduler = get_cosine_schedule_with_warmup(
@@ -586,7 +592,9 @@ def train_lora_model(data, video_folder, args):
 
             # Salva un checkpoint
             if conta % checkpoint_interval == 0:
+                
                 checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch{epoch+1}_iter{conta}.pth")
+                '''
                 torch.save({
                     'epoch': epoch,
                     'iteration': conta,
@@ -595,7 +603,7 @@ def train_lora_model(data, video_folder, args):
                     'lr_scheduler_state_dict': lr_scheduler.state_dict(),
                     'loss': loss.item(),
                 }, checkpoint_path)
-                print(f"Checkpoint salvato: {checkpoint_path}")
+                '''
 
                 # Aggiorna il checkpoint più recente
                 torch.save({
@@ -606,6 +614,8 @@ def train_lora_model(data, video_folder, args):
                     'lr_scheduler_state_dict': lr_scheduler.state_dict(),
                     'loss': loss.item(),
                 }, os.path.join(checkpoint_dir, "latest_checkpoint.pth"))
+
+                print(f"Checkpoint salvato: {checkpoint_path}")
 
             conta += 1
 
