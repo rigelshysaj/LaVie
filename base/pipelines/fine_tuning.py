@@ -454,7 +454,7 @@ def train_lora_model(data, video_folder, args):
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
     #dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
-
+    print(f"Numero totale di elementi nel dataloader: {len(dataloader)}")
 
     optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
 
@@ -606,7 +606,7 @@ def train_lora_model(data, video_folder, args):
                 # Aggiorna il checkpoint più recente
                 torch.save({
                     'total_iterations': total,
-                    'epoch': epoch+2,
+                    'epoch': epoch+1,
                     'iteration': i+1,
                     'model_state_dict': unet.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
