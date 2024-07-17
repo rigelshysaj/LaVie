@@ -479,7 +479,7 @@ def train_lora_model(data, video_folder, args):
         start_epoch = checkpoint['epoch']
         conta = checkpoint['iteration']
         #conta = checkpoint['total_iterations']
-        print(f"Ripresa dell'addestramento dall'epoca {start_epoch}, iterazione {start_iteration}")
+        print(f"Ripresa dell'addestramento dall'epoca {start_epoch}, iterazione {conta}")
 
     
     unet.train()
