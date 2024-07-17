@@ -479,7 +479,7 @@ def train_lora_model(data, video_folder, args):
         start_epoch = checkpoint['epoch']
         conta = checkpoint['iteration']
         #conta = checkpoint['total_iterations']
-        print(f"Ripresa dell'addestramento dall'epoca {start_epoch}, iterazione {conta}")
+        print(f"Ripresa dell'addestramento dall'epoca {start_epoch}, iterazione_totale {conta}")
 
     
     unet.train()
@@ -488,7 +488,7 @@ def train_lora_model(data, video_folder, args):
     text_encoder.eval()
     vae.eval()
 
-    conta =+ 1
+    conta += 1
     
     attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
     #projection_layer = nn.Linear(64, 224).to(unet.device)
