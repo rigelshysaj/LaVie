@@ -478,6 +478,7 @@ def train_lora_model(data, video_folder, args):
         lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
         start_epoch = checkpoint['epoch']
         start_iteration = checkpoint['iteration']
+        conta = checkpoint['total_iterations']
         print(f"Ripresa dell'addestramento dall'epoca {start_epoch}, iterazione {start_iteration}")
 
     
@@ -487,7 +488,7 @@ def train_lora_model(data, video_folder, args):
     text_encoder.eval()
     vae.eval()
 
-    conta = start_iteration + 1
+    conta =+ 1
 
     
     attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
@@ -510,12 +511,15 @@ def train_lora_model(data, video_folder, args):
 
             #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
-            if i < start_iteration:
+            if start_epoch < epoch or start_iteration <= i:
                 continue
+
+            print(f"epoca {epoch}, iterazione {i}")
+
 
             video = video.to(device)
             optimizer.zero_grad()
-            print(f"Iterazione numero: {conta}")
+            print(f"numero totale: {conta}")
 
             #print(f"video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
 
@@ -584,8 +588,6 @@ def train_lora_model(data, video_folder, args):
             del text_features, image_inputs, last_hidden_state, attention_output, encoder_hidden_states
             torch.cuda.empty_cache()
 
-            print(f"Epoch {epoch + 1}/{num_epochs} completed with loss: {loss.item()}")
-
             # Salva un checkpoint
             if conta % checkpoint_interval == 0:
                 
@@ -603,8 +605,9 @@ def train_lora_model(data, video_folder, args):
 
                 # Aggiorna il checkpoint più recente
                 torch.save({
+                    'total_iterations': conta,
                     'epoch': epoch+1,
-                    'iteration': conta,
+                    'iteration': i,
                     'model_state_dict': unet.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'lr_scheduler_state_dict': lr_scheduler.state_dict(),
@@ -614,6 +617,8 @@ def train_lora_model(data, video_folder, args):
                 print(f"Checkpoint salvato: {checkpoint_path}")
 
             conta += 1
+
+        print(f"Epoch {epoch + 1}/{num_epochs} completed with loss: {loss.item()}")
 
         # Resetta start_iteration dopo ogni epoca
         #start_iteration = 0
