@@ -488,6 +488,7 @@ def train_lora_model(data, video_folder, args):
     vae.eval()
 
     conta =+ 1
+    print("contaaaaaaaaaaa111111111: " + conta)
 
     
     attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
@@ -507,6 +508,9 @@ def train_lora_model(data, video_folder, args):
                 continue
 
             video, description, frame_tensor = batch
+
+            print("contaaaaaaaaaaa2222222222: " + conta)
+
 
             #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
