@@ -477,8 +477,8 @@ def train_lora_model(data, video_folder, args):
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
         start_epoch = checkpoint['epoch']
-        start_iteration = checkpoint['iteration']
-        conta = checkpoint['total_iterations']
+        conta = checkpoint['iteration']
+        #conta = checkpoint['total_iterations']
         print(f"Ripresa dell'addestramento dall'epoca {start_epoch}, iterazione {start_iteration}")
 
     
@@ -511,8 +511,8 @@ def train_lora_model(data, video_folder, args):
 
             #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
-            if start_epoch < epoch or start_iteration <= i:
-                continue
+            #if start_epoch < epoch or start_iteration <= i:
+                #continue
 
             print(f"epoca {epoch}, iterazione {i}")
 
