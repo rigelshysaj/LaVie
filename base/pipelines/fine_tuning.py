@@ -470,7 +470,6 @@ def train_lora_model(data, video_folder, args):
     checkpoint_interval = 100  # Salva un checkpoint ogni 100 iterazioni
 
     start_epoch = 0
-    start_iteration = 0
     if os.path.exists(os.path.join(checkpoint_dir, "latest_checkpoint.pth")):
         checkpoint = torch.load(os.path.join(checkpoint_dir, "latest_checkpoint.pth"))
         unet.load_state_dict(checkpoint['model_state_dict'])
@@ -515,11 +514,10 @@ def train_lora_model(data, video_folder, args):
                 #continue
 
             print(f"epoca {epoch}, iterazione {i}")
-
+            print(f"numero totale: {conta}")
 
             video = video.to(device)
             optimizer.zero_grad()
-            print(f"numero totale: {conta}")
 
             #print(f"video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
 
