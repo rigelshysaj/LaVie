@@ -510,9 +510,8 @@ def train_lora_model(data, video_folder, args):
 
             #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
-            if i < start_iteration:
-                print(f"index i is: {i}")
-                continue
+            #if i < start_iteration:
+                #continue
 
             video = video.to(device)
             optimizer.zero_grad()
