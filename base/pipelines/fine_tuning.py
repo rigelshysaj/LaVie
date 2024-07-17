@@ -512,6 +512,7 @@ def train_lora_model(data, video_folder, args):
             #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
             if start_epoch > epoch or iteration >= i:
+                print(f"i: {i}")
                 continue
 
             print(f"epoca {epoch+1}, iterazione {i+1}")
