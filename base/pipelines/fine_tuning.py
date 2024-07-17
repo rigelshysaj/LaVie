@@ -593,8 +593,9 @@ def train_lora_model(data, video_folder, args):
                 checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch{epoch+1}_iter{total}.pth")
                 '''
                 torch.save({
+                    'total_iterations': total,
                     'epoch': epoch+1,
-                    'iteration': conta,
+                    'iteration': i+1,
                     'model_state_dict': unet.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'lr_scheduler_state_dict': lr_scheduler.state_dict(),
@@ -605,7 +606,7 @@ def train_lora_model(data, video_folder, args):
                 # Aggiorna il checkpoint più recente
                 torch.save({
                     'total_iterations': total,
-                    'epoch': epoch+1,
+                    'epoch': epoch+2,
                     'iteration': i+1,
                     'model_state_dict': unet.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
