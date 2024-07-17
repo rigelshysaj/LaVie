@@ -510,8 +510,8 @@ def train_lora_model(data, video_folder, args):
 
             #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
-            #if i < start_iteration:
-                #continue
+            if i < start_iteration:
+                continue
 
             video = video.to(device)
             optimizer.zero_grad()
@@ -616,7 +616,7 @@ def train_lora_model(data, video_folder, args):
             conta += 1
 
         # Resetta start_iteration dopo ogni epoca
-        start_iteration = 0
+        #start_iteration = 0
     
             
     unet.save_pretrained("/content/drive/My Drive/finetuned_lora_unet")
