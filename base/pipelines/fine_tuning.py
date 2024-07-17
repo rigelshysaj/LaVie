@@ -588,6 +588,10 @@ def train_lora_model(data, video_folder, args):
             del text_features, image_inputs, last_hidden_state, attention_output, encoder_hidden_states
             torch.cuda.empty_cache()
 
+            if (i + 1) % len(dataloader) == 0:
+                print(f"Epoch {epoch + 1}/{num_epochs} completed with loss: {loss.item()}")
+
+
             # Salva un checkpoint
             if total % checkpoint_interval == 0:
                 
@@ -618,8 +622,6 @@ def train_lora_model(data, video_folder, args):
                 print(f"Checkpoint salvato: {checkpoint_path}")
 
             total += 1
-
-        print(f"Epoch {epoch + 1}/{num_epochs} completed with loss: {loss.item()}")
 
         # Resetta start_iteration dopo ogni epoca
         #start_iteration = 0
