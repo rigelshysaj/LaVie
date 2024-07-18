@@ -470,7 +470,6 @@ def train_lora_model(data, video_folder, args):
     checkpoint_interval = 100  # Salva un checkpoint ogni 100 iterazioni
 
     start_epoch = 0
-    total = 0
     iteration = 0
     if os.path.exists(os.path.join(checkpoint_dir, "latest_checkpoint.pth")):
         checkpoint = torch.load(os.path.join(checkpoint_dir, "latest_checkpoint.pth"))
@@ -478,9 +477,8 @@ def train_lora_model(data, video_folder, args):
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
         start_epoch = checkpoint['epoch']
-        total = checkpoint['total_iterations']
         iteration = checkpoint['iteration']
-        print(f"Ripresa dell'addestramento dall'epoca {start_epoch}, iterazione {iteration} e numero totale {total}")
+        print(f"Ripresa dell'addestramento dall'epoca {start_epoch}, iterazione {iteration}")
 
     
     unet.train()
@@ -488,8 +486,6 @@ def train_lora_model(data, video_folder, args):
     unet.enable_gradient_checkpointing()
     text_encoder.eval()
     vae.eval()
-
-    total += 1
     
     attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
     #projection_layer = nn.Linear(64, 224).to(unet.device)
@@ -502,7 +498,14 @@ def train_lora_model(data, video_folder, args):
 
 
     for epoch in range(num_epochs):
+
+        if epoch < start_epoch:
+            continue  # Salta le epoche già completate
+
         for i, batch in enumerate(dataloader):
+
+            if epoch == start_epoch and i <= iteration:
+                continue
 
             if batch[0] is None:
                 continue
@@ -511,12 +514,7 @@ def train_lora_model(data, video_folder, args):
 
             #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
-            if start_epoch > epoch or iteration >= i:
-                #print(f"i: {i}")
-                continue
-
-            print(f"epoca {epoch+1}, iterazione {i+1}")
-            print(f"numero totale: {total}")
+            print(f"epoca {epoch+1}, iterazione {i}")
 
             video = video.to(device)
             optimizer.zero_grad()
@@ -593,12 +591,11 @@ def train_lora_model(data, video_folder, args):
 
 
             # Salva un checkpoint
-            if total % checkpoint_interval == 0:
+            if (i + 1) % checkpoint_interval == 0:
                 
-                checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch{epoch+1}_iter{total}.pth")
+                checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch{epoch+1}_iter{i}.pth")
                 '''
                 torch.save({
-                    'total_iterations': total,
                     'epoch': epoch+1,
                     'iteration': i+1,
                     'model_state_dict': unet.state_dict(),
@@ -610,9 +607,8 @@ def train_lora_model(data, video_folder, args):
 
                 # Aggiorna il checkpoint più recente
                 torch.save({
-                    'total_iterations': total,
                     'epoch': epoch+1,
-                    'iteration': i+1,
+                    'iteration': i,
                     'model_state_dict': unet.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'lr_scheduler_state_dict': lr_scheduler.state_dict(),
@@ -620,8 +616,6 @@ def train_lora_model(data, video_folder, args):
                 }, os.path.join(checkpoint_dir, "latest_checkpoint.pth"))
 
                 print(f"Checkpoint salvato: {checkpoint_path}")
-
-            total += 1
 
         # Resetta start_iteration dopo ogni epoca
         #start_iteration = 0
