@@ -87,6 +87,10 @@ def load_model_for_inference(checkpoint_dir, device, args):
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
     clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
     noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
+
+    text_encoder.eval()
+    vae.eval()
+    clip_model.eval()
     
     return unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler
 
@@ -567,14 +571,14 @@ def train_lora_model(data, video_folder, args):
             del text_features, image_inputs, last_hidden_state, attention_output, encoder_hidden_states
             torch.cuda.empty_cache()
 
-            if (i + 1) % len(dataloader) == 0:
-                print(f"Epoch {epoch + 1}/{num_epochs} completed with loss: {loss.item()}")
+            if i % len(dataloader) == 0:
+                print(f"Epoch {epoch}/{num_epochs} completed with loss: {loss.item()}")
 
 
             # Salva un checkpoint
-            if (i + 1) % checkpoint_interval == 0:
+            if i % checkpoint_interval == 0:
                 
-                checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch{epoch+1}_iter{i}.pth")
+                checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch{epoch}_iter{i}.pth")
                 '''
                 torch.save({
                     'epoch': epoch,
@@ -597,10 +601,6 @@ def train_lora_model(data, video_folder, args):
                 }, os.path.join(checkpoint_dir, "latest_checkpoint.pth"))
 
                 print(f"Checkpoint salvato: {checkpoint_path}")
-
-        # Resetta start_iteration dopo ogni epoca
-        #start_iteration = 0
-    
             
     unet.save_pretrained("/content/drive/My Drive/finetuned_lora_unet")
     
