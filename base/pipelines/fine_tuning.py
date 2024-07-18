@@ -76,26 +76,7 @@ def load_model_for_inference(checkpoint_dir, device, args):
         print(f"Caricato checkpoint dall'epoca {checkpoint['epoch']}, iterazione {checkpoint['iteration']}")
     else:
         print("Nessun checkpoint trovato. Utilizzo del modello non addestrato.")
-    '''
-    
-    if os.path.exists(checkpoint_path):
-        checkpoint = torch.load(checkpoint_path)
-        state_dict = checkpoint['model_state_dict']
-        
-        # Rimuovi il prefisso "base_model.model." dalle chiavi
-        new_state_dict = {}
-        for key, value in state_dict.items():
-            if key.startswith("base_model.model."):
-                new_key = key.replace("base_model.model.", "")
-                new_state_dict[new_key] = value
-            else:
-                new_state_dict[key] = value
-        
-        unet.load_state_dict(new_state_dict, strict=False)
-        print(f"Caricato checkpoint dall'epoca {checkpoint['epoch']}, iterazione {checkpoint['iteration']}")
-    else:
-        print("Nessun checkpoint trovato. Utilizzo del modello non addestrato.")
-    '''
+
     
     unet.eval()
     
@@ -514,7 +495,7 @@ def train_lora_model(data, video_folder, args):
 
             #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
-            print(f"epoca {epoch+1}, iterazione {i}")
+            print(f"epoca {epoch}, iterazione {i}")
 
             video = video.to(device)
             optimizer.zero_grad()
@@ -596,8 +577,8 @@ def train_lora_model(data, video_folder, args):
                 checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch{epoch+1}_iter{i}.pth")
                 '''
                 torch.save({
-                    'epoch': epoch+1,
-                    'iteration': i+1,
+                    'epoch': epoch,
+                    'iteration': i,
                     'model_state_dict': unet.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'lr_scheduler_state_dict': lr_scheduler.state_dict(),
@@ -607,7 +588,7 @@ def train_lora_model(data, video_folder, args):
 
                 # Aggiorna il checkpoint più recente
                 torch.save({
-                    'epoch': epoch+1,
+                    'epoch': epoch,
                     'iteration': i,
                     'model_state_dict': unet.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
