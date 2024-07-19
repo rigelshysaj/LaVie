@@ -119,11 +119,11 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
         encoder_hidden_states = attention_output.transpose(0, 1)
         
         # Generazione dell'output
-        latents = torch.randn((1, 4, 16, 40, 64), device=device)
+        latents = torch.randn((1, 4, 16, 40, 64), device=device) #Campiona X_T ∼ N(0,I). Qui, latents rappresenta X_T
         
         noise_scheduler.set_timesteps(1000)
         
-        for t in tqdm(noise_scheduler.timesteps):
+        for t in tqdm(noise_scheduler.timesteps):                               #Il ciclo for scorre attraverso i timestep t da T a 1. Il campionamento di z ∼ N(0, I) se t > 1, altrimenti z = 0 è implicito nel metodo noise_scheduler.step
             latent_model_input = noise_scheduler.scale_model_input(latents, t)
 
             latent_model_input = latent_model_input.to(torch.float16)
@@ -149,14 +149,14 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
             noise_pred = noise_pred_uncond + guidance_scale * (noise_pred - noise_pred_uncond)
             
             # Compute the previous noisy sample x_t -> x_t-1
-            latents = noise_scheduler.step(noise_pred, t, latents).prev_sample
+            latents = noise_scheduler.step(noise_pred, t, latents).prev_sample #Qui, noise_pred rappresenta ϵ_θ(x_t, t). La funzione noise_scheduler.step calcola x_t-1 utilizzando l'equazione descritta
 
-        print(f"latents1 shape: {latents.shape}, dtype: {latents.dtype}")
+        #print(f"latents1 shape: {latents.shape}, dtype: {latents.dtype}")
         
         # Decodifica dei latents in immagine
         latents = 1 / vae.config.scaling_factor * latents
 
-        print(f"latents2 shape: {latents.shape}, dtype: {latents.dtype}")
+        #print(f"latents2 shape: {latents.shape}, dtype: {latents.dtype}")
 
         video = decode_latents(latents, vae, gradient=False)
         
@@ -536,12 +536,15 @@ def train_lora_model(data, video_folder, args):
                 latents = encode_latents(video, vae)
                 #print(f"latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
-                latents = latents * vae.config.scaling_factor
+                latents = latents * vae.config.scaling_factor #Campiona x_0 ∼ q(x_0). Qui, latents rappresenta x_0
+
                 #print(f"latents2 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
-                noise = torch.randn_like(latents)
-                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (latents.shape[0],), device=latents.device)
-                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
+                noise = torch.randn_like(latents) #campiona ϵ ∼ N(0, I). Qui, noise rappresenta ϵ
+
+                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (latents.shape[0],), device=latents.device) #Campiona t ∼ Uniform({1, . . . , T}). Qui, timesteps rappresenta il campionamento di t
+
+                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps) #Qui, noisy_latents rappresenta x_{t} = \sqrt{\overline{a}_{t}}x_{0} + \sqrt{1 - \overline{a}_{t}} \epsilon
 
                 #print(f"noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
@@ -551,8 +554,9 @@ def train_lora_model(data, video_folder, args):
                     timestep=timesteps,
                     encoder_hidden_states=encoder_hidden_states
                 ).sample
+                #Qui, output rappresenta ϵ_θ(x_t, t)
 
-                loss = F.mse_loss(output, noise)
+                loss = F.mse_loss(output, noise) #calcola || \epsilon - \epsilon_{\theta}(x_{t}, t) ||^{2}
 
                 loss = loss / accumulation_steps
                 
@@ -636,9 +640,9 @@ def main(args):
 
     unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler = load_model_for_inference(checkpoint_dir, device, args)
 
-    description = "A man in suit"
+    description = "A squirrel eating"
 
-    image_path = "/content/drive/My Drive/suit.jpeg"
+    image_path = "/content/drive/My Drive/What-to-Feed-Squirrels.webp"
 
     image = Image.open(image_path)
 
