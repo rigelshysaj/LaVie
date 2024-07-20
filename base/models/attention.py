@@ -674,7 +674,7 @@ class TemporalAttention(CrossAttention):
         batch_size, sequence_length, _ = hidden_states.shape
 
         print(f"TemporalAttention hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([640, 16, 640]), dtype: torch.float32. Il shape di hidden_states all'inizio può essere anche [160, 16, 1280] o [40, 16, 1280 o [2560, 16, 320] etc..
-        print(f"TemporalAttention encoder_hidden_states1 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #None type
+        #print(f"TemporalAttention encoder_hidden_states1 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #None type
 
         encoder_hidden_states = encoder_hidden_states
 
