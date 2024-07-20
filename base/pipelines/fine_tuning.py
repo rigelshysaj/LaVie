@@ -166,7 +166,7 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
 
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None, target_size=(512, 320), fixed_frame_count=16):
+    def __init__(self, annotations_file, video_dir, transform=None, target_size=(256, 256), fixed_frame_count=5):
         self.video_dir = video_dir
         self.transform = transform
         self.target_size = target_size
@@ -377,7 +377,7 @@ def decode_latents(latents, vae, gradient=True):
         decoded_batch = checkpoint(decode_batch, latents_batch)
         decoded_parts.append(decoded_batch)
         # Libera un po' di memoria
-        torch.cuda.empty_cache()
+        #torch.cuda.empty_cache()
     
     #print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}") #[1, 4, 40, 64] torch.float16
 
@@ -506,48 +506,47 @@ def train_lora_model(data, video_folder, args):
 
             #print(f"video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
 
+            text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
+            text_features = text_encoder(text_inputs)[0].to(torch.float16)
+            #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+
+            image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
+            outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
+            last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
+            #print(f"last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
+            
+            # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
+            text_features = text_features.transpose(0, 1)
+            last_hidden_state = last_hidden_state.transpose(0, 1)
+
+            assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
+
+            # Calcola l'attenzione
+            attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
+
+            #print(f"attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
+            
+            # Ritorna alle dimensioni originali
+            encoder_hidden_states = attention_output.transpose(0, 1)
+
+            #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
+
+            latents = encode_latents(video, vae)
+            #print(f"latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
+
+            latents = latents * vae.config.scaling_factor #Campiona x_0 ∼ q(x_0). Qui, latents rappresenta x_0
+
+            #print(f"latents2 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
+
+            noise = torch.randn_like(latents) #campiona ϵ ∼ N(0, I). Qui, noise rappresenta ϵ
+
+            timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (latents.shape[0],), device=latents.device) #Campiona t ∼ Uniform({1, . . . , T}). Qui, timesteps rappresenta il campionamento di t
+
+            noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps) #Qui, noisy_latents rappresenta x_{t} = \sqrt{\overline{a}_{t}}x_{0} + \sqrt{1 - \overline{a}_{t}} \epsilon
+
+            #print(f"noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
+
             with torch.cuda.amp.autocast():
-
-                text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
-                text_features = text_encoder(text_inputs)[0].to(torch.float16)
-                #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
-
-                image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
-                outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
-                last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
-                #print(f"last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
-                
-                # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
-                text_features = text_features.transpose(0, 1)
-                last_hidden_state = last_hidden_state.transpose(0, 1)
-
-                assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
-
-                # Calcola l'attenzione
-                attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
-
-                #print(f"attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
-                
-                # Ritorna alle dimensioni originali
-                encoder_hidden_states = attention_output.transpose(0, 1)
-
-                #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
-
-                latents = encode_latents(video, vae)
-                #print(f"latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
-
-                latents = latents * vae.config.scaling_factor #Campiona x_0 ∼ q(x_0). Qui, latents rappresenta x_0
-
-                #print(f"latents2 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
-
-                noise = torch.randn_like(latents) #campiona ϵ ∼ N(0, I). Qui, noise rappresenta ϵ
-
-                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (latents.shape[0],), device=latents.device) #Campiona t ∼ Uniform({1, . . . , T}). Qui, timesteps rappresenta il campionamento di t
-
-                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps) #Qui, noisy_latents rappresenta x_{t} = \sqrt{\overline{a}_{t}}x_{0} + \sqrt{1 - \overline{a}_{t}} \epsilon
-
-                #print(f"noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
-
                 # Forward pass
                 output = unet(
                     sample=noisy_latents,
@@ -556,9 +555,9 @@ def train_lora_model(data, video_folder, args):
                 ).sample
                 #Qui, output rappresenta ϵ_θ(x_t, t)
 
-                loss = F.mse_loss(output, noise) #calcola || \epsilon - \epsilon_{\theta}(x_{t}, t) ||^{2}
+            loss = F.mse_loss(output, noise) #calcola || \epsilon - \epsilon_{\theta}(x_{t}, t) ||^{2}
 
-                loss = loss / accumulation_steps
+            loss = loss / accumulation_steps
                 
             scaler.scale(loss).backward()
 
@@ -648,7 +647,7 @@ def main(args):
 
     # Definisci la trasformazione
     transform = transforms.Compose([
-        transforms.Resize((320, 512)),  # Ridimensiona l'immagine a 320x512
+        transforms.Resize((256, 256)),
         transforms.ToTensor()  # Converte l'immagine in un tensore
     ])
 
