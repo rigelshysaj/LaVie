@@ -555,9 +555,9 @@ def train_lora_model(data, video_folder, args):
                 ).sample
                 #Qui, output rappresenta ϵ_θ(x_t, t)
 
-            loss = F.mse_loss(output, noise) #calcola || \epsilon - \epsilon_{\theta}(x_{t}, t) ||^{2}
+                loss = F.mse_loss(output, noise) #calcola || \epsilon - \epsilon_{\theta}(x_{t}, t) ||^{2}
 
-            loss = loss / accumulation_steps
+                loss = loss / accumulation_steps
                 
             scaler.scale(loss).backward()
 
