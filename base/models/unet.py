@@ -497,7 +497,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         # pre-process
         print(f"UNet3DConditionModel forward sample1 shape: {sample.shape}, dtype: {sample.dtype}")
         sample = self.conv_in(sample) 
-        print(f"UNet3DConditionModel forward after conv_in sample2 shape: {sample.shape}, dtype: {sample.dtype}")
+        print(f"UNet3DConditionModel forward sample2 shape: {sample.shape}, dtype: {sample.dtype}")
         #sample: shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
 
         # down
@@ -516,7 +516,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
 
             down_block_res_samples += res_samples
 
-        print(f"UNet3DConditionModel forward after downsample_block sample shape3: {sample.shape}, dtype: {sample.dtype}")
+        print(f"UNet3DConditionModel forward sample3 shape: {sample.shape}, dtype: {sample.dtype}")
 
         #sample: shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
         #downsample_block type: bound method Module.type
@@ -525,7 +525,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         sample = self.mid_block(
             sample, emb, encoder_hidden_states=encoder_hidden_states, attention_mask=attention_mask, use_image_num=use_image_num,
         )
-        print(f"UNet3DConditionModel forward after mid_blocksample shape4: {sample.shape}, dtype: {sample.dtype}")
+        print(f"UNet3DConditionModel forward sample4 shape: {sample.shape}, dtype: {sample.dtype}")
 
         #sample: shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
 
@@ -536,14 +536,14 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             res_samples = down_block_res_samples[-len(upsample_block.resnets) :] #prende gli ultimi len(upsample_block.resnets) elementi della tupla
             down_block_res_samples = down_block_res_samples[: -len(upsample_block.resnets)] #prende tutti gli elementi della tupla eccetto gli ultimi len(upsample_block.resnets).
 
-            print(f"UNet3DConditionModel forward res_samples[{i}] upsample: {res_samples[i].shape}, dtype: {res_samples[i].dtype}")
-            print(f"UNet3DConditionModel forward down_block_res_samples[{i}] upsample: {down_block_res_samples[i].shape}, dtype: {down_block_res_samples[i].dtype}")
+            print(f"UNet3DConditionModel forward len res_samples: {len(res_samples)}")
+            print(f"UNet3DConditionModel forward len down_block_res_samples: {len(down_block_res_samples)}")
 
             # if we have not reached the final block and need to forward the
             # upsample size, we do it here
             if not is_final_block and forward_upsample_size:
                 upsample_size = down_block_res_samples[-1].shape[2:]
-                print(f"UNet3DConditionModel forward upsample_size unet forward: {upsample_size.shape}, dtype: {upsample_size.dtype}")
+                print(f"UNet3DConditionModel forward upsample_size1: {upsample_size.shape}, dtype: {upsample_size.dtype}")
 
 
             if hasattr(upsample_block, "has_cross_attention") and upsample_block.has_cross_attention:
@@ -556,27 +556,27 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
                     attention_mask=attention_mask,
                     use_image_num=use_image_num,
                 )
-                print(f"UNet3DConditionModel forward sample after upsample_block with has_cross_attention shape5: {sample.shape}, dtype: {sample.dtype}")
+                print(f"UNet3DConditionModel forward sample5 shape: {sample.shape}, dtype: {sample.dtype}")
 
             else:
                 sample = upsample_block(
                     hidden_states=sample, temb=emb, res_hidden_states_tuple=res_samples, upsample_size=upsample_size
                 )
-                print(f"UNet3DConditionModel forward sample after upsample_block without has_cross_attention shape6: {sample.shape}, dtype: {sample.dtype}")
+                print(f"UNet3DConditionModel forward sample6 shape: {sample.shape}, dtype: {sample.dtype}")
 
 
         #sample: shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
             
         # post-process
         sample = self.conv_norm_out(sample)
-        print(f"UNet3DConditionModel forward sample shape7: {sample.shape}, dtype: {sample.dtype}")
+        print(f"UNet3DConditionModel forward sample7 shape: {sample.shape}, dtype: {sample.dtype}")
 
         #sample: shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float32
         sample = self.conv_act(sample)
-        print(f"UNet3DConditionModel forward sample shape8: {sample.shape}, dtype: {sample.dtype}")
+        print(f"UNet3DConditionModel forward sample8 shape: {sample.shape}, dtype: {sample.dtype}")
         #sample: shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float32
         sample = self.conv_out(sample)
-        print(f"UNet3DConditionModel forward sample shape9: {sample.shape}, dtype: {sample.dtype}")
+        print(f"UNet3DConditionModel forward sample9 shape: {sample.shape}, dtype: {sample.dtype}")
         #sample: shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float16
 
         # print(sample.shape)
