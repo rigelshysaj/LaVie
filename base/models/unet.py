@@ -502,7 +502,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
 
         # down
         down_block_res_samples = (sample,)
-        for downsample_block in self.down_blocks:
+        for i, downsample_block in enumerate(self.down_blocks):
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:
                 sample, res_samples = downsample_block(
                     hidden_states=sample,
@@ -513,6 +513,9 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
                 )
             else:
                 sample, res_samples = downsample_block(hidden_states=sample, temb=emb)
+
+            print(f"UNet3DConditionModel forward inside downsample_block {hasattr(downsample_block, "has_cross_attention")} sample shape{i}: {sample.shape}, dtype: {sample.dtype}")
+            print(f"UNet3DConditionModel forward inside downsample_block {hasattr(downsample_block, "has_cross_attention")} res_samples shape{i}: {res_samples.shape}, dtype: {res_samples.dtype}")
 
             down_block_res_samples += res_samples
 
