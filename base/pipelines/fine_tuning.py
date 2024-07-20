@@ -304,6 +304,8 @@ class VideoDatasetMsrvtt(Dataset):
 
 
 def encode_latents(video, vae):
+    video = video.to(torch.float16)
+
     # video ha forma [b, c, f, h, w]
     b, c, f, h, w = video.shape
     
