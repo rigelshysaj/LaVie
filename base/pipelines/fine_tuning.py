@@ -520,10 +520,9 @@ def train_lora_model(data, video_folder, args):
 
             assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
 
-            attention_layer = attention_layer.to(torch.float16)
-
+            with torch.cuda.amp.autocast():
             # Calcola l'attenzione
-            attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
+                attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
 
             #print(f"attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
             
