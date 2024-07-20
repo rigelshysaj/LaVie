@@ -26,6 +26,7 @@ from diffusers.schedulers import DDIMScheduler, DDPMScheduler
 from transformers import get_cosine_schedule_with_warmup
 from dataclasses import dataclass
 from peft import PeftModel, LoraConfig
+from peft.utils.other import find_all_linear_names
 from PIL import Image
 from torchvision import transforms
 
@@ -422,14 +423,12 @@ def train_lora_model(data, video_folder, args):
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
     clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
+    target_modules = find_all_linear_names(unet)
+
     lora_config = LoraConfig(
         r=8, 
         lora_alpha=16,
-        target_modules = [
-            "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
-            "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
-            "attn_temp.to_q", "attn_temp.to_k", "attn_temp.to_v", "attn_temp.to_out.0",
-            "ff.net.0.proj", "ff.net.2"]
+        target_modules = target_modules
     )
 
     unet = get_peft_model(unet, lora_config)
