@@ -364,9 +364,8 @@ def decode_latents(latents, vae, gradient=True):
     decoded_parts = []
     batch_size = 1  # Puoi aumentare questo valore se la tua GPU lo consente
 
-    def decode_batch(batch):
-        with torch.cuda.amp.autocast():
-            return vae.decode(batch).sample
+    def decode_batch(batch):    
+        return vae.decode(batch).sample
 
     #print(f"latents shape: {latents.shape}, dtype: {latents.dtype}") #[16, 4, 40, 64] torch.float16
     
@@ -545,6 +544,11 @@ def train_lora_model(data, video_folder, args):
             noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps) #Qui, noisy_latents rappresenta x_{t} = \sqrt{\overline{a}_{t}}x_{0} + \sqrt{1 - \overline{a}_{t}} \epsilon
 
             #print(f"noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
+
+
+            noisy_latents = noisy_latents.to(torch.float16)
+            last_hidden_state = last_hidden_state.to(torch.float16)
+            encoder_hidden_states = encoder_hidden_states.to(torch.float16)
 
             with torch.cuda.amp.autocast():
                 # Forward pass
