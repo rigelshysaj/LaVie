@@ -517,7 +517,10 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
                 sample, res_samples = downsample_block(hidden_states=sample, temb=emb)
 
             print(f"UNet3DConditionModel forward inside downsample_block {has_ca} sample{i} shape: {sample.shape}, dtype: {sample.dtype}")
-            print(f"UNet3DConditionModel forward inside downsample_block {has_ca} res_samples{i} shape: {res_samples.shape}, dtype: {res_samples.dtype}")
+
+            for i, _ in enumerate(res_samples):
+                print(f"UNet3DConditionModel forward  inside downsample_block {has_ca} res_samples{i} shape: {res_samples[i].shape}, dtype: {res_samples[i].dtype}")
+
 
             down_block_res_samples += res_samples
 
