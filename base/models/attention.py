@@ -148,7 +148,7 @@ class CrossAttention(nn.Module):
 
         print(f"CrossAttention forward hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([16, 2560, 320]), dtype: torch.float32
         #hidden states può avere shape [16, 160, 1280] o [16, 640, 640] o 16, 40, 1280] etc..
-        print(f"CrossAttention forward encoder_hidden_states1 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #None type
+        #print(f"CrossAttention forward encoder_hidden_states1 shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #None type
         encoder_hidden_states = encoder_hidden_states
 
         if self.group_norm is not None:
