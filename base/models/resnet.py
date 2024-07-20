@@ -51,6 +51,7 @@ class Upsample3D(nn.Module):
         dtype = hidden_states.dtype
         if dtype == torch.bfloat16:
             hidden_states = hidden_states.to(torch.float32)
+            print(f"Upsample3D hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         # upsample_nearest_nhwc fails with large batch sizes. see https://github.com/huggingface/diffusers/issues/984
         if hidden_states.shape[0] >= 64:
@@ -60,8 +61,10 @@ class Upsample3D(nn.Module):
         # size and do not make use of `scale_factor=2`
         if output_size is None:
             hidden_states = F.interpolate(hidden_states, scale_factor=[1.0, 2.0, 2.0], mode="nearest")
+            print(f"Upsample3D forward hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         else:
             hidden_states = F.interpolate(hidden_states, size=output_size, mode="nearest")
+            print(f"Upsample3D forward hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         # If the input is bfloat16, we cast back to bfloat16
         if dtype == torch.bfloat16:
@@ -70,8 +73,10 @@ class Upsample3D(nn.Module):
         if self.use_conv:
             if self.name == "conv":
                 hidden_states = self.conv(hidden_states)
+                print(f"Upsample3D forward hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             else:
                 hidden_states = self.Conv2d_0(hidden_states)
+                print(f"Upsample3D forward hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         return hidden_states
 
@@ -105,19 +110,9 @@ class Downsample3D(nn.Module):
             raise NotImplementedError
 
         assert hidden_states.shape[1] == self.channels
-        #print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+        print(f"Downsample3D forward hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         hidden_states = self.conv(hidden_states)
-        #print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
-
-        '''
-        hidden_states1 shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
-        hidden_states2 shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float16
-        hidden_states1 shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
-        hidden_states2 shape: torch.Size([1, 640, 16, 10, 16]), dtype: torch.float16
-        hidden_states1 shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
-        hidden_states2 shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
-        '''
-
+        print(f"Downsample3D forward hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         return hidden_states
 
@@ -188,52 +183,52 @@ class ResnetBlock3D(nn.Module):
 
     def forward(self, input_tensor, temb):
         hidden_states = input_tensor
-        #print(f"hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float16
+        print(f"ResnetBlock3D forward hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float16
         #quando le ultimi tre dimensioni sono 16, 40, 64, la seconda dimensiona non si raddoppia. Ovviamente al posto di 320 può essere 640,1280
         hidden_states = self.norm1(hidden_states)
 
-        #print(f"hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float32
+        print(f"ResnetBlock3D forward  hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float32
 
         hidden_states = self.nonlinearity(hidden_states)
 
-        #print(f"hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float32
+        print(f"ResnetBlock3D forward  hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float32
 
 
         hidden_states = self.conv1(hidden_states)
 
-        #print(f"hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
+        print(f"ResnetBlock3D forward  hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
 
         if temb is not None:
             temb = self.time_emb_proj(self.nonlinearity(temb))[:, :, None, None, None]
 
         if temb is not None and self.time_embedding_norm == "default":
             hidden_states = hidden_states + temb
-            #print(f"hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
+            print(f"ResnetBlock3D forward hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
 
         hidden_states = self.norm2(hidden_states)
 
-        #print(f"hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float32
+        print(f"ResnetBlock3D forward hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float32
 
         if temb is not None and self.time_embedding_norm == "scale_shift":
             scale, shift = torch.chunk(temb, 2, dim=1)
             hidden_states = hidden_states * (1 + scale) + shift
-            #print(f"hidden_states7 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+            print(f"ResnetBlock3D forward hidden_states7 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         hidden_states = self.nonlinearity(hidden_states)
 
-        #print(f"hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float32
+        print(f"ResnetBlock3D forward hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float32
 
         hidden_states = self.dropout(hidden_states)
 
-        #print(f"hidden_states9 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float32
+        print(f"ResnetBlock3D forward hidden_states9 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float32
 
         hidden_states = self.conv2(hidden_states)
 
-        #print(f"hidden_states10 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
+        print(f"ResnetBlock3D forward hidden_states10 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
 
         if self.conv_shortcut is not None:
             input_tensor = self.conv_shortcut(input_tensor)
-            #print(f"input_tensor shape: {input_tensor.shape}, dtype: {input_tensor.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
+            print(f"ResnetBlock3D forward input_tensor shape: {input_tensor.shape}, dtype: {input_tensor.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
 
         output_tensor = (input_tensor + hidden_states) / self.output_scale_factor
 
@@ -243,3 +238,4 @@ class ResnetBlock3D(nn.Module):
 class Mish(torch.nn.Module):
     def forward(self, hidden_states):
         return hidden_states * torch.tanh(torch.nn.functional.softplus(hidden_states))
+    
