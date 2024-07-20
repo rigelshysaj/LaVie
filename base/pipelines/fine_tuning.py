@@ -321,10 +321,11 @@ def encode_latents(video, vae):
     
     for i in range(0, video.shape[0], batch_size):
         latents_batch = video[i:i+batch_size]
+        latents_batch = latents_batch.requires_grad_(True)
         #print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}") #shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
         # Usa checkpoint per risparmiare memoria
-        encoded_batch = checkpoint(encode_batch, latents_batch)
+        encoded_batch = checkpoint(encode_batch, latents_batch, use_reentrant=False)
 
         #print(f"encoded_batch shape: {encoded_batch.shape}, dtype: {encoded_batch.dtype}") #shape: torch.Size([1, 4, 40, 64]), dtype: torch.float32
 
@@ -366,16 +367,15 @@ def decode_latents(latents, vae, gradient=True):
     batch_size = 1  # Puoi aumentare questo valore se la tua GPU lo consente
 
     def decode_batch(batch):
-        with torch.cuda.amp.autocast():
-            return vae.decode(batch).sample
+        return vae.decode(batch).sample
 
     #print(f"latents shape: {latents.shape}, dtype: {latents.dtype}") #[16, 4, 40, 64] torch.float16
     
     for i in range(0, latents.shape[0], batch_size):
         latents_batch = latents[i:i+batch_size]
-
+        latents_batch = latents_batch.requires_grad_(True)
         # Usa checkpoint per risparmiare memoria
-        decoded_batch = checkpoint(decode_batch, latents_batch)
+        decoded_batch = checkpoint(decode_batch, latents_batch, use_reentrant=False)
         decoded_parts.append(decoded_batch)
         # Libera un po' di memoria
         #torch.cuda.empty_cache()
