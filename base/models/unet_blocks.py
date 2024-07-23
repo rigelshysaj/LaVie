@@ -170,6 +170,8 @@ class UNetMidBlock3DCrossAttn(nn.Module):
         self.attn_num_head_channels = attn_num_head_channels
         resnet_groups = resnet_groups if resnet_groups is not None else min(in_channels // 4, 32)
 
+        print(f"UNetMidBlock3DCrossAttn __init__ in_channels: {in_channels}, temb_channels: {temb_channels}, dropout: {dropout}, num_layers: {num_layers}, resnet_eps: {resnet_eps}, resnet_time_scale_shift: {resnet_time_scale_shift}, resnet_act_fn: {resnet_act_fn}, resnet_groups: {resnet_groups}, resnet_pre_norm: {resnet_pre_norm}, attn_num_head_channels: {attn_num_head_channels}, output_scale_factor: {output_scale_factor}, cross_attention_dim: {cross_attention_dim}, dual_cross_attention: {dual_cross_attention}, use_linear_projection: {use_linear_projection}, upcast_attention: {upcast_attention}, use_first_frame: {use_first_frame}, use_relative_position: {use_relative_position}, rotary_emb: {rotary_emb}")
+
         # there is always at least one resnet
         resnets = [
             ResnetBlock3D(
@@ -224,6 +226,10 @@ class UNetMidBlock3DCrossAttn(nn.Module):
         self.resnets = nn.ModuleList(resnets)
 
     def forward(self, hidden_states, temb=None, encoder_hidden_states=None, attention_mask=None, use_image_num=None):
+        if(temb is not None):
+            print(f"UNetMidBlock3DCrossAttn forward temb shape: {temb.shape}, dtype: {temb.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
+
+
         print(f"UNetMidBlock3DCrossAttn forward hidden_states shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
         hidden_states = self.resnets[0](hidden_states, temb)
         print(f"UNetMidBlock3DCrossAttn forward hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
@@ -274,8 +280,33 @@ class CrossAttnDownBlock3D(nn.Module):
         self.has_cross_attention = True
         self.attn_num_head_channels = attn_num_head_channels
 
+        print(f"CrossAttnDownBlock3D __init__ in_channels: {in_channels},
+            out_channels: {out_channels},
+            temb_channels: {temb_channels}, 
+            dropout: {dropout}, 
+            num_layers: {num_layers}, 
+            resnet_eps: {resnet_eps}, 
+            resnet_time_scale_shift: {resnet_time_scale_shift}, 
+            only_cross_attention: {only_cross_attention}, 
+            downsample_padding: {downsample_padding}, 
+            resnet_act_fn: {resnet_act_fn}, 
+            resnet_groups: {resnet_groups}, 
+            add_downsample: {add_downsample}, 
+            resnet_pre_norm: {resnet_pre_norm}, 
+            attn_num_head_channels: {attn_num_head_channels}, 
+            output_scale_factor: {output_scale_factor}, 
+            cross_attention_dim: {cross_attention_dim}, 
+            dual_cross_attention: {dual_cross_attention},  
+            use_linear_projection: {use_linear_projection}, 
+            upcast_attention: {upcast_attention}, 
+            use_first_frame: {use_first_frame}, 
+            use_relative_position: {use_relative_position}, 
+            rotary_emb: {rotary_emb}")
+
+
         for i in range(num_layers):
             in_channels = in_channels if i == 0 else out_channels
+            print(f"CrossAttnDownBlock3D __init__ inside for loop in_channels: {in_channels}")
             resnets.append(
                 ResnetBlock3D(
                     in_channels=in_channels,
@@ -326,6 +357,10 @@ class CrossAttnDownBlock3D(nn.Module):
 
     def forward(self, hidden_states, temb=None, encoder_hidden_states=None, attention_mask=None, use_image_num=None):
         output_states = ()
+
+        if(temb is not None):
+            print(f"CrossAttnDownBlock3D forward hidden_stembtates shape: {temb.shape}, dtype: {temb.dtype}") #torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
+
 
         print(f"CrossAttnDownBlock3D forward hidden_states shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
         print(f"CrossAttnDownBlock3D forward encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #shape: torch.Size([1, 8, 768]), dtype: torch.float16
@@ -405,8 +440,22 @@ class DownBlock3D(nn.Module):
         super().__init__()
         resnets = []
 
+        print(f"DownBlock3D __init__ in_channels: {in_channels},
+            out_channels: {out_channels},
+            temb_channels: {temb_channels}, 
+            dropout: {dropout}, 
+            num_layers: {num_layers}, 
+            resnet_eps: {resnet_eps}, 
+            resnet_time_scale_shift: {resnet_time_scale_shift}, 
+            downsample_padding: {downsample_padding}, 
+            resnet_act_fn: {resnet_act_fn}, 
+            resnet_groups: {resnet_groups}, 
+            add_downsample: {add_downsample}, 
+            resnet_pre_norm: {resnet_pre_norm}")
+
         for i in range(num_layers):
             in_channels = in_channels if i == 0 else out_channels
+            print(f"DownBlock3D __init__ inside for loop in_channels: {in_channels}")
             resnets.append(
                 ResnetBlock3D(
                     in_channels=in_channels,
@@ -438,6 +487,11 @@ class DownBlock3D(nn.Module):
         self.gradient_checkpointing = False
 
     def forward(self, hidden_states, temb=None):
+
+        if(temb is not None):
+            print(f"DownBlock3D forward temb shape: {temb.shape}, dtype: {temb.dtype}")
+
+
         print(f"DownBlock3D forward hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
         output_states = ()
 
@@ -497,6 +551,31 @@ class CrossAttnUpBlock3D(nn.Module):
         rotary_emb=False
     ):
         super().__init__()
+
+        print(f"CrossAttnUpBlock3D __init__ in_channels: {in_channels},
+            out_channels: {out_channels},
+            prev_output_channel: {prev_output_channel},
+            temb_channels: {temb_channels}, 
+            dropout: {dropout}, 
+            num_layers: {num_layers}, 
+            resnet_eps: {resnet_eps}, 
+            resnet_time_scale_shift: {resnet_time_scale_shift}, 
+            only_cross_attention: {only_cross_attention}, 
+            resnet_act_fn: {resnet_act_fn}, 
+            resnet_groups: {resnet_groups}, 
+            resnet_pre_norm: {resnet_pre_norm}, 
+            attn_num_head_channels: {attn_num_head_channels}, 
+            output_scale_factor: {output_scale_factor},
+            add_upsample: {add_upsample}, 
+            cross_attention_dim: {cross_attention_dim}, 
+            dual_cross_attention: {dual_cross_attention},  
+            use_linear_projection: {use_linear_projection}, 
+            upcast_attention: {upcast_attention}, 
+            use_first_frame: {use_first_frame}, 
+            use_relative_position: {use_relative_position}, 
+            rotary_emb: {rotary_emb}")
+
+
         resnets = []
         attentions = []
 
@@ -506,7 +585,8 @@ class CrossAttnUpBlock3D(nn.Module):
         for i in range(num_layers):
             res_skip_channels = in_channels if (i == num_layers - 1) else out_channels
             resnet_in_channels = prev_output_channel if i == 0 else out_channels
-
+            print(f"CrossAttnUpBlock3D __init__ inside for loop res_skip_channels: {res_skip_channels}")
+            print(f"CrossAttnUpBlock3D __init__ inside for loop resnet_in_channels: {resnet_in_channels}")
             resnets.append(
                 ResnetBlock3D(
                     in_channels=resnet_in_channels + res_skip_channels,
@@ -561,6 +641,18 @@ class CrossAttnUpBlock3D(nn.Module):
         use_image_num=None,
     ):
         
+        if(temb is not None):
+            print(f"CrossAttnUpBlock3D forward temb shape: {temb.shape}, dtype: {temb.dtype}")
+
+        if(encoder_hidden_states is not None):
+            print(f"CrossAttnUpBlock3D forward encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
+
+        if(upsample_size is not None):
+            print(f"CrossAttnUpBlock3D forward upsample_size shape: {upsample_size.shape}, dtype: {upsample_size.dtype}")
+
+        if(use_image_num is not None):
+            print(f"CrossAttnUpBlock3D forward use_image_num shape: {use_image_num.shape}, dtype: {use_image_num.dtype}")
+
         print(f"CrossAttnUpBlock3D forward hidden_states0 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
         #In questo caso la seconda dimensione è 1280, però cambia, i tre valori sono 320, 640 e 1280. Ovviamente, in base al valore della seconda dimensione cambiano anche i valori dei print di sotto, per esempio, se è 320, il valore 2560 di sotto sarà 640.
         for resnet, attn in zip(self.resnets, self.attentions):
@@ -637,11 +729,28 @@ class UpBlock3D(nn.Module):
         add_upsample=True,
     ):
         super().__init__()
+
+        print(f"UpBlock3D __init__ in_channels: {in_channels},
+            out_channels: {out_channels},
+            temb_channels: {temb_channels}, 
+            dropout: {dropout}, 
+            num_layers: {num_layers}, 
+            resnet_eps: {resnet_eps},
+            add_upsample: {add_upsample}, 
+            resnet_time_scale_shift: {resnet_time_scale_shift}, 
+            prev_output_channel: {prev_output_channel}, 
+            resnet_act_fn: {resnet_act_fn}, 
+            resnet_groups: {resnet_groups}, 
+            output_scale_factor: {output_scale_factor}, 
+            resnet_pre_norm: {resnet_pre_norm}")
+
         resnets = []
 
         for i in range(num_layers):
             res_skip_channels = in_channels if (i == num_layers - 1) else out_channels
             resnet_in_channels = prev_output_channel if i == 0 else out_channels
+            print(f"UpBlock3D __init__ inside for loop res_skip_channels: {res_skip_channels}")
+            print(f"UpBlock3D __init__ inside for loop resnet_in_channels: {resnet_in_channels}")
 
             resnets.append(
                 ResnetBlock3D(
@@ -668,7 +777,15 @@ class UpBlock3D(nn.Module):
         self.gradient_checkpointing = False
 
     def forward(self, hidden_states, res_hidden_states_tuple, temb=None, upsample_size=None):
-        print(f"UpBlock3D forward hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
+        if(temb is not None):
+            print(f"UpBlock3D forward temb shape: {temb.shape}, dtype: {temb.dtype}")
+        if(upsample_size is not None):
+            print(f"UpBlock3D forward temb shape: {temb.shape}, dtype: {temb.dtype}")
+        
+        print(f"UpBlock3D forward res_hidden_states_tuple len: {len(res_hidden_states_tuple)}")
+
+
+        print(f"UpBlock3D forward upsample_size shape: {upsample_size.shape}, dtype: {upsample_size.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
         for resnet in self.resnets:
             # pop res hidden states
             res_hidden_states = res_hidden_states_tuple[-1]

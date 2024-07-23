@@ -30,6 +30,13 @@ class Upsample3D(nn.Module):
         self.use_conv_transpose = use_conv_transpose
         self.name = name
 
+        print(f"Upsample3D __init__ channels: {channels},
+            out_channels: {out_channels},
+            self.out_channels: {self.out_channels},
+            use_conv: {use_conv}, 
+            use_conv_transpose: {use_conv_transpose}, 
+            name: {name}")
+
         conv = None
         if use_conv_transpose:
             raise NotImplementedError
@@ -43,6 +50,10 @@ class Upsample3D(nn.Module):
 
     def forward(self, hidden_states, output_size=None):
         assert hidden_states.shape[1] == self.channels
+
+        if(output_size is not None):
+            print(f"Upsample3D output_size shape: {output_size.shape}, dtype: {output_size.dtype}")
+
 
         if self.use_conv_transpose:
             raise NotImplementedError
@@ -90,6 +101,14 @@ class Downsample3D(nn.Module):
         self.padding = padding
         stride = 2
         self.name = name
+
+        print(f"Downsample3D __init__ channels: {channels},
+            out_channels: {out_channels},
+            self.out_channels: {self.out_channels},
+            use_conv: {use_conv}, 
+            padding: {padding}, 
+            stride: {stride}, 
+            name: {name}")
 
         if use_conv:
             conv = InflatedConv3d(self.channels, self.out_channels, 3, stride=stride, padding=padding)
@@ -148,6 +167,22 @@ class ResnetBlock3D(nn.Module):
         if groups_out is None:
             groups_out = groups
 
+        print(f"ResnetBlock3D __init__ in_channels: {in_channels},
+            out_channels: {out_channels},
+            self.out_channels: {self.out_channels},
+            temb_channels: {temb_channels}, 
+            dropout: {dropout}, 
+            groups: {groups}, 
+            groups_out: {groups_out}, 
+            pre_norm: {pre_norm}, 
+            eps: {eps}, 
+            non_linearity: {non_linearity}, 
+            time_embedding_norm: {time_embedding_norm}, 
+            output_scale_factor: {output_scale_factor}, 
+            use_in_shortcut: {use_in_shortcut}, 
+            conv_shortcut: {conv_shortcut}, 
+            output_scale_factor: {output_scale_factor}")
+
         self.norm1 = torch.nn.GroupNorm(num_groups=groups, num_channels=in_channels, eps=eps, affine=True)
 
         self.conv1 = InflatedConv3d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
@@ -182,9 +217,12 @@ class ResnetBlock3D(nn.Module):
             self.conv_shortcut = InflatedConv3d(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
 
     def forward(self, input_tensor, temb):
+        
+        print(f"ResnetBlock3D forward temb shape: {temb.shape}, dtype: {temb.dtype}") 
+
         hidden_states = input_tensor
         print(f"ResnetBlock3D forward hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float16
-        #quando le ultimi tre dimensioni sono 16, 40, 64, la seconda dimensiona non si raddoppia. Ovviamente al posto di 320 può essere 640,1280
+        
         hidden_states = self.norm1(hidden_states)
 
         print(f"ResnetBlock3D forward  hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float32
@@ -193,13 +231,14 @@ class ResnetBlock3D(nn.Module):
 
         print(f"ResnetBlock3D forward  hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float32
 
-
         hidden_states = self.conv1(hidden_states)
 
         print(f"ResnetBlock3D forward  hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
 
         if temb is not None:
             temb = self.time_emb_proj(self.nonlinearity(temb))[:, :, None, None, None]
+            print(f"ResnetBlock3D forward temb1 shape: {temb.shape}, dtype: {temb.dtype}") 
+
 
         if temb is not None and self.time_embedding_norm == "default":
             hidden_states = hidden_states + temb
