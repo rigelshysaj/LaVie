@@ -715,12 +715,10 @@ class UpBlock3D(nn.Module):
         if(temb is not None):
             print(f"UpBlock3D forward temb shape: {temb.shape}, dtype: {temb.dtype}")
         if(upsample_size is not None):
-            print(f"UpBlock3D forward temb shape: {temb.shape}, dtype: {temb.dtype}")
+            print(f"UpBlock3D forward temb shape: {upsample_size.shape}, dtype: {upsample_size.dtype}")
         
         print(f"UpBlock3D forward res_hidden_states_tuple len: {len(res_hidden_states_tuple)}")
 
-
-        print(f"UpBlock3D forward upsample_size shape: {upsample_size.shape}, dtype: {upsample_size.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
         for resnet in self.resnets:
             # pop res hidden states
             res_hidden_states = res_hidden_states_tuple[-1]
