@@ -715,7 +715,7 @@ class UpBlock3D(nn.Module):
         if(temb is not None):
             print(f"UpBlock3D forward temb shape: {temb.shape}, dtype: {temb.dtype}")
         if(upsample_size is not None):
-            print(f"UpBlock3D forward temb shape: {upsample_size.shape}, dtype: {upsample_size.dtype}")
+            print(f"UpBlock3D forward upsample_size shape: {upsample_size.shape}, dtype: {upsample_size.dtype}")
         
         print(f"UpBlock3D forward res_hidden_states_tuple len: {len(res_hidden_states_tuple)}")
 
