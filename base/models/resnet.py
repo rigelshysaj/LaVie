@@ -30,12 +30,7 @@ class Upsample3D(nn.Module):
         self.use_conv_transpose = use_conv_transpose
         self.name = name
 
-        print(f"Upsample3D __init__ channels: {channels},
-            out_channels: {out_channels},
-            self.out_channels: {self.out_channels},
-            use_conv: {use_conv}, 
-            use_conv_transpose: {use_conv_transpose}, 
-            name: {name}")
+        print(f"Upsample3D __init__ channels: {channels}, out_channels: {out_channels}, self.out_channels: {self.out_channels}, use_conv: {use_conv}, use_conv_transpose: {use_conv_transpose}, name: {name}")
 
         conv = None
         if use_conv_transpose:
@@ -102,13 +97,7 @@ class Downsample3D(nn.Module):
         stride = 2
         self.name = name
 
-        print(f"Downsample3D __init__ channels: {channels},
-            out_channels: {out_channels},
-            self.out_channels: {self.out_channels},
-            use_conv: {use_conv}, 
-            padding: {padding}, 
-            stride: {stride}, 
-            name: {name}")
+        print(f"Downsample3D __init__ channels: {channels}, out_channels: {out_channels}, self.out_channels: {self.out_channels}, use_conv: {use_conv}, padding: {padding}, stride: {stride}, name: {name}")
 
         if use_conv:
             conv = InflatedConv3d(self.channels, self.out_channels, 3, stride=stride, padding=padding)
@@ -167,21 +156,7 @@ class ResnetBlock3D(nn.Module):
         if groups_out is None:
             groups_out = groups
 
-        print(f"ResnetBlock3D __init__ in_channels: {in_channels},
-            out_channels: {out_channels},
-            self.out_channels: {self.out_channels},
-            temb_channels: {temb_channels}, 
-            dropout: {dropout}, 
-            groups: {groups}, 
-            groups_out: {groups_out}, 
-            pre_norm: {pre_norm}, 
-            eps: {eps}, 
-            non_linearity: {non_linearity}, 
-            time_embedding_norm: {time_embedding_norm}, 
-            output_scale_factor: {output_scale_factor}, 
-            use_in_shortcut: {use_in_shortcut}, 
-            conv_shortcut: {conv_shortcut}, 
-            output_scale_factor: {output_scale_factor}")
+        print(f"ResnetBlock3D __init__ in_channels: {in_channels}, out_channels: {out_channels}, self.out_channels: {self.out_channels}, temb_channels: {temb_channels}, dropout: {dropout}, groups: {groups}, groups_out: {groups_out}, pre_norm: {pre_norm}, eps: {eps}, non_linearity: {non_linearity}, time_embedding_norm: {time_embedding_norm}, output_scale_factor: {output_scale_factor}, use_in_shortcut: {use_in_shortcut}, conv_shortcut: {conv_shortcut}, output_scale_factor: {output_scale_factor}")
 
         self.norm1 = torch.nn.GroupNorm(num_groups=groups, num_channels=in_channels, eps=eps, affine=True)
 
