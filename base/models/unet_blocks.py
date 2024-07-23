@@ -280,28 +280,7 @@ class CrossAttnDownBlock3D(nn.Module):
         self.has_cross_attention = True
         self.attn_num_head_channels = attn_num_head_channels
 
-        print(f"CrossAttnDownBlock3D __init__ in_channels: {in_channels},
-            out_channels: {out_channels},
-            temb_channels: {temb_channels}, 
-            dropout: {dropout}, 
-            num_layers: {num_layers}, 
-            resnet_eps: {resnet_eps}, 
-            resnet_time_scale_shift: {resnet_time_scale_shift}, 
-            only_cross_attention: {only_cross_attention}, 
-            downsample_padding: {downsample_padding}, 
-            resnet_act_fn: {resnet_act_fn}, 
-            resnet_groups: {resnet_groups}, 
-            add_downsample: {add_downsample}, 
-            resnet_pre_norm: {resnet_pre_norm}, 
-            attn_num_head_channels: {attn_num_head_channels}, 
-            output_scale_factor: {output_scale_factor}, 
-            cross_attention_dim: {cross_attention_dim}, 
-            dual_cross_attention: {dual_cross_attention},  
-            use_linear_projection: {use_linear_projection}, 
-            upcast_attention: {upcast_attention}, 
-            use_first_frame: {use_first_frame}, 
-            use_relative_position: {use_relative_position}, 
-            rotary_emb: {rotary_emb}")
+        print(f"CrossAttnDownBlock3D __init__ in_channels: {in_channels}, out_channels: {out_channels}, temb_channels: {temb_channels}, dropout: {dropout}, num_layers: {num_layers}, resnet_eps: {resnet_eps}, resnet_time_scale_shift: {resnet_time_scale_shift}, only_cross_attention: {only_cross_attention}, downsample_padding: {downsample_padding}, resnet_act_fn: {resnet_act_fn}, resnet_groups: {resnet_groups}, add_downsample: {add_downsample}, resnet_pre_norm: {resnet_pre_norm}, attn_num_head_channels: {attn_num_head_channels}, output_scale_factor: {output_scale_factor}, cross_attention_dim: {cross_attention_dim}, dual_cross_attention: {dual_cross_attention}, use_linear_projection: {use_linear_projection}, upcast_attention: {upcast_attention}, use_first_frame: {use_first_frame}, use_relative_position: {use_relative_position}, rotary_emb: {rotary_emb}")
 
 
         for i in range(num_layers):
