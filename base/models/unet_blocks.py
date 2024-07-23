@@ -597,8 +597,8 @@ class CrossAttnUpBlock3D(nn.Module):
         if(upsample_size is not None):
             print(f"CrossAttnUpBlock3D forward upsample_size shape: {upsample_size.shape}, dtype: {upsample_size.dtype}")
 
-        if(use_image_num is not None):
-            print(f"CrossAttnUpBlock3D forward use_image_num shape: {use_image_num.shape}, dtype: {use_image_num.dtype}")
+        
+        print(f"CrossAttnUpBlock3D forward use_image_num: {use_image_num}")
 
         print(f"CrossAttnUpBlock3D forward hidden_states0 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
         #In questo caso la seconda dimensione è 1280, però cambia, i tre valori sono 320, 640 e 1280. Ovviamente, in base al valore della seconda dimensione cambiano anche i valori dei print di sotto, per esempio, se è 320, il valore 2560 di sotto sarà 640.
