@@ -285,7 +285,7 @@ class CrossAttnDownBlock3D(nn.Module):
 
         for i in range(num_layers):
             in_channels = in_channels if i == 0 else out_channels
-            print(f"CrossAttnDownBlock3D __init__ inside for loop in_channels: {in_channels}")
+            print(f"CrossAttnDownBlock3D __init__ inside for loop iterazione: {i} in_channels: {in_channels}")
             resnets.append(
                 ResnetBlock3D(
                     in_channels=in_channels,
@@ -423,7 +423,7 @@ class DownBlock3D(nn.Module):
 
         for i in range(num_layers):
             in_channels = in_channels if i == 0 else out_channels
-            print(f"DownBlock3D __init__ inside for loop in_channels: {in_channels}")
+            print(f"DownBlock3D __init__ inside for loop iterazione: {i} in_channels: {in_channels}")
             resnets.append(
                 ResnetBlock3D(
                     in_channels=in_channels,
@@ -532,8 +532,8 @@ class CrossAttnUpBlock3D(nn.Module):
         for i in range(num_layers):
             res_skip_channels = in_channels if (i == num_layers - 1) else out_channels
             resnet_in_channels = prev_output_channel if i == 0 else out_channels
-            print(f"CrossAttnUpBlock3D __init__ inside for loop res_skip_channels: {res_skip_channels}")
-            print(f"CrossAttnUpBlock3D __init__ inside for loop resnet_in_channels: {resnet_in_channels}")
+            print(f"CrossAttnUpBlock3D __init__ inside for loop iterazione: {i} res_skip_channels: {res_skip_channels}")
+            print(f"CrossAttnUpBlock3D __init__ inside for loop iterazione: {i} resnet_in_channels: {resnet_in_channels}")
             resnets.append(
                 ResnetBlock3D(
                     in_channels=resnet_in_channels + res_skip_channels,
@@ -684,8 +684,8 @@ class UpBlock3D(nn.Module):
         for i in range(num_layers):
             res_skip_channels = in_channels if (i == num_layers - 1) else out_channels
             resnet_in_channels = prev_output_channel if i == 0 else out_channels
-            print(f"UpBlock3D __init__ inside for loop res_skip_channels: {res_skip_channels}")
-            print(f"UpBlock3D __init__ inside for loop resnet_in_channels: {resnet_in_channels}")
+            print(f"UpBlock3D __init__ inside for loop iterazione: {i} res_skip_channels: {res_skip_channels}")
+            print(f"UpBlock3D __init__ inside for loop iterazione: {i} resnet_in_channels: {resnet_in_channels}")
 
             resnets.append(
                 ResnetBlock3D(
