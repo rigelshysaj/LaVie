@@ -195,7 +195,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             #print(f"output_channel down_block_types: {output_channel}")
 
             '''
-            input_channel down_block_types: 320
+            input_channel down_block_types: 320         gli ultimi due sono per DownBlock3D e il resto per CrossAttnDownBlock3D
             output_channel down_block_types: 320
             input_channel down_block_types: 320
             output_channel down_block_types: 640
@@ -270,7 +270,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             #print(f"output_channel up_block_types: {output_channel}")
 
             '''
-            input_channel up_block_types: 1280
+            input_channel up_block_types: 1280          i primi due sono per UpBlock3D e il resto per CrossAttnUpBlock3D
             output_channel up_block_types: 1280
             input_channel up_block_types: 640
             output_channel up_block_types: 1280

@@ -87,6 +87,9 @@ class CrossAttention(nn.Module):
         self._use_memory_efficient_attention_xformers = False
         self.added_kv_proj_dim = added_kv_proj_dim
 
+        print(f"CrossAttention __init__ query_dim: {query_dim}, cross_attention_dim: {cross_attention_dim}, heads: {heads}, dim_head: {dim_head}, dropout: {dropout}, bias: {bias}, upcast_attention: {upcast_attention}, upcast_softmax: {upcast_softmax}, added_kv_proj_dim: {added_kv_proj_dim}, norm_num_groups: {norm_num_groups}, use_relative_position: {use_relative_position}, cross_attention_dim: {cross_attention_dim}, inner_dim: {inner_dim}, self.scale: {self.scale}")
+
+
         if norm_num_groups is not None:
             self.group_norm = nn.GroupNorm(num_channels=inner_dim, num_groups=norm_num_groups, eps=1e-5, affine=True)
         else:
@@ -367,6 +370,8 @@ class Transformer3DModel(ModelMixin, ConfigMixin):
         self.attention_head_dim = attention_head_dim
         inner_dim = num_attention_heads * attention_head_dim
 
+        print(f"num_attention_heads: {num_attention_heads}, attention_head_dim: {attention_head_dim}, in_channels: {in_channels}, num_layers: {num_layers}, dropout: {dropout}, norm_num_groups: {norm_num_groups}, cross_attention_dim: {cross_attention_dim}, attention_bias: {attention_bias}, activation_fn: {activation_fn}, num_embeds_ada_norm: {num_embeds_ada_norm}, use_linear_projection: {use_linear_projection}, only_cross_attention: {only_cross_attention}, upcast_attention: {upcast_attention}, use_first_frame: {use_first_frame}, use_relative_position: {use_relative_position}, rotary_emb: {rotary_emb}, inner_dim: {inner_dim}")
+
         # Define input layers
         self.in_channels = in_channels
 
@@ -496,6 +501,8 @@ class BasicTransformerBlock(nn.Module):
         self.only_cross_attention = only_cross_attention
         self.use_ada_layer_norm = num_embeds_ada_norm is not None
         self.use_first_frame = use_first_frame
+
+        print(f"dim: {dim}, num_attention_heads: {num_attention_heads}, attention_head_dim: {attention_head_dim}, dropout: {dropout}, cross_attention_dim: {cross_attention_dim}, activation_fn: {activation_fn}, num_embeds_ada_norm: {num_embeds_ada_norm}, attention_bias: {attention_bias}, only_cross_attention: {only_cross_attention}, upcast_attention: {upcast_attention}, use_first_frame: {use_first_frame}, use_relative_position: {use_relative_position}, rotary_emb: {rotary_emb}, use_ada_layer_norm: {self.use_ada_layer_norm}")
 
         # Spatial-Attn
         self.attn1 = CrossAttention(
@@ -669,6 +676,8 @@ class TemporalAttention(CrossAttention):
         self.time_rel_pos_bias = RelativePositionBias(heads=heads, max_distance=32) # realistically will not be able to generate that many frames of video... yet
         self.rotary_emb = rotary_emb
 
+        print(f"query_dim: {query_dim}, cross_attention_dim: {cross_attention_dim}, heads: {heads}, dim_head: {dim_head}, dropout: {dropout}, bias: {bias}, upcast_attention: {upcast_attention}, upcast_softmax: {upcast_softmax}, added_kv_proj_dim: {added_kv_proj_dim}, norm_num_groups: {norm_num_groups}, rotary_emb: {rotary_emb}")
+
     def forward(self, hidden_states, encoder_hidden_states=None, attention_mask=None):
         time_rel_pos_bias = self.time_rel_pos_bias(hidden_states.shape[1], device=hidden_states.device)
         batch_size, sequence_length, _ = hidden_states.shape
@@ -823,9 +832,12 @@ class RelativePositionBias(nn.Module):
         self.num_buckets = num_buckets
         self.max_distance = max_distance
         self.relative_attention_bias = nn.Embedding(num_buckets, heads)
+        print(f"heads: {heads}, num_buckets: {num_buckets}, max_distance: {max_distance}")
+        print(f"relative_attention_bias shape: {self.relative_attention_bias.shape}, dtype: {self.relative_attention_bias.dtype}")
 
     @staticmethod
     def _relative_position_bucket(relative_position, num_buckets=32, max_distance=128):
+
         ret = 0
         n = -relative_position
 
