@@ -833,7 +833,7 @@ class RelativePositionBias(nn.Module):
         self.max_distance = max_distance
         self.relative_attention_bias = nn.Embedding(num_buckets, heads)
         print(f"heads: {heads}, num_buckets: {num_buckets}, max_distance: {max_distance}")
-        print(f"relative_attention_bias: {self.relative_attention_bias}, dtype: {self.relative_attention_bias.dtype}")
+        print(f"relative_attention_bias: {self.relative_attention_bias}, type: {self.relative_attention_bias.type}")
 
     @staticmethod
     def _relative_position_bucket(relative_position, num_buckets=32, max_distance=128):
