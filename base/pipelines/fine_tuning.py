@@ -660,7 +660,7 @@ def main(args):
     print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
 
     video = inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, image_tensor, device, guidance_scale=7.5).video
-    imageio.mimwrite(args.output_folder + 'ocean' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+    imageio.mimwrite(args.output_folder + 'chiuhaha' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
     print('save path {}'.format(args.output_folder))
     
