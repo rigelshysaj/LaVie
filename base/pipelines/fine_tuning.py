@@ -356,6 +356,7 @@ def decode_latents(latents, vae):
 '''
 
 def decode_latents(latents, vae, gradient=True):
+    latents = latents.to(torch.float16)
     video_length = latents.shape[2]
     #latents = 1 / 0.18215 * latents
     latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
@@ -613,8 +614,6 @@ def train_lora_model(data, video_folder, args):
 
 def main(args):
 
-    
-    '''
     # Determina se sei su Google Colab
     on_colab = 'COLAB_GPU' in os.environ
 
@@ -642,7 +641,7 @@ def main(args):
 
     description = "a dog barks at the screen"
 
-    image_path = "/content/drive/My Drive/images.jpeg"
+    image_path = "/content/drive/My Drive/chih.jpeg"
 
     image = Image.open(image_path)
 
@@ -663,7 +662,7 @@ def main(args):
     imageio.mimwrite(args.output_folder + 'chiuhaha' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
     print('save path {}'.format(args.output_folder))
-    
+    '''
 
     '''
     Questa parte commentata serve se devo usare il dataset msrvtt
