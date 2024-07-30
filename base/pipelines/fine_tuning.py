@@ -568,8 +568,8 @@ def train_lora_model(data, video_folder, args):
             if (i + 1) % accumulation_steps == 0:
                 try:
                     scaler.step(optimizer)
-                    scaler.step(lr_scheduler)
                     scaler.update()
+                    lr_scheduler.step()
                 except ValueError as e:
                     print(f"Skipping scaler step due to error: {e}")
                 optimizer.zero_grad()
