@@ -231,11 +231,7 @@ class VideoDatasetMsvd(Dataset):
             video_id = os.path.splitext(video_file)[0]
             descriptions = self.video_descriptions.get(video_id, [])
 
-            #if not descriptions or descriptions == []:
-                #print(f"No description found for video {video_id}")
-                #return None, None, None
-
-            #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
+            print(f"description of __getitem__: {descriptions} video_id: {video_id}")
             
             # Applica trasformazioni, se presenti
             if self.transform:
