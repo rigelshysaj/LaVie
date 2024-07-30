@@ -30,8 +30,6 @@ class Upsample3D(nn.Module):
         self.use_conv_transpose = use_conv_transpose
         self.name = name
 
-        print(f"Upsample3D __init__ channels: {channels}, out_channels: {out_channels}, self.out_channels: {self.out_channels}, use_conv: {use_conv}, use_conv_transpose: {use_conv_transpose}, name: {name}")
-
         conv = None
         if use_conv_transpose:
             raise NotImplementedError
@@ -46,10 +44,6 @@ class Upsample3D(nn.Module):
     def forward(self, hidden_states, output_size=None):
         assert hidden_states.shape[1] == self.channels
 
-        if(output_size is not None):
-            print(f"Upsample3D output_size shape: {output_size.shape}, dtype: {output_size.dtype}")
-
-
         if self.use_conv_transpose:
             raise NotImplementedError
 
@@ -57,7 +51,6 @@ class Upsample3D(nn.Module):
         dtype = hidden_states.dtype
         if dtype == torch.bfloat16:
             hidden_states = hidden_states.to(torch.float32)
-            print(f"Upsample3D hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         # upsample_nearest_nhwc fails with large batch sizes. see https://github.com/huggingface/diffusers/issues/984
         if hidden_states.shape[0] >= 64:
@@ -67,10 +60,8 @@ class Upsample3D(nn.Module):
         # size and do not make use of `scale_factor=2`
         if output_size is None:
             hidden_states = F.interpolate(hidden_states, scale_factor=[1.0, 2.0, 2.0], mode="nearest")
-            print(f"Upsample3D forward hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         else:
             hidden_states = F.interpolate(hidden_states, size=output_size, mode="nearest")
-            print(f"Upsample3D forward hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         # If the input is bfloat16, we cast back to bfloat16
         if dtype == torch.bfloat16:
@@ -79,10 +70,8 @@ class Upsample3D(nn.Module):
         if self.use_conv:
             if self.name == "conv":
                 hidden_states = self.conv(hidden_states)
-                print(f"Upsample3D forward hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
             else:
                 hidden_states = self.Conv2d_0(hidden_states)
-                print(f"Upsample3D forward hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         return hidden_states
 
@@ -96,8 +85,6 @@ class Downsample3D(nn.Module):
         self.padding = padding
         stride = 2
         self.name = name
-
-        print(f"Downsample3D __init__ channels: {channels}, out_channels: {out_channels}, self.out_channels: {self.out_channels}, use_conv: {use_conv}, padding: {padding}, stride: {stride}, name: {name}")
 
         if use_conv:
             conv = InflatedConv3d(self.channels, self.out_channels, 3, stride=stride, padding=padding)
@@ -118,9 +105,7 @@ class Downsample3D(nn.Module):
             raise NotImplementedError
 
         assert hidden_states.shape[1] == self.channels
-        print(f"Downsample3D forward hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
         hidden_states = self.conv(hidden_states)
-        print(f"Downsample3D forward hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         return hidden_states
 
@@ -156,8 +141,6 @@ class ResnetBlock3D(nn.Module):
         if groups_out is None:
             groups_out = groups
 
-        print(f"ResnetBlock3D __init__ in_channels: {in_channels}, out_channels: {out_channels}, self.out_channels: {self.out_channels}, temb_channels: {temb_channels}, dropout: {dropout}, groups: {groups}, groups_out: {groups_out}, pre_norm: {pre_norm}, eps: {eps}, non_linearity: {non_linearity}, time_embedding_norm: {time_embedding_norm}, output_scale_factor: {output_scale_factor}, use_in_shortcut: {use_in_shortcut}, conv_shortcut: {conv_shortcut}, output_scale_factor: {output_scale_factor}")
-
         self.norm1 = torch.nn.GroupNorm(num_groups=groups, num_channels=in_channels, eps=eps, affine=True)
 
         self.conv1 = InflatedConv3d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
@@ -192,57 +175,32 @@ class ResnetBlock3D(nn.Module):
             self.conv_shortcut = InflatedConv3d(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
 
     def forward(self, input_tensor, temb):
-        
-        print(f"ResnetBlock3D forward temb shape: {temb.shape}, dtype: {temb.dtype}") 
-
         hidden_states = input_tensor
-        print(f"ResnetBlock3D forward hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float16
-        
+
         hidden_states = self.norm1(hidden_states)
-
-        print(f"ResnetBlock3D forward  hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float32
-
         hidden_states = self.nonlinearity(hidden_states)
-
-        print(f"ResnetBlock3D forward  hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float32
 
         hidden_states = self.conv1(hidden_states)
 
-        print(f"ResnetBlock3D forward  hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
-
         if temb is not None:
             temb = self.time_emb_proj(self.nonlinearity(temb))[:, :, None, None, None]
-            print(f"ResnetBlock3D forward temb1 shape: {temb.shape}, dtype: {temb.dtype}") 
-
 
         if temb is not None and self.time_embedding_norm == "default":
             hidden_states = hidden_states + temb
-            print(f"ResnetBlock3D forward hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
 
         hidden_states = self.norm2(hidden_states)
-
-        print(f"ResnetBlock3D forward hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float32
 
         if temb is not None and self.time_embedding_norm == "scale_shift":
             scale, shift = torch.chunk(temb, 2, dim=1)
             hidden_states = hidden_states * (1 + scale) + shift
-            print(f"ResnetBlock3D forward hidden_states7 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         hidden_states = self.nonlinearity(hidden_states)
 
-        print(f"ResnetBlock3D forward hidden_states8 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float32
-
         hidden_states = self.dropout(hidden_states)
-
-        print(f"ResnetBlock3D forward hidden_states9 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float32
-
         hidden_states = self.conv2(hidden_states)
-
-        print(f"ResnetBlock3D forward hidden_states10 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
 
         if self.conv_shortcut is not None:
             input_tensor = self.conv_shortcut(input_tensor)
-            print(f"ResnetBlock3D forward input_tensor shape: {input_tensor.shape}, dtype: {input_tensor.dtype}") #shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16
 
         output_tensor = (input_tensor + hidden_states) / self.output_scale_factor
 

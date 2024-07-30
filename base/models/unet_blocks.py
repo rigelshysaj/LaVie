@@ -170,8 +170,6 @@ class UNetMidBlock3DCrossAttn(nn.Module):
         self.attn_num_head_channels = attn_num_head_channels
         resnet_groups = resnet_groups if resnet_groups is not None else min(in_channels // 4, 32)
 
-        print(f"UNetMidBlock3DCrossAttn __init__ in_channels: {in_channels}, temb_channels: {temb_channels}, dropout: {dropout}, num_layers: {num_layers}, resnet_eps: {resnet_eps}, resnet_time_scale_shift: {resnet_time_scale_shift}, resnet_act_fn: {resnet_act_fn}, resnet_groups: {resnet_groups}, resnet_pre_norm: {resnet_pre_norm}, attn_num_head_channels: {attn_num_head_channels}, output_scale_factor: {output_scale_factor}, cross_attention_dim: {cross_attention_dim}, dual_cross_attention: {dual_cross_attention}, use_linear_projection: {use_linear_projection}, upcast_attention: {upcast_attention}, use_first_frame: {use_first_frame}, use_relative_position: {use_relative_position}, rotary_emb: {rotary_emb}")
-
         # there is always at least one resnet
         resnets = [
             ResnetBlock3D(
@@ -226,21 +224,10 @@ class UNetMidBlock3DCrossAttn(nn.Module):
         self.resnets = nn.ModuleList(resnets)
 
     def forward(self, hidden_states, temb=None, encoder_hidden_states=None, attention_mask=None, use_image_num=None):
-        if(temb is not None):
-            print(f"UNetMidBlock3DCrossAttn forward temb shape: {temb.shape}, dtype: {temb.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
-
-
-        print(f"UNetMidBlock3DCrossAttn forward hidden_states shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
         hidden_states = self.resnets[0](hidden_states, temb)
-        print(f"UNetMidBlock3DCrossAttn forward hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
-
         for attn, resnet in zip(self.attentions, self.resnets[1:]):
             hidden_states = attn(hidden_states, encoder_hidden_states=encoder_hidden_states, use_image_num=use_image_num).sample
-            print(f"UNetMidBlock3DCrossAttn forward hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
-
             hidden_states = resnet(hidden_states, temb)
-            print(f"UNetMidBlock3DCrossAttn forward hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
-
 
         return hidden_states
 
@@ -280,12 +267,8 @@ class CrossAttnDownBlock3D(nn.Module):
         self.has_cross_attention = True
         self.attn_num_head_channels = attn_num_head_channels
 
-        print(f"CrossAttnDownBlock3D __init__ in_channels: {in_channels}, out_channels: {out_channels}, temb_channels: {temb_channels}, dropout: {dropout}, num_layers: {num_layers}, resnet_eps: {resnet_eps}, resnet_time_scale_shift: {resnet_time_scale_shift}, only_cross_attention: {only_cross_attention}, downsample_padding: {downsample_padding}, resnet_act_fn: {resnet_act_fn}, resnet_groups: {resnet_groups}, add_downsample: {add_downsample}, resnet_pre_norm: {resnet_pre_norm}, attn_num_head_channels: {attn_num_head_channels}, output_scale_factor: {output_scale_factor}, cross_attention_dim: {cross_attention_dim}, dual_cross_attention: {dual_cross_attention}, use_linear_projection: {use_linear_projection}, upcast_attention: {upcast_attention}, use_first_frame: {use_first_frame}, use_relative_position: {use_relative_position}, rotary_emb: {rotary_emb}")
-
-
         for i in range(num_layers):
             in_channels = in_channels if i == 0 else out_channels
-            print(f"CrossAttnDownBlock3D __init__ inside for loop iterazione: {i} in_channels: {in_channels}")
             resnets.append(
                 ResnetBlock3D(
                     in_channels=in_channels,
@@ -337,15 +320,6 @@ class CrossAttnDownBlock3D(nn.Module):
     def forward(self, hidden_states, temb=None, encoder_hidden_states=None, attention_mask=None, use_image_num=None):
         output_states = ()
 
-        if(temb is not None):
-            print(f"CrossAttnDownBlock3D forward hidden_stembtates shape: {temb.shape}, dtype: {temb.dtype}") #torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
-
-
-        print(f"CrossAttnDownBlock3D forward hidden_states shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
-        print(f"CrossAttnDownBlock3D forward encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #shape: torch.Size([1, 8, 768]), dtype: torch.float16
-
-        #Però quando il shape di hidden_states è [1, 320, 16, 20, 32] le dimensioni di sotto cambiano, diventano: encoder_hidden_states shape: torch.Size([1, 8, 768]), dtype: torch.float16, hidden_states1 shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16, hidden_states2 shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16, hidden_states1 shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16, hidden_states2 shape: torch.Size([1, 640, 16, 20, 32]), dtype: torch.float16, hidden_states5 shape: torch.Size([1, 640, 16, 10, 16]), dtype: torch.float16, hidden_states shape: torch.Size([1, 640, 16, 10, 16]), dtype: torch.float16, encoder_hidden_states shape: torch.Size([1, 8, 768]), dtype: torch.float16, hidden_states1 shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16, hidden_states2 shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16, hidden_states1 shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16, hidden_states2 shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16, hidden_states5 shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
-
         for resnet, attn in zip(self.resnets, self.attentions):
             if self.training and self.gradient_checkpointing:
 
@@ -368,33 +342,22 @@ class CrossAttnDownBlock3D(nn.Module):
                     return custom_forward
 
                 hidden_states = torch.utils.checkpoint.checkpoint(create_custom_forward(resnet), hidden_states, temb)
-                print(f"CrossAttnDownBlock3D forward hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
-
                 hidden_states = torch.utils.checkpoint.checkpoint(
                     create_custom_forward_attn(attn, return_dict=False, use_image_num=use_image_num),
                     hidden_states,
                     encoder_hidden_states,
                 )[0]
-                print(f"CrossAttnDownBlock3D forward hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 40, 64]), dtype: torch.float16
-
             else:
                 hidden_states = resnet(hidden_states, temb)
-                print(f"CrossAttnDownBlock3D forward hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
                 hidden_states = attn(hidden_states, encoder_hidden_states=encoder_hidden_states, use_image_num=use_image_num).sample
-                print(f"CrossAttnDownBlock3D forward hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
-
 
             output_states += (hidden_states,)
 
         if self.downsamplers is not None:
             for downsampler in self.downsamplers:
                 hidden_states = downsampler(hidden_states)
-                print(f"CrossAttnDownBlock3D forward hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float16
-
 
             output_states += (hidden_states,)
-        
-        print(f"CrossAttnDownBlock3D forward hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 320, 16, 20, 32]), dtype: torch.float16
 
         return hidden_states, output_states
 
@@ -419,11 +382,8 @@ class DownBlock3D(nn.Module):
         super().__init__()
         resnets = []
 
-        print(f"DownBlock3D __init__ in_channels: {in_channels}, out_channels: {out_channels}, temb_channels: {temb_channels}, dropout: {dropout}, num_layers: {num_layers}, resnet_eps: {resnet_eps}, resnet_time_scale_shift: {resnet_time_scale_shift}, downsample_padding: {downsample_padding}, resnet_act_fn: {resnet_act_fn}, resnet_groups: {resnet_groups}, add_downsample: {add_downsample}, resnet_pre_norm: {resnet_pre_norm}")
-
         for i in range(num_layers):
             in_channels = in_channels if i == 0 else out_channels
-            print(f"DownBlock3D __init__ inside for loop iterazione: {i} in_channels: {in_channels}")
             resnets.append(
                 ResnetBlock3D(
                     in_channels=in_channels,
@@ -455,12 +415,6 @@ class DownBlock3D(nn.Module):
         self.gradient_checkpointing = False
 
     def forward(self, hidden_states, temb=None):
-
-        if(temb is not None):
-            print(f"DownBlock3D forward temb shape: {temb.shape}, dtype: {temb.dtype}")
-
-
-        print(f"DownBlock3D forward hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
         output_states = ()
 
         for resnet in self.resnets:
@@ -473,21 +427,16 @@ class DownBlock3D(nn.Module):
                     return custom_forward
 
                 hidden_states = torch.utils.checkpoint.checkpoint(create_custom_forward(resnet), hidden_states, temb)
-                print(f"DownBlock3D forward hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
             else:
                 hidden_states = resnet(hidden_states, temb)
-                print(f"DownBlock3D forward hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
             output_states += (hidden_states,)
 
         if self.downsamplers is not None:
             for downsampler in self.downsamplers:
                 hidden_states = downsampler(hidden_states)
-                print(f"DownBlock3D forward hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
             output_states += (hidden_states,)
-
-        print(f"DownBlock3D forward hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
 
         return hidden_states, output_states
 
@@ -519,10 +468,6 @@ class CrossAttnUpBlock3D(nn.Module):
         rotary_emb=False
     ):
         super().__init__()
-
-        print(f"CrossAttnUpBlock3D __init__ in_channels: {in_channels}, out_channels: {out_channels}, prev_output_channel: {prev_output_channel}, temb_channels: {temb_channels}, dropout: {dropout}, num_layers: {num_layers}, resnet_eps: {resnet_eps}, resnet_time_scale_shift: {resnet_time_scale_shift}, only_cross_attention: {only_cross_attention}, resnet_act_fn: {resnet_act_fn}, resnet_groups: {resnet_groups}, resnet_pre_norm: {resnet_pre_norm}, attn_num_head_channels: {attn_num_head_channels}, output_scale_factor: {output_scale_factor}, add_upsample: {add_upsample}, cross_attention_dim: {cross_attention_dim}, dual_cross_attention: {dual_cross_attention},  use_linear_projection: {use_linear_projection}, upcast_attention: {upcast_attention}, use_first_frame: {use_first_frame}, use_relative_position: {use_relative_position}, rotary_emb: {rotary_emb}")
-
-
         resnets = []
         attentions = []
 
@@ -532,8 +477,7 @@ class CrossAttnUpBlock3D(nn.Module):
         for i in range(num_layers):
             res_skip_channels = in_channels if (i == num_layers - 1) else out_channels
             resnet_in_channels = prev_output_channel if i == 0 else out_channels
-            print(f"CrossAttnUpBlock3D __init__ inside for loop iterazione: {i} res_skip_channels: {res_skip_channels}")
-            print(f"CrossAttnUpBlock3D __init__ inside for loop iterazione: {i} resnet_in_channels: {resnet_in_channels}")
+
             resnets.append(
                 ResnetBlock3D(
                     in_channels=resnet_in_channels + res_skip_channels,
@@ -587,28 +531,11 @@ class CrossAttnUpBlock3D(nn.Module):
         attention_mask=None,
         use_image_num=None,
     ):
-        
-        if(temb is not None):
-            print(f"CrossAttnUpBlock3D forward temb shape: {temb.shape}, dtype: {temb.dtype}")
-
-        if(encoder_hidden_states is not None):
-            print(f"CrossAttnUpBlock3D forward encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
-
-        if(upsample_size is not None):
-            print(f"CrossAttnUpBlock3D forward upsample_size shape: {upsample_size.shape}, dtype: {upsample_size.dtype}")
-
-        
-        print(f"CrossAttnUpBlock3D forward use_image_num: {use_image_num}")
-
-        print(f"CrossAttnUpBlock3D forward hidden_states0 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
-        #In questo caso la seconda dimensione è 1280, però cambia, i tre valori sono 320, 640 e 1280. Ovviamente, in base al valore della seconda dimensione cambiano anche i valori dei print di sotto, per esempio, se è 320, il valore 2560 di sotto sarà 640.
         for resnet, attn in zip(self.resnets, self.attentions):
             # pop res hidden states
             res_hidden_states = res_hidden_states_tuple[-1]
-            print(f"CrossAttnUpBlock3D forward res_hidden_states shape: {res_hidden_states.shape}, dtype: {res_hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
-            print(f"CrossAttnUpBlock3D forward hidden_states1 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 2560, 16, 10, 16]), dtype: torch.float16
 
             if self.training and self.gradient_checkpointing:
 
@@ -631,29 +558,18 @@ class CrossAttnUpBlock3D(nn.Module):
                     return custom_forward
 
                 hidden_states = torch.utils.checkpoint.checkpoint(create_custom_forward(resnet), hidden_states, temb)
-                print(f"CrossAttnUpBlock3D forward hidden_states1 shape (after resnet with checkpoint): {hidden_states.shape}, dtype: {hidden_states.dtype}") #torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
-
                 hidden_states = torch.utils.checkpoint.checkpoint(
                     create_custom_forward_attn(attn, return_dict=False, use_image_num=use_image_num),
                     hidden_states,
                     encoder_hidden_states,
                 )[0]
-                print(f"CrossAttnUpBlock3D forward hidden_states1 shape (after attn): {hidden_states.shape}, dtype: {hidden_states.dtype}") #torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
-                #Se noti che hidden_states non mantiene le sue dimensioni aggiornate quando entra nel contesto del checkpointing, potrebbe essere dovuto al modo in cui il checkpointing ricalcola i tensori intermedi durante il backward pass. Questo significa che le operazioni forward all'interno del checkpointing non vengono eseguite immediatamente, e quindi hidden_states potrebbe sembrare riportato a una dimensione iniziale
-
             else:
                 hidden_states = resnet(hidden_states, temb)
-                print(f"CrossAttnUpBlock3D forward hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
-
                 hidden_states = attn(hidden_states, encoder_hidden_states=encoder_hidden_states, use_image_num=use_image_num).sample
-                print(f"CrossAttnUpBlock3D forward hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         if self.upsamplers is not None:
             for upsampler in self.upsamplers:
                 hidden_states = upsampler(hidden_states, upsample_size)
-                print(f"CrossAttnUpBlock3D forward hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 20, 32]), dtype: torch.float16
-
-        print(f"CrossAttnUpBlock3D forward hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 20, 32]), dtype: torch.float16
 
         return hidden_states
 
@@ -676,16 +592,11 @@ class UpBlock3D(nn.Module):
         add_upsample=True,
     ):
         super().__init__()
-
-        print(f"UpBlock3D __init__ in_channels: {in_channels}, out_channels: {out_channels}, temb_channels: {temb_channels}, dropout: {dropout}, num_layers: {num_layers}, resnet_eps: {resnet_eps}, add_upsample: {add_upsample}, resnet_time_scale_shift: {resnet_time_scale_shift}, prev_output_channel: {prev_output_channel}, resnet_act_fn: {resnet_act_fn}, resnet_groups: {resnet_groups}, output_scale_factor: {output_scale_factor}, resnet_pre_norm: {resnet_pre_norm}")
-
         resnets = []
 
         for i in range(num_layers):
             res_skip_channels = in_channels if (i == num_layers - 1) else out_channels
             resnet_in_channels = prev_output_channel if i == 0 else out_channels
-            print(f"UpBlock3D __init__ inside for loop iterazione: {i} res_skip_channels: {res_skip_channels}")
-            print(f"UpBlock3D __init__ inside for loop iterazione: {i} resnet_in_channels: {resnet_in_channels}")
 
             resnets.append(
                 ResnetBlock3D(
@@ -712,20 +623,11 @@ class UpBlock3D(nn.Module):
         self.gradient_checkpointing = False
 
     def forward(self, hidden_states, res_hidden_states_tuple, temb=None, upsample_size=None):
-        if(temb is not None):
-            print(f"UpBlock3D forward temb shape: {temb.shape}, dtype: {temb.dtype}")
-        if(upsample_size is not None):
-            print(f"UpBlock3D forward upsample_size shape: {upsample_size.shape}, dtype: {upsample_size.dtype}")
-        
-        print(f"UpBlock3D forward res_hidden_states_tuple len: {len(res_hidden_states_tuple)}")
-
         for resnet in self.resnets:
             # pop res hidden states
             res_hidden_states = res_hidden_states_tuple[-1]
-            print(f"UpBlock3D forward res_hidden_states shape: {res_hidden_states.shape}, dtype: {res_hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
-            print(f"UpBlock3D forward hidden_states2 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 2560, 16, 5, 8]), dtype: torch.float16
 
             if self.training and self.gradient_checkpointing:
 
@@ -736,16 +638,11 @@ class UpBlock3D(nn.Module):
                     return custom_forward
 
                 hidden_states = torch.utils.checkpoint.checkpoint(create_custom_forward(resnet), hidden_states, temb)
-                print(f"UpBlock3D forward hidden_states3 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 5, 8]), dtype: torch.float16
             else:
                 hidden_states = resnet(hidden_states, temb)
-                print(f"UpBlock3D forward hidden_states4 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
 
         if self.upsamplers is not None:
             for upsampler in self.upsamplers:
                 hidden_states = upsampler(hidden_states, upsample_size)
-                print(f"UpBlock3D forward hidden_states5 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
-
-        print(f"UpBlock3D forward hidden_states6 shape: {hidden_states.shape}, dtype: {hidden_states.dtype}") #shape: torch.Size([1, 1280, 16, 10, 16]), dtype: torch.float16
 
         return hidden_states

@@ -450,10 +450,10 @@ def train_lora_model(data, video_folder, args):
         num_training_steps=(len(dataloader) * batch_size),
     )
 
-    num_epochs = 3
+    num_epochs = 20
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
-    checkpoint_interval = 100  # Salva un checkpoint ogni 100 iterazioni
+    checkpoint_interval = 20  # Salva un checkpoint ogni 100 iterazioni
 
     start_epoch = 0
     iteration = 0
@@ -496,8 +496,6 @@ def train_lora_model(data, video_folder, args):
             if batch[0] is None:
                 continue
 
-            print("------------------------------------------INIZIO----------------------------------------")
-
             video, description, frame_tensor = batch
 
             #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
@@ -507,16 +505,16 @@ def train_lora_model(data, video_folder, args):
             video = video.to(device)
             optimizer.zero_grad()
 
-            print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
+            #print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
 
             text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
             text_features = text_encoder(text_inputs)[0].to(torch.float16)
-            print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+            #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
             image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
             outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
             last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
-            print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
+            #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
             
             # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
             text_features = text_features.transpose(0, 1)
@@ -529,7 +527,7 @@ def train_lora_model(data, video_folder, args):
             # Calcola l'attenzione
             attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
 
-            print(f"train_lora_model attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
+            #print(f"train_lora_model attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
             
             # Ritorna alle dimensioni originali
             encoder_hidden_states = attention_output.transpose(0, 1)
@@ -537,11 +535,11 @@ def train_lora_model(data, video_folder, args):
             print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
 
             latents = encode_latents(video, vae)
-            print(f"train_lora_model latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
+            #print(f"train_lora_model latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
             latents = latents * vae.config.scaling_factor #Campiona x_0 ∼ q(x_0). Qui, latents rappresenta x_0
 
-            print(f"train_lora_model latents2 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
+            #print(f"train_lora_model latents2 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
             noise = torch.randn_like(latents) #campiona ϵ ∼ N(0, I). Qui, noise rappresenta ϵ
 
@@ -549,7 +547,7 @@ def train_lora_model(data, video_folder, args):
 
             noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps) #Qui, noisy_latents rappresenta x_{t} = \sqrt{\overline{a}_{t}}x_{0} + \sqrt{1 - \overline{a}_{t}} \epsilon
 
-            print(f"train_lora_model noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
+            #print(f"train_lora_model noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
             with torch.cuda.amp.autocast():
                 # Forward pass
@@ -566,9 +564,7 @@ def train_lora_model(data, video_folder, args):
                 
             scaler.scale(loss).backward()
 
-            print("------------------------------------------FINE----------------------------------------")
-
-
+            
             if (i + 1) % accumulation_steps == 0:
                 try:
                     scaler.step(optimizer)
