@@ -181,9 +181,7 @@ class VideoDatasetMsvd(Dataset):
                 video_id = parts[0]
                 description = ' '.join(parts[1:])
                 if video_id not in self.video_descriptions:
-                    #self.video_descriptions[video_id] = []
                     self.video_descriptions[video_id] = description
-                #self.video_descriptions[video_id].append(description)
         
         # Ottieni la lista dei file video nella cartella YouTubeClips
         self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
@@ -531,7 +529,7 @@ def train_lora_model(data, video_folder, args):
             # Ritorna alle dimensioni originali
             encoder_hidden_states = attention_output.transpose(0, 1)
 
-            print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
+            #print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
 
             latents = encode_latents(video, vae)
             #print(f"train_lora_model latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
@@ -616,7 +614,7 @@ def train_lora_model(data, video_folder, args):
 def main(args):
 
     
-    
+    '''
     # Determina se sei su Google Colab
     on_colab = 'COLAB_GPU' in os.environ
 
@@ -642,9 +640,9 @@ def main(args):
 
     unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler = load_model_for_inference(checkpoint_dir, device, args)
 
-    description = "A squirrel eating"
+    description = "a dog barks at the screen"
 
-    image_path = "/content/drive/My Drive/What-to-Feed-Squirrels.webp"
+    image_path = "/content/drive/My Drive/images.jpeg"
 
     image = Image.open(image_path)
 
@@ -665,7 +663,7 @@ def main(args):
     imageio.mimwrite(args.output_folder + 'ocean' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
     print('save path {}'.format(args.output_folder))
-    '''
+    
 
     '''
     Questa parte commentata serve se devo usare il dataset msrvtt
