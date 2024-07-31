@@ -448,10 +448,10 @@ def train_lora_model(data, video_folder, args):
         num_training_steps=(len(dataloader) * batch_size),
     )
 
-    num_epochs = 20
+    num_epochs = 100
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
-    checkpoint_interval = 100  # Salva un checkpoint ogni 100 iterazioni
+    checkpoint_interval = 20  # Salva un checkpoint ogni 100 iterazioni
 
     start_epoch = 0
     iteration = 0
@@ -528,7 +528,7 @@ def train_lora_model(data, video_folder, args):
             #print(f"train_lora_model attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
             
             # Ritorna alle dimensioni originali
-            encoder_hidden_states = text_features
+            encoder_hidden_states = attention_output.transpose(0, 1)
 
             #print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
 
@@ -664,7 +664,7 @@ def main(args):
     print('save path {}'.format(args.output_folder))
     
     '''
-
+    
     '''
     Questa parte commentata serve se devo usare il dataset msrvtt
 
