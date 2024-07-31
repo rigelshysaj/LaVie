@@ -613,7 +613,7 @@ def train_lora_model(data, video_folder, args):
     
 
 def main(args):
-    '''
+    
     # Determina se sei su Google Colab
     on_colab = 'COLAB_GPU' in os.environ
 
@@ -663,7 +663,8 @@ def main(args):
 
     print('save path {}'.format(args.output_folder))
     
-
+    '''
+    
     '''
     Questa parte commentata serve se devo usare il dataset msrvtt
 
