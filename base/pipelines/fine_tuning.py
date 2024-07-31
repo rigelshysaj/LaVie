@@ -528,7 +528,7 @@ def train_lora_model(data, video_folder, args):
             #print(f"train_lora_model attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
             
             # Ritorna alle dimensioni originali
-            encoder_hidden_states = text_features
+            encoder_hidden_states = attention_output.transpose(0, 1)
 
             #print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
 
