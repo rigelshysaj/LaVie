@@ -515,20 +515,20 @@ def train_lora_model(data, video_folder, args):
             #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
             
             # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
-            text_features1 = text_features.transpose(0, 1)
+            text_features = text_features.transpose(0, 1)
             last_hidden_state = last_hidden_state.transpose(0, 1)
 
-            assert text_features1.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
+            assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
 
             attention_layer = attention_layer.to(torch.float16)
 
             # Calcola l'attenzione
-            attention_output, _ = attention_layer(text_features1, last_hidden_state, last_hidden_state)
+            attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
 
             #print(f"train_lora_model attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
             
             # Ritorna alle dimensioni originali
-            encoder_hidden_states = text_features
+            encoder_hidden_states = attention_output.transpose(0, 1)
 
             #print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
 
