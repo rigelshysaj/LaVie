@@ -451,7 +451,7 @@ def train_lora_model(data, video_folder, args):
     num_epochs = 20
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
-    checkpoint_interval = 20  # Salva un checkpoint ogni 100 iterazioni
+    checkpoint_interval = 100  # Salva un checkpoint ogni 100 iterazioni
 
     start_epoch = 0
     iteration = 0
@@ -581,7 +581,7 @@ def train_lora_model(data, video_folder, args):
 
 
             # Salva un checkpoint
-            if i % checkpoint_interval == 0:
+            if (i + 1) % checkpoint_interval == 0:
                 
                 checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch{epoch}_iter{i}.pth")
                 '''
