@@ -32,4 +32,3 @@ dependencies:
       - diffusers==0.16.0
       - omegaconf==2.3.0
       - imageio==2.34.2
-      - 
