@@ -421,13 +421,9 @@ def train_lora_model(data, video_folder, args):
     clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
     lora_config = LoraConfig(
-        r=8, 
+        r=32, 
         lora_alpha=16,
-        target_modules = [
-            "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
-            "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
-            "attn_temp.to_q", "attn_temp.to_k", "attn_temp.to_v", "attn_temp.to_out.0",
-            "ff.net.0.proj", "ff.net.2"]
+        target_modules = ["proj_in", "proj_out", "ff.net.0.proj", "ff.net.2"]
     )
 
     unet = get_peft_model(unet, lora_config)
