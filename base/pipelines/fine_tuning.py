@@ -430,6 +430,12 @@ def train_lora_model(data, video_folder, args):
 
     unet = get_peft_model(unet, lora_config)
 
+    for name, param in unet.named_parameters():
+        if "lora" in name and "attn2" in name:
+            param.requires_grad = True
+        else:
+            param.requires_grad = False
+
     batch_size=1
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
@@ -438,7 +444,12 @@ def train_lora_model(data, video_folder, args):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
     print(f"Numero totale di elementi nel dataloader: {len(dataloader)}")
 
-    optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
+    #optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
+
+    trainable_params = (
+        [p for n, p in unet.named_parameters() if "lora" in n and "attn2" in n]
+    )
+    optimizer = torch.optim.AdamW(trainable_params, lr=1e-5)
 
     lr_scheduler = get_cosine_schedule_with_warmup(
         optimizer=optimizer,
