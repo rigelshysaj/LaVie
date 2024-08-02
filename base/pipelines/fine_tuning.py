@@ -421,9 +421,11 @@ def train_lora_model(data, video_folder, args):
     clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
     lora_config = LoraConfig(
-        r=32, 
+        r=32,
         lora_alpha=16,
-        target_modules = ["proj_in", "proj_out", "ff.net.0.proj", "ff.net.2"]
+        target_modules=["attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0"],
+        lora_dropout=0.1,
+        bias="none"
     )
 
     unet = get_peft_model(unet, lora_config)
@@ -444,7 +446,7 @@ def train_lora_model(data, video_folder, args):
         num_training_steps=(len(dataloader) * batch_size),
     )
 
-    num_epochs = 50
+    num_epochs = 100
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
     checkpoint_interval = 20  # Salva un checkpoint ogni 100 iterazioni
@@ -505,7 +507,7 @@ def train_lora_model(data, video_folder, args):
             text_features = text_encoder(text_inputs)[0].to(torch.float16)
             #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
-            # Ritorna alle dimensioni originali
+            
             encoder_hidden_states = text_features
 
             #print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
