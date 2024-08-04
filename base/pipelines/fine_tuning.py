@@ -110,7 +110,7 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
         encoder_hidden_states = text_features
         
         # Generazione dell'output
-        latents = torch.randn((1, 4, 16, 40, 64), device=device) #Campiona X_T ∼ N(0,I). Qui, latents rappresenta X_T
+        latents = torch.randn((1, 4, 5, 32, 32), device=device) #Campiona X_T ∼ N(0,I). Qui, latents rappresenta X_T
         
         noise_scheduler.set_timesteps(100)
         
