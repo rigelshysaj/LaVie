@@ -95,7 +95,7 @@ def inference(unet, tokenizer, text_encoder, vae, noise_scheduler, description, 
         # Decodifica dei latents in video
         video = decode_latents(latents, vae)
         
-    return video
+    return StableDiffusionPipelineOutput(video=video)
 
 
 class VideoDatasetMsvd(Dataset):
