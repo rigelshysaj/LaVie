@@ -81,7 +81,7 @@ def load_model_for_inference(checkpoint_dir, device, args):
     return unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler
 
 
-def inference_simple(unet, tokenizer, text_encoder, vae, noise_scheduler, description, device):
+def inference(unet, tokenizer, text_encoder, vae, noise_scheduler, description, device):
     with torch.no_grad():
         # Preparazione del testo
         text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(device)
