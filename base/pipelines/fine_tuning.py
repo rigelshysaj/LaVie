@@ -55,9 +55,7 @@ def load_model_for_inference(checkpoint_dir, device, args):
     lora_config = LoraConfig(
         r=32,
         lora_alpha=16,
-        target_modules=["attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0"],
-        lora_dropout=0.1,
-        bias="none"
+        target_modules=["attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0"]
     )
     
     # Applica LoRA al modello
