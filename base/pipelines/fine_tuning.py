@@ -58,9 +58,7 @@ def load_model_for_inference(checkpoint_dir, device, args):
         target_modules=[
             "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
             "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
-            "ff.net.0.proj", "ff.net.2",
-            "conv_shortcut",
-            "conv1",
+            "ff.net.0.proj", "ff.net.2"
         ],
         lora_dropout=0.1,
         bias="none",
@@ -342,9 +340,7 @@ def train_lora_model(data, video_folder, args):
         target_modules=[
             "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
             "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
-            "ff.net.0.proj", "ff.net.2",
-            "conv_shortcut",
-            "conv1",
+            "ff.net.0.proj", "ff.net.2"
         ],
         lora_dropout=0.1,
         bias="none",
@@ -353,7 +349,7 @@ def train_lora_model(data, video_folder, args):
     unet = get_peft_model(unet, lora_config)
 
     for name, param in unet.named_parameters():
-        if "lora" in name and "attn2" in name:
+        if "lora" in name:
             param.requires_grad = True
         else:
             param.requires_grad = False
@@ -368,7 +364,7 @@ def train_lora_model(data, video_folder, args):
     #optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
 
     trainable_params = (
-        [p for n, p in unet.named_parameters() if "lora" in n and "attn2" in n]
+        [p for n, p in unet.named_parameters() if "lora" in n]
     )
 
     optimizer = torch.optim.AdamW(trainable_params, lr=1e-7)
