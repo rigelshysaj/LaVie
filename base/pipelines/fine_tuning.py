@@ -99,21 +99,8 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
         text_features = text_encoder(text_inputs)[0].to(torch.float16)
         
         # Preparazione del video/immagine
-        image_inputs = clip_processor(images=input_image, return_tensors="pt").pixel_values.to(unet.device)
-        outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
-        last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
-
-        # Calcolo dell'attenzione (come nel training)
-        attention_layer = torch.nn.MultiheadAttention(embed_dim=768, num_heads=8, dtype=torch.float16).to(device)
-        text_features = text_features.transpose(0, 1)
-        last_hidden_state = last_hidden_state.transpose(0, 1)
-
-        text_features = text_features.to(torch.float16)
-        last_hidden_state = last_hidden_state.to(torch.float16)
-        attention_layer = attention_layer.to(torch.float16)
-
-        attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
-        encoder_hidden_states = attention_output.transpose(0, 1)
+        
+        encoder_hidden_states = text_features
         
         # Generazione dell'output
         latents = torch.randn((1, 4, 16, 40, 64), device=device) #Campiona X_T ∼ N(0,I). Qui, latents rappresenta X_T
