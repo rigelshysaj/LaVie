@@ -56,15 +56,14 @@ def load_model_for_inference(checkpoint_dir, device, args):
         r=64,
         lora_alpha=32,
         target_modules=[
-            "to_q", "to_k", "to_v", "to_out.0",
-            "proj_in", "proj_out",
+            "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
+            "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
+            "ff.net.0.proj", "ff.net.2",
+            "conv_shortcut",
             "conv1", "conv2",
-            "time_emb_proj",
-            "downsample.conv",
-            "upsample.conv",
         ],
         lora_dropout=0.1,
-        bias="none"
+        bias="none",
     )
 
     # Applica LoRA al modello
@@ -341,15 +340,14 @@ def train_lora_model(data, video_folder, args):
         r=64,
         lora_alpha=32,
         target_modules=[
-            "to_q", "to_k", "to_v", "to_out.0",
-            "proj_in", "proj_out",
+            "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
+            "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
+            "ff.net.0.proj", "ff.net.2",
+            "conv_shortcut",
             "conv1", "conv2",
-            "time_emb_proj",
-            "downsample.conv",
-            "upsample.conv",
         ],
         lora_dropout=0.1,
-        bias="none"
+        bias="none",
     )
 
     unet = get_peft_model(unet, lora_config)
