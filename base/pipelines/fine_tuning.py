@@ -614,7 +614,7 @@ def main(args):
 
     unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler = load_model_for_inference(checkpoint_dir, device, args)
 
-    description = "a dog barks at the screen"
+    description = "a chihuahua barks at the screen"
 
     image_path = "/content/drive/My Drive/chih.jpeg"
 
