@@ -403,8 +403,8 @@ def train_lora_model(data, video_folder, args):
     clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
     lora_config = LoraConfig(
-        r=32,
-        lora_alpha=16,
+        r=64,
+        lora_alpha=32,
         target_modules=["attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0"]
     )
 
@@ -416,7 +416,6 @@ def train_lora_model(data, video_folder, args):
         else:
             param.requires_grad = False
 
-    batch_size=1
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
@@ -432,13 +431,7 @@ def train_lora_model(data, video_folder, args):
 
     optimizer = torch.optim.AdamW(trainable_params, lr=1e-7)
 
-    lr_scheduler = get_cosine_schedule_with_warmup(
-        optimizer=optimizer,
-        num_warmup_steps=100,
-        num_training_steps=(len(dataloader) * batch_size),
-    )
-
-    num_epochs = 50
+    num_epochs = 1000
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
     checkpoint_interval = 100  # Salva un checkpoint ogni 100 iterazioni
@@ -449,7 +442,6 @@ def train_lora_model(data, video_folder, args):
         checkpoint = torch.load(os.path.join(checkpoint_dir, "latest_checkpoint.pth"))
         unet.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
         start_epoch = checkpoint['epoch']
         iteration = checkpoint['iteration']
         print(f"Ripresa dell'addestramento dall'epoca {start_epoch}, iterazione {iteration}")
@@ -461,13 +453,6 @@ def train_lora_model(data, video_folder, args):
     text_encoder.eval()
     vae.eval()
     
-    attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
-    #projection_layer = nn.Linear(64, 224).to(unet.device)
-
-    accumulation_steps = 8
-
-    scaler = torch.cuda.amp.GradScaler()
-
     noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
 
 
@@ -486,7 +471,7 @@ def train_lora_model(data, video_folder, args):
             if batch[0] is None:
                 continue
 
-            video, description, frame_tensor = batch
+            video, description, frame = batch
 
             #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
@@ -531,57 +516,26 @@ def train_lora_model(data, video_folder, args):
                 #Qui, output rappresenta ϵ_θ(x_t, t)
 
             loss = F.mse_loss(output, noise) #calcola || \epsilon - \epsilon_{\theta}(x_{t}, t) ||^{2}
-
-            loss = loss / accumulation_steps
                 
-            scaler.scale(loss).backward()
+            loss.backward()
 
             
-            if (i + 1) % accumulation_steps == 0:
-                try:
-                    scaler.step(optimizer)
-                    scaler.update()
-                    lr_scheduler.step()
-                except ValueError as e:
-                    print(f"Skipping scaler step due to error: {e}")
-                optimizer.zero_grad()
-
-
-            del text_features, encoder_hidden_states
-            torch.cuda.empty_cache()
-
-            if i % len(dataloader) == 0:
-                print(f"Epoch {epoch}/{num_epochs} completed with loss: {loss.item()}")
-
-            # Salva un checkpoint
-            if count % checkpoint_interval == 0:
-                
-                checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch{epoch}_iter{i}.pth")
-                '''
-                torch.save({
-                    'epoch': epoch,
-                    'iteration': i,
-                    'model_state_dict': unet.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'lr_scheduler_state_dict': lr_scheduler.state_dict(),
-                    'loss': loss.item(),
-                }, checkpoint_path)
-                '''
-
-                # Aggiorna il checkpoint più recente
-                torch.save({
-                    'epoch': epoch,
-                    'iteration': i,
-                    'model_state_dict': unet.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'lr_scheduler_state_dict': lr_scheduler.state_dict(),
-                    'loss': loss.item(),
-                }, os.path.join(checkpoint_dir, "latest_checkpoint.pth"))
-
-                print(f"Checkpoint salvato: {checkpoint_path}")
+            # Logging dettagliato
+            print(f"Epoch {epoch}, Batch {i}, Loss: {loss.item()}")
+            for name, param in unet.named_parameters():
+                if "lora" in name:
+                    print(f"{name} - grad norm: {param.grad.norm().item()}")
             
-    unet.save_pretrained("/content/drive/My Drive/finetuned_lora_unet")
-    
+            optimizer.step()
+            optimizer.zero_grad()
+
+            # Genera e salva un campione ogni 10 epoche
+            if epoch % 10 == 0:
+                with torch.no_grad():
+                    video = inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, frame, device).video
+                    imageio.mimwrite(args.output_folder + "sample_epoch_{epoch}.mp4", video[0], fps=8, quality=9)
+                    print('save path {}'.format(args.output_folder))
+
     return unet
     
 
@@ -592,7 +546,7 @@ def main(args):
 
     if on_colab:
         # Percorso del dataset su Google Colab
-        dataset_path = '/content/drive/My Drive/msvd_small'
+        dataset_path = '/content/drive/My Drive/msvd_one'
     else:
         # Percorso del dataset locale (sincronizzato con Google Drive)
         dataset_path = '/path/to/your/Google_Drive/sync/folder/path/to/your/dataset'
