@@ -345,7 +345,7 @@ def train_lora_model(data, video_folder, args):
             # Genera e salva un campione ogni 10 epoche
             if epoch % 100 == 0:
                 with torch.no_grad():
-                    video = inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, frame, device).video
+                    video = inference(unet, tokenizer, text_encoder, vae, noise_scheduler, description, device).video
                     imageio.mimwrite(args.output_folder + f"sample_epoch_{epoch}.mp4", video[0], fps=8, quality=9)
                     print('save path {}'.format(args.output_folder))
 
