@@ -194,8 +194,7 @@ def decode_latents(latents, vae):
     video = vae.decode(latents).sample
     video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=f)
     
-    video = (video / 2 + 0.5).clamp(0, 1)
-    video = (video * 255).to(torch.uint8)
+    video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
     
     return video
 
