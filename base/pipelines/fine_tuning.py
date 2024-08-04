@@ -81,61 +81,30 @@ def load_model_for_inference(checkpoint_dir, device, args):
     return unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler
 
 
-def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, input_image, device, guidance_scale=7.5):
+def inference_simple(unet, tokenizer, text_encoder, vae, noise_scheduler, description, device):
     with torch.no_grad():
         # Preparazione del testo
         text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(device)
         text_features = text_encoder(text_inputs)[0].to(torch.float16)
         
-        # Preparazione del video/immagine
-        
-        encoder_hidden_states = text_features
-        
         # Generazione dell'output
-        latents = torch.randn((1, 4, 5, 32, 32), device=device) #Campiona X_T ∼ N(0,I). Qui, latents rappresenta X_T
+        latents = torch.randn((1, 4, 5, 32, 32), device=device)
         
         noise_scheduler.set_timesteps(100)
         
-        for t in tqdm(noise_scheduler.timesteps):                               #Il ciclo for scorre attraverso i timestep t da T a 1. Il campionamento di z ∼ N(0, I) se t > 1, altrimenti z = 0 è implicito nel metodo noise_scheduler.step
+        for t in tqdm(noise_scheduler.timesteps):
             latent_model_input = noise_scheduler.scale_model_input(latents, t)
-
-            latent_model_input = latent_model_input.to(torch.float16)
-            #unet = unet.to(torch.float16)
-            encoder_hidden_states = encoder_hidden_states.to(torch.float16)
             
-            # Genera la previsione non condizionata
-            uncond_embeddings = torch.zeros_like(encoder_hidden_states)
-            noise_pred_uncond = unet(
-                sample=latent_model_input,
-                timestep=t,
-                encoder_hidden_states=uncond_embeddings
-            ).sample
-
-            # Genera la previsione condizionata
-            noise_pred = unet(
-                sample=latent_model_input,
-                timestep=t,
-                encoder_hidden_states=encoder_hidden_states
-            ).sample
-
-            # Applica la guidance
-            noise_pred = noise_pred_uncond + guidance_scale * (noise_pred - noise_pred_uncond)
+            # Genera la previsione
+            noise_pred = unet(latent_model_input, t, encoder_hidden_states=text_features).sample
             
             # Compute the previous noisy sample x_t -> x_t-1
-            latents = noise_scheduler.step(noise_pred, t, latents).prev_sample #Qui, noise_pred rappresenta ϵ_θ(x_t, t). La funzione noise_scheduler.step calcola x_t-1 utilizzando l'equazione descritta
-
-        #print(f"latents1 shape: {latents.shape}, dtype: {latents.dtype}")
+            latents = noise_scheduler.step(noise_pred, t, latents).prev_sample
         
-        # Decodifica dei latents in immagine
-        latents = 1 / vae.config.scaling_factor * latents
-
-        #print(f"latents2 shape: {latents.shape}, dtype: {latents.dtype}")
-
-        video = decode_latents(latents, vae, gradient=False)
+        # Decodifica dei latents in video
+        video = decode_latents(latents, vae)
         
-    return StableDiffusionPipelineOutput(video=video)
-
-
+    return video
 
 
 class VideoDatasetMsvd(Dataset):
@@ -218,81 +187,24 @@ class VideoDatasetMsvd(Dataset):
 
 def encode_latents(video, vae):
     video = video.to(torch.float16)
-
-    # video ha forma [b, c, f, h, w]
     b, c, f, h, w = video.shape
-    
-    # Riarrangia il video in una serie di immagini
     video = einops.rearrange(video, "b c f h w -> (b f) c h w")
     
-    encode_parts = []
-    batch_size = 1  # Puoi aumentare questo valore se la tua GPU lo consente
-
-
-    def encode_batch(batch):
-        return vae.encode(batch).latent_dist.sample()
-    
-    for i in range(0, video.shape[0], batch_size):
-        latents_batch = video[i:i+batch_size]
-        latents_batch = latents_batch.requires_grad_(True)
-        #print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}") #shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
-
-        # Usa checkpoint per risparmiare memoria
-        encoded_batch = checkpoint(encode_batch, latents_batch, use_reentrant=False)
-
-        #print(f"encoded_batch shape: {encoded_batch.shape}, dtype: {encoded_batch.dtype}") #shape: torch.Size([1, 4, 40, 64]), dtype: torch.float32
-
-        encode_parts.append(encoded_batch)
-        # Libera un po' di memoria
-        #torch.cuda.empty_cache()
-
-    latents = torch.cat(encode_parts, dim=0)
-        
-    # Riarrangia i latents per reintrodurre la dimensione temporale
+    latents = vae.encode(video).latent_dist.sample()
     latents = einops.rearrange(latents, "(b f) c h w -> b c f h w", b=b)
     
     return latents
 
-
-def decode_latents(latents, vae, gradient=True):
+def decode_latents(latents, vae):
     latents = latents.to(torch.float16)
-    video_length = latents.shape[2]
-    #latents = 1 / 0.18215 * latents
+    b, c, f, h, w = latents.shape
     latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
     
-    decoded_parts = []
-    batch_size = 1  # Puoi aumentare questo valore se la tua GPU lo consente
-
-    def decode_batch(batch):
-        return vae.decode(batch).sample
-
-    #print(f"latents shape: {latents.shape}, dtype: {latents.dtype}") #[16, 4, 40, 64] torch.float16
+    video = vae.decode(latents).sample
+    video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=f)
     
-    for i in range(0, latents.shape[0], batch_size):
-        latents_batch = latents[i:i+batch_size]
-        latents_batch = latents_batch.requires_grad_(True)
-        # Usa checkpoint per risparmiare memoria
-        decoded_batch = checkpoint(decode_batch, latents_batch, use_reentrant=False)
-        decoded_parts.append(decoded_batch)
-        # Libera un po' di memoria
-        #torch.cuda.empty_cache()
-    
-    #print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}") #[1, 4, 40, 64] torch.float16
-
-
-    # Concatena tutte le parti decodificate
-    video = torch.cat(decoded_parts, dim=0)
-    
-    # Riorganizza le dimensioni del video
-    video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
-    
-    if(gradient):
-        # Normalizza e converti a uint8 senza perdere il tracciamento dei gradienti
-        video = (video / 2 + 0.5) * 255
-        video = video.add(0.5).clamp(0, 255)
-    else:
-        video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
-
+    video = (video / 2 + 0.5).clamp(0, 1)
+    video = (video * 255).to(torch.uint8)
     
     return video
 
