@@ -53,14 +53,11 @@ def load_model_for_inference(checkpoint_dir, device, args):
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
 
     lora_config = LoraConfig(
-        r=8,
+        r=32,
         lora_alpha=16,
-        target_modules=[
-            "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
-            "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
-            "attn_temp.to_q", "attn_temp.to_k", "attn_temp.to_v", "attn_temp.to_out.0",
-            "ff.net.0.proj", "ff.net.2"
-        ]
+        target_modules=["attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0"],
+        lora_dropout=0.1,
+        bias="none"
     )
     
     # Applica LoRA al modello
@@ -461,8 +458,8 @@ def train_lora_model(data, video_folder, args):
     num_epochs = 50
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
-    checkpoint_interval = 20  # Salva un checkpoint ogni 100 iterazioni
-
+    checkpoint_interval = 100  # Salva un checkpoint ogni 100 iterazioni
+    count = 0
     start_epoch = 0
     iteration = 0
     if os.path.exists(os.path.join(checkpoint_dir, "latest_checkpoint.pth")):
@@ -493,6 +490,8 @@ def train_lora_model(data, video_folder, args):
 
     for epoch in range(num_epochs):
 
+        count += 1
+
         if epoch < start_epoch:
             continue  # Salta le epoche già completate
 
@@ -519,26 +518,8 @@ def train_lora_model(data, video_folder, args):
             text_features = text_encoder(text_inputs)[0].to(torch.float16)
             #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
-            image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
-            outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
-            last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
-            #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
-            
-            # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
-            text_features = text_features.transpose(0, 1)
-            last_hidden_state = last_hidden_state.transpose(0, 1)
-
-            assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
-
-            attention_layer = attention_layer.to(torch.float16)
-
-            # Calcola l'attenzione
-            attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
-
-            #print(f"train_lora_model attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
-            
             # Ritorna alle dimensioni originali
-            encoder_hidden_states = attention_output.transpose(0, 1)
+            encoder_hidden_states = text_features
 
             #print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
 
@@ -583,7 +564,7 @@ def train_lora_model(data, video_folder, args):
                 optimizer.zero_grad()
 
 
-            del text_features, image_inputs, last_hidden_state, attention_output, encoder_hidden_states
+            del text_features, encoder_hidden_states
             torch.cuda.empty_cache()
 
             if i % len(dataloader) == 0:
@@ -591,7 +572,7 @@ def train_lora_model(data, video_folder, args):
 
 
             # Salva un checkpoint
-            if (i + 1) % checkpoint_interval == 0:
+            if count % checkpoint_interval == 0:
                 
                 checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch{epoch}_iter{i}.pth")
                 '''
