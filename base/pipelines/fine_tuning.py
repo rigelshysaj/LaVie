@@ -225,63 +225,6 @@ class VideoDatasetMsvd(Dataset):
             return None, None, None
 
 
-
-class VideoDatasetMsrvtt(Dataset):
-    def __init__(self, data, video_folder):
-        self.videos = [video for video in data['videos'] if os.path.exists(os.path.join(video_folder, f"{video['video_id']}.mp4"))]
-        self.sentences = {sentence['video_id']: sentence['caption'] for sentence in data['sentences']}
-        self.video_folder = video_folder
-        
-
-    def __len__(self):
-        return len(self.videos)
-
-    def __getitem__(self, idx):
-        video_info = self.videos[idx]
-        video_id = video_info['video_id']
-        video_path = os.path.join(self.video_folder, f"{video_id}.mp4")
-
-        # Estrarre un frame dal video
-        frame = self.extract_frame(video_path, video_info['start time'])
-        if frame is None:
-            raise ValueError(f"Frame extraction failed for video {video_id}")
-
-        # Ottenere la descrizione
-        description = self.sentences.get(video_id, None)
-        if description is None:
-            raise ValueError(f"No description found for video {video_id}")
-
-        # Convertire il frame in un tensore PyTorch
-        frame_tensor = torch.tensor(frame).permute(2, 0, 1)  # Convert to CxHxW
-
-        return video_path, description, frame_tensor
-    
-
-
-    def extract_frame(self, video_path, time_sec):
-      
-      cap = cv2.VideoCapture(video_path)
-      if not cap.isOpened():
-          print(f"Cannot open video file: {video_path}")
-          cap.release()
-          return None
-
-      duration = cap.get(cv2.CAP_PROP_FRAME_COUNT) / cap.get(cv2.CAP_PROP_FPS)
-      
-      # Se il timestamp è maggiore della durata, usa il momento più vicino possibile alla fine del video
-      if time_sec > duration:
-          time_sec = duration - 0.1  # Ritira di poco per evitare di superare la fine effettiva
-          print(f"Adjusted timestamp to {time_sec} sec due to out of bounds in {video_path}")
-
-      cap.set(cv2.CAP_PROP_POS_MSEC, time_sec * 1000)
-      ret, frame = cap.read()
-      cap.release()
-      if not ret:
-          print(f"Failed to extract frame at {time_sec} sec from {video_path}")
-          return None
-      return frame
-
-
 def encode_latents(video, vae):
     video = video.to(torch.float16)
 
@@ -318,24 +261,7 @@ def encode_latents(video, vae):
     latents = einops.rearrange(latents, "(b f) c h w -> b c f h w", b=b)
     
     return latents
-    
-'''
-def decode_latents(latents, vae):
-    video_length = latents.shape[2]
-    latents = 1 / 0.18215 * latents
-    latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
 
-    print(f"latents requires grad: {latents.requires_grad}")
-    
-    # Utilizzare torch.no_grad() per risparmiare memoria
-    with torch.no_grad():
-        video = vae.decode(latents).sample
-
-    video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
-    video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
-    print(f"video requires grad: {video.requires_grad}")
-    return video
-'''
 
 def decode_latents(latents, vae, gradient=True):
     latents = latents.to(torch.float16)
@@ -519,6 +445,9 @@ def train_lora_model(data, video_folder, args):
                 
             loss.backward()
 
+            for name, param in unet.named_parameters():
+                if param.grad is not None:
+                    print(f"{name} - grad min: {param.grad.min().item()}, max: {param.grad.max().item()}")
             
             # Logging dettagliato
             print(f"Epoch {epoch}, Batch {i}, Loss: {loss.item()}")
@@ -530,10 +459,10 @@ def train_lora_model(data, video_folder, args):
             optimizer.zero_grad()
 
             # Genera e salva un campione ogni 10 epoche
-            if epoch % 10 == 0:
+            if epoch % 100 == 0:
                 with torch.no_grad():
                     video = inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, frame, device).video
-                    imageio.mimwrite(args.output_folder + "sample_epoch_{epoch}.mp4", video[0], fps=8, quality=9)
+                    imageio.mimwrite(args.output_folder + f"sample_epoch_{epoch}.mp4", video[0], fps=8, quality=9)
                     print('save path {}'.format(args.output_folder))
 
     return unet
@@ -557,69 +486,6 @@ def main(args):
     
     train_lora_model(data, video_folder, args)
 
-    '''
-
-    #inference
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    checkpoint_dir = "/content/drive/My Drive/checkpoints"
-
-    unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler = load_model_for_inference(checkpoint_dir, device, args)
-
-    description = "a Teddy bear"
-
-    image_path = "/content/drive/My Drive/chih.jpeg"
-
-    image = Image.open(image_path)
-
-    # Definisci la trasformazione
-    transform = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.ToTensor()  # Converte l'immagine in un tensore
-    ])
-
-    # Applica la trasformazione all'immagine
-    input_image = transform(image)
-
-    image_tensor = input_image.unsqueeze(0).to(torch.float16)  # Aggiunge una dimensione per il batch
-
-    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
-
-    video = inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, description, image_tensor, device, guidance_scale=7.5).video
-    imageio.mimwrite(args.output_folder + 'chihuahaaaa' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
-
-    print('save path {}'.format(args.output_folder))
-    '''
-    
-    '''
-    Questa parte commentata serve se devo usare il dataset msrvtt
-
-    # Determina se sei su Google Colab
-    on_colab = 'COLAB_GPU' in os.environ
-
-    if on_colab:
-        # Percorso del dataset su Google Colab
-        dataset_path = '/content/drive/My Drive/msrvtt'
-    else:
-        # Percorso del dataset locale (sincronizzato con Google Drive)
-        dataset_path = '/path/to/your/Google_Drive/sync/folder/path/to/your/dataset'
-    
-    # Percorsi dei file
-    video_folder = os.path.join(dataset_path, 'TrainValVideo')
-    annotation_folder = os.path.join(dataset_path, 'train_val_annotation')
-
-    # File di annotazione
-    json_file = os.path.join(annotation_folder, 'train_val_videodatainfo.json')
-    category_file = os.path.join(annotation_folder, 'category.txt')
-
-    # Caricare il file JSON
-    with open(json_file, 'r') as f:
-        data = json.load(f)
-
-    
-    train_lora_model(data, video_folder, OmegaConf.load(args.config))
-
-    '''
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
