@@ -103,7 +103,7 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
         # Generazione dell'output
         latents = torch.randn((1, 4, 16, 40, 64), device=device) #Campiona X_T ∼ N(0,I). Qui, latents rappresenta X_T
         
-        noise_scheduler.set_timesteps(1000)
+        noise_scheduler.set_timesteps(100)
         
         for t in tqdm(noise_scheduler.timesteps):                               #Il ciclo for scorre attraverso i timestep t da T a 1. Il campionamento di z ∼ N(0, I) se t > 1, altrimenti z = 0 è implicito nel metodo noise_scheduler.step
             latent_model_input = noise_scheduler.scale_model_input(latents, t)
