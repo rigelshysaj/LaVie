@@ -53,11 +53,20 @@ def load_model_for_inference(checkpoint_dir, device, args):
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
 
     lora_config = LoraConfig(
-        r=32,
-        lora_alpha=16,
-        target_modules=["attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0"]
+        r=64,
+        lora_alpha=32,
+        target_modules=[
+            "to_q", "to_k", "to_v", "to_out.0",
+            "proj_in", "proj_out",
+            "conv1", "conv2",
+            "time_emb_proj",
+            "downsample.conv",
+            "upsample.conv",
+        ],
+        lora_dropout=0.1,
+        bias="none"
     )
-    
+
     # Applica LoRA al modello
     unet = get_peft_model(unet, lora_config)
     
@@ -331,7 +340,16 @@ def train_lora_model(data, video_folder, args):
     lora_config = LoraConfig(
         r=64,
         lora_alpha=32,
-        target_modules=["attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0"]
+        target_modules=[
+            "to_q", "to_k", "to_v", "to_out.0",
+            "proj_in", "proj_out",
+            "conv1", "conv2",
+            "time_emb_proj",
+            "downsample.conv",
+            "upsample.conv",
+        ],
+        lora_dropout=0.1,
+        bias="none"
     )
 
     unet = get_peft_model(unet, lora_config)
