@@ -45,24 +45,13 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
-def load_model_for_inference(checkpoint_dir, device, args):
+def load_model_for_inference(device, args):
 
     sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
 
     # Carica il modello UNet e applica LoRA
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
  
-    # Carica l'ultimo checkpoint
-    checkpoint_path = os.path.join(checkpoint_dir, "latest_checkpoint.pth")
-
-    
-    if os.path.exists(checkpoint_path):
-        checkpoint = torch.load(checkpoint_path)
-        unet.load_state_dict(checkpoint['model_state_dict'])
-        print(f"Caricato checkpoint dall'epoca {checkpoint['epoch']}, iterazione {checkpoint['iteration']}")
-    else:
-        print("Nessun checkpoint trovato. Utilizzo del modello non addestrato.")
-
     
     unet.eval()
     
@@ -89,6 +78,8 @@ def inference(unet, tokenizer, text_encoder, vae, noise_scheduler, description, 
         
         # Generazione dell'output
         latents = torch.randn((1, 4, 5, 32, 32), device=device)
+
+        latents = latents.to(torch.float16)
         
         noise_scheduler.set_timesteps(100)
         
@@ -354,21 +345,16 @@ def train_lora_model(data, video_folder, args):
 
 def main(args):
     
-    # Determina se sei su Google Colab
-    on_colab = 'COLAB_GPU' in os.environ
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    if on_colab:
-        # Percorso del dataset su Google Colab
-        dataset_path = '/content/drive/My Drive/msvd_one'
-    else:
-        # Percorso del dataset locale (sincronizzato con Google Drive)
-        dataset_path = '/path/to/your/Google_Drive/sync/folder/path/to/your/dataset'
-    
-    # Percorsi dei file
-    video_folder = os.path.join(dataset_path, 'YouTubeClips')
-    data = os.path.join(dataset_path, 'annotations.txt')
-    
-    train_lora_model(data, video_folder, args)
+    unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler = load_model_for_inference(device, args)
+
+    description = "a Teddy bear"
+
+    video = inference(unet, tokenizer, text_encoder, vae, noise_scheduler, description, device).video
+    imageio.mimwrite(args.output_folder + 'teddy_bear' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+
+    print('save path {}'.format(args.output_folder))
 
 
 if __name__ == "__main__":
