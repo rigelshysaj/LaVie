@@ -55,9 +55,7 @@ def load_model_for_inference(checkpoint_dir, device, args):
     lora_config = LoraConfig(
         r=32,
         lora_alpha=16,
-        target_modules=["attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0"],
-        lora_dropout=0.1,
-        bias="none"
+        target_modules=["attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0"]
     )
     
     # Applica LoRA al modello
@@ -99,8 +97,21 @@ def inference(unet, tokenizer, text_encoder, vae, clip_model, clip_processor, no
         text_features = text_encoder(text_inputs)[0].to(torch.float16)
         
         # Preparazione del video/immagine
-        
-        encoder_hidden_states = text_features
+        image_inputs = clip_processor(images=input_image, return_tensors="pt").pixel_values.to(unet.device)
+        outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
+        last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
+
+        # Calcolo dell'attenzione (come nel training)
+        attention_layer = torch.nn.MultiheadAttention(embed_dim=768, num_heads=8, dtype=torch.float16).to(device)
+        text_features = text_features.transpose(0, 1)
+        last_hidden_state = last_hidden_state.transpose(0, 1)
+
+        text_features = text_features.to(torch.float16)
+        last_hidden_state = last_hidden_state.to(torch.float16)
+        attention_layer = attention_layer.to(torch.float16)
+
+        attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
+        encoder_hidden_states = attention_output.transpose(0, 1)
         
         # Generazione dell'output
         latents = torch.randn((1, 4, 16, 40, 64), device=device) #Campiona X_T ∼ N(0,I). Qui, latents rappresenta X_T
@@ -443,8 +454,8 @@ def train_lora_model(data, video_folder, args):
     num_epochs = 50
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
-    checkpoint_interval = 100  # Salva un checkpoint ogni 100 iterazioni
-    count = 0
+    checkpoint_interval = 20  # Salva un checkpoint ogni 100 iterazioni
+
     start_epoch = 0
     iteration = 0
     if os.path.exists(os.path.join(checkpoint_dir, "latest_checkpoint.pth")):
@@ -480,8 +491,6 @@ def train_lora_model(data, video_folder, args):
 
         for i, batch in enumerate(dataloader):
 
-            count += 1
-
             if epoch == start_epoch and i <= iteration:
                 continue
 
@@ -503,8 +512,26 @@ def train_lora_model(data, video_folder, args):
             text_features = text_encoder(text_inputs)[0].to(torch.float16)
             #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
+            image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
+            outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
+            last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
+            #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
+            
+            # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
+            text_features = text_features.transpose(0, 1)
+            last_hidden_state = last_hidden_state.transpose(0, 1)
+
+            assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
+
+            attention_layer = attention_layer.to(torch.float16)
+
+            # Calcola l'attenzione
+            attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
+
+            #print(f"train_lora_model attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
+            
             # Ritorna alle dimensioni originali
-            encoder_hidden_states = text_features
+            encoder_hidden_states = attention_output.transpose(0, 1)
 
             #print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
 
@@ -549,14 +576,15 @@ def train_lora_model(data, video_folder, args):
                 optimizer.zero_grad()
 
 
-            del text_features, encoder_hidden_states
+            del text_features, image_inputs, last_hidden_state, attention_output, encoder_hidden_states
             torch.cuda.empty_cache()
 
             if i % len(dataloader) == 0:
                 print(f"Epoch {epoch}/{num_epochs} completed with loss: {loss.item()}")
 
+
             # Salva un checkpoint
-            if count % checkpoint_interval == 0:
+            if (i + 1) % checkpoint_interval == 0:
                 
                 checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch{epoch}_iter{i}.pth")
                 '''
@@ -588,7 +616,7 @@ def train_lora_model(data, video_folder, args):
     
 
 def main(args):
-    '''
+    
     # Determina se sei su Google Colab
     on_colab = 'COLAB_GPU' in os.environ
 
@@ -614,7 +642,7 @@ def main(args):
 
     unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler = load_model_for_inference(checkpoint_dir, device, args)
 
-    description = "a chihuahua barks at the screen"
+    description = "a dog barks at the screen"
 
     image_path = "/content/drive/My Drive/chih.jpeg"
 
@@ -637,7 +665,7 @@ def main(args):
     imageio.mimwrite(args.output_folder + 'chihuahaaaa' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
     print('save path {}'.format(args.output_folder))
-    
+    '''
     
     '''
     Questa parte commentata serve se devo usare il dataset msrvtt
