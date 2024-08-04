@@ -77,7 +77,7 @@ def inference(unet, tokenizer, text_encoder, vae, noise_scheduler, description, 
         text_features = text_encoder(text_inputs)[0].to(torch.float16)
         
         # Generazione dell'output
-        latents = torch.randn((1, 4, 5, 32, 32), device=device)
+        latents = torch.randn((1, 4, 16, 40, 64), device=device)
 
         latents = latents.to(torch.float16)
         
