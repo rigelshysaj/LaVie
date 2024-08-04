@@ -321,7 +321,7 @@ def train_lora_model(data, video_folder, args):
 
     # Imposta tutti i parametri per l'addestramento
     for param in unet.parameters():
-        param.requires_grad = True
+        param.requires_grad = False
 
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
