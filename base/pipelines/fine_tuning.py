@@ -51,22 +51,7 @@ def load_model_for_inference(checkpoint_dir, device, args):
 
     # Carica il modello UNet e applica LoRA
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
-
-    lora_config = LoraConfig(
-        r=64,
-        lora_alpha=32,
-        target_modules=[
-            "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
-            "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
-            "ff.net.0.proj", "ff.net.2"
-        ],
-        lora_dropout=0.1,
-        bias="none",
-    )
-
-    # Applica LoRA al modello
-    unet = get_peft_model(unet, lora_config)
-    
+ 
     # Carica l'ultimo checkpoint
     checkpoint_path = os.path.join(checkpoint_dir, "latest_checkpoint.pth")
 
@@ -334,25 +319,9 @@ def train_lora_model(data, video_folder, args):
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
     clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
-    lora_config = LoraConfig(
-        r=64,
-        lora_alpha=32,
-        target_modules=[
-            "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
-            "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
-            "ff.net.0.proj", "ff.net.2"
-        ],
-        lora_dropout=0.1,
-        bias="none",
-    )
-
-    unet = get_peft_model(unet, lora_config)
-
-    for name, param in unet.named_parameters():
-        if "lora" in name:
-            param.requires_grad = True
-        else:
-            param.requires_grad = False
+    # Imposta tutti i parametri per l'addestramento
+    for param in unet.parameters():
+        param.requires_grad = True
 
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
@@ -363,11 +332,9 @@ def train_lora_model(data, video_folder, args):
 
     #optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
 
-    trainable_params = (
-        [p for n, p in unet.named_parameters() if "lora" in n]
-    )
 
-    optimizer = torch.optim.AdamW(trainable_params, lr=1e-7)
+
+    optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
 
     num_epochs = 1000
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
@@ -456,6 +423,8 @@ def train_lora_model(data, video_folder, args):
             loss = F.mse_loss(output, noise) #calcola || \epsilon - \epsilon_{\theta}(x_{t}, t) ||^{2}
                 
             loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(unet.parameters(), max_norm=1.0)
 
             for name, param in unet.named_parameters():
                 if param.grad is not None:
