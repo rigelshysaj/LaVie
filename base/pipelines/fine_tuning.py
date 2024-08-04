@@ -426,15 +426,6 @@ def train_lora_model(data, video_folder, args):
 
             torch.nn.utils.clip_grad_norm_(unet.parameters(), max_norm=1.0)
 
-            for name, param in unet.named_parameters():
-                if param.grad is not None:
-                    print(f"{name} - grad min: {param.grad.min().item()}, max: {param.grad.max().item()}")
-            
-            # Logging dettagliato
-            print(f"Epoch {epoch}, Batch {i}, Loss: {loss.item()}")
-            for name, param in unet.named_parameters():
-                if "lora" in name:
-                    print(f"{name} - grad norm: {param.grad.norm().item()}")
             
             optimizer.step()
             optimizer.zero_grad()
