@@ -351,7 +351,7 @@ def main(args):
     description = "a chihuahua barks at the screen"
 
     video = inference(unet, tokenizer, text_encoder, vae, noise_scheduler, description, device).video
-    imageio.mimwrite(args.output_folder + 'teddy_bear' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+    imageio.mimwrite(args.output_folder + 'chihuahua' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
     print('save path {}'.format(args.output_folder))
 
