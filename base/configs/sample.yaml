@@ -1,6 +1,6 @@
 # path:
 ckpt_path: "../pretrained_models/lavie_base.pt"
-output_folder: "/content/drive/My Drive/"
+output_folder: "../res/base/"
 pretrained_path: "../pretrained_models"
 
 # model config: 
@@ -24,6 +24,5 @@ guidance_scale: 7.5
 sample_method: 'ddpm'
 num_sampling_steps: 50
 text_prompt: [
-              'a bear in a suit',
-              'a panda taking a selfie, 2k, high quality'
+              'a cat meow at the screen'
        ] 
