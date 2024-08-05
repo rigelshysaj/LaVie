@@ -348,7 +348,7 @@ def main(args):
 
     unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler = load_model_for_inference(device, args)
 
-    description = "a Teddy bear"
+    description = "a chihuahua barks at the screen"
 
     video = inference(unet, tokenizer, text_encoder, vae, noise_scheduler, description, device).video
     imageio.mimwrite(args.output_folder + 'teddy_bear' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
