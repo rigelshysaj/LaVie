@@ -81,7 +81,7 @@ def inference(unet, tokenizer, text_encoder, vae, noise_scheduler, description, 
 
         latents = latents.to(torch.float16)
         
-        noise_scheduler.set_timesteps(100)
+        noise_scheduler.set_timesteps(50)
         
         for t in tqdm(noise_scheduler.timesteps):
             latent_model_input = noise_scheduler.scale_model_input(latents, t)
