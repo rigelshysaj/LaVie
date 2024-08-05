@@ -52,8 +52,7 @@ def load_model_for_inference(device, args):
 
     # Carica il modello UNet e applica LoRA
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
-    state_dict = find_model(args.ckpt_path)
-    unet.load_state_dict(state_dict)
+ 
     
     unet.eval()
     
@@ -317,7 +316,7 @@ def main(args):
 
     video = videogen_pipeline("a cat meow at the screen", video_length=16, height=320, width=512, num_inference_steps=50, guidance_scale=7.5).video
 
-    imageio.mimwrite(args.output_folder + 'nahengre' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+    imageio.mimwrite(args.output_folder + 'efundit' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
     print('save path {}'.format(args.output_folder))
 
