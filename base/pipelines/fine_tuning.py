@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from peft import PeftModel, LoraConfig
 from PIL import Image
 from torchvision import transforms
+from inference import VideoGenPipeline
 
 from diffusers.utils import (
     deprecate,
@@ -68,34 +69,6 @@ def load_model_for_inference(device, args):
     clip_model.eval()
     
     return unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler
-
-
-def inference(unet, tokenizer, text_encoder, vae, noise_scheduler, description, device):
-    with torch.no_grad():
-        # Preparazione del testo
-        text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(device)
-        text_features = text_encoder(text_inputs)[0].to(torch.float16)
-        
-        # Generazione dell'output
-        latents = torch.randn((1, 4, 16, 40, 64), device=device)
-
-        latents = latents.to(torch.float16)
-        
-        noise_scheduler.set_timesteps(50)
-        
-        for t in tqdm(noise_scheduler.timesteps):
-            latent_model_input = noise_scheduler.scale_model_input(latents, t)
-            
-            # Genera la previsione
-            noise_pred = unet(latent_model_input, t, encoder_hidden_states=text_features).sample
-            
-            # Compute the previous noisy sample x_t -> x_t-1
-            latents = noise_scheduler.step(noise_pred, t, latents).prev_sample
-        
-        # Decodifica dei latents in video
-        video = decode_latents(latents, vae)
-        
-    return StableDiffusionPipelineOutput(video=video)
 
 
 class VideoDatasetMsvd(Dataset):
@@ -186,17 +159,6 @@ def encode_latents(video, vae):
     
     return latents
 
-def decode_latents(latents, vae):
-    latents = latents.to(torch.float16)
-    b, c, f, h, w = latents.shape
-    latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
-    
-    video = vae.decode(latents).sample
-    video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=f)
-    
-    video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
-    
-    return video
 
 def custom_collate(batch):
     batch = list(filter(lambda x: x[0] is not None and x[1] is not None and x[2] is not None, batch))
@@ -348,10 +310,13 @@ def main(args):
 
     unet, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler = load_model_for_inference(device, args)
 
-    description = "a chihuahua barks at the screen"
+    videogen_pipeline = VideoGenPipeline(vae=vae, text_encoder=text_encoder, tokenizer=tokenizer, scheduler=noise_scheduler, unet=unet).to(device)
+	
+    videogen_pipeline.enable_xformers_memory_efficient_attention()
 
-    video = inference(unet, tokenizer, text_encoder, vae, noise_scheduler, description, device).video
-    imageio.mimwrite(args.output_folder + 'chihuahua' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+    video = videogen_pipeline("a cat meow at the screen", video_length=16, height=320, width=512, num_inference_steps=50, guidance_scale=7.5).video
+
+    imageio.mimwrite(args.output_folder + 'meow' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
     print('save path {}'.format(args.output_folder))
 
