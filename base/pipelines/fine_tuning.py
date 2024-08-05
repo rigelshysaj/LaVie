@@ -314,9 +314,9 @@ def main(args):
 	
     videogen_pipeline.enable_xformers_memory_efficient_attention()
 
-    video = videogen_pipeline("a cat meow at the screen", video_length=16, height=320, width=512, num_inference_steps=50, guidance_scale=7.5).video
+    video = videogen_pipeline("a chihuahua barks at the screen", video_length=16, height=320, width=512, num_inference_steps=50, guidance_scale=7.5).video
 
-    imageio.mimwrite(args.output_folder + 'meow' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+    imageio.mimwrite(args.output_folder + 'chihuahua' + '.mp4', video[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
     print('save path {}'.format(args.output_folder))
 
