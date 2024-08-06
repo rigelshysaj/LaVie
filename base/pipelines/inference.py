@@ -159,6 +159,9 @@ class VideoGenPipeline(DiffusionPipeline):
         self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
         self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(self.device)
         self.attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(self.device)
+        self.image_projection = nn.Linear(768, 768)  # Assumendo che le dimensioni siano 768
+        self.text_projection = nn.Linear(768, 768)
+        self.combination_layer = nn.Linear(768 * 2, 768)
 
     def enable_vae_slicing(self):
         r"""
@@ -318,7 +321,47 @@ class VideoGenPipeline(DiffusionPipeline):
         prompt_embeds = prompt_embeds.repeat(1, num_images_per_prompt, 1)
         prompt_embeds = prompt_embeds.view(bs_embed * num_images_per_prompt, seq_len, -1)
 
-        
+        if input_image is not None:
+            # Processa l'immagine con CLIP
+            image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
+            outputs = self.clip_model.vision_model(image_inputs, output_hidden_states=True)
+            #image_features = outputs.hidden_states[-1].to(torch.float16)
+            image_features = outputs.last_hidden_state.to(torch.float16)
+            print(f"image_features1 shape: {image_features.shape}, dtype: {image_features.dtype}")
+             # Proietta gli embedding nello stesso spazio
+            projected_image = self.image_projection(image_features)
+            projected_text = self.text_projection(prompt_embeds)
+            # Combina l'embedding del testo con l'embedding dell'immagine
+            print(f"projected_image shape: {projected_image.shape}, dtype: {projected_image.dtype}")
+            print(f"projected_text shape: {projected_text.shape}, dtype: {projected_text.dtype}")
+
+            combined = torch.cat([projected_text, projected_image], dim=-1)
+
+            print(f"combined shape: {combined.shape}, dtype: {combined.dtype}")
+
+
+            prompt_embeds = self.combination_layer(combined)
+
+            print(f"prompt_embeds shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
+
+            '''
+            prompt_embeds = prompt_embeds.transpose(0, 1)
+            image_features = image_features.transpose(0, 1)
+
+            assert prompt_embeds.dtype == image_features.dtype, "prompt_embeds and image_features must have the same dtype"
+
+            prompt_embeds = prompt_embeds.to(torch.float16)
+            image_features = image_features.to(torch.float16)
+            self.attention_layer = self.attention_layer.to(torch.float16)
+
+            combined_embeds, _ = self.attention_layer(prompt_embeds, image_features, image_features)
+
+            combined_embeds = combined_embeds.transpose(0, 1)
+
+            prompt_embeds = combined_embeds
+            '''
+
+            print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
