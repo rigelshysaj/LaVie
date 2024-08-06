@@ -325,7 +325,12 @@ class VideoGenPipeline(DiffusionPipeline):
             image_features = outputs.hidden_states[-1].to(torch.float16)
             # Combina l'embedding del testo con l'embedding dell'immagine
             print(f"prompt_embeds shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
-            print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") 
+            print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
+
+            prompt_embeds = prompt_embeds.to(torch.float16)
+            image_features = image_features.to(torch.float16)
+            attention_layer = attention_layer.to(torch.float16)
+
             combined_embeds = self.attention_layer(prompt_embeds, image_features, image_features)
             prompt_embeds = combined_embeds
 
@@ -536,11 +541,7 @@ class VideoGenPipeline(DiffusionPipeline):
         callback_steps: int = 1,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
     ):
-        
-        print("-----------------------aaaaaaaa-------------------------------")
-        print(image_path)
-        print("-----------------------bbbbbbbb-------------------------------")
-        
+         
         # 0. Default height and width to unet
         height = height or self.unet.config.sample_size * self.vae_scale_factor
         width = width or self.unet.config.sample_size * self.vae_scale_factor
