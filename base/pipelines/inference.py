@@ -159,10 +159,11 @@ class VideoGenPipeline(DiffusionPipeline):
         self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
         self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(self.device)
         self.attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(self.device)
-        self.image_projection = nn.Linear(768, 768).to(self.device)
-        self.text_projection = nn.Linear(768, 768).to(self.device)
-        self.combination_layer = nn.Linear(768 * 2, 768).to(self.device)
-
+        dtype = torch.float32
+    
+        self.image_projection = nn.Linear(768, 768).to(self.device).to(dtype)
+        self.text_projection = nn.Linear(768, 768).to(self.device).to(dtype)
+        self.combination_layer = nn.Linear(768 * 2, 768).to(self.device).to(dtype)
     def enable_vae_slicing(self):
         r"""
         Enable sliced VAE decoding.
@@ -326,7 +327,7 @@ class VideoGenPipeline(DiffusionPipeline):
             image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
             outputs = self.clip_model.vision_model(image_inputs, output_hidden_states=True)
             #image_features = outputs.hidden_states[-1].to(torch.float16)
-            image_features = outputs.last_hidden_state.to(torch.float16)
+            image_features = outputs.last_hidden_state.to(torch.float32)
             print(f"image_features1 shape: {image_features.shape}, dtype: {image_features.dtype}")
              # Proietta gli embedding nello stesso spazio
             projected_image = self.image_projection(image_features)
