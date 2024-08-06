@@ -516,8 +516,8 @@ class VideoGenPipeline(DiffusionPipeline):
     @torch.no_grad()
     def __call__(
         self,
+        image_path: str,  # Nuovo parametro
         prompt: Union[str, List[str]] = None,
-        image_path: str = None,  # Nuovo parametro
         height: Optional[int] = None,
         width: Optional[int] = None,
         video_length: int = 16,
