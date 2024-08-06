@@ -327,6 +327,11 @@ class VideoGenPipeline(DiffusionPipeline):
             print(f"prompt_embeds shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
             print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
 
+            prompt_embeds = prompt_embeds.transpose(0, 1)
+            image_features = image_features.transpose(0, 1)
+
+            assert prompt_embeds.dtype == image_features.dtype, "prompt_embeds and image_features must have the same dtype"
+
             prompt_embeds = prompt_embeds.to(torch.float16)
             image_features = image_features.to(torch.float16)
             self.attention_layer = self.attention_layer.to(torch.float16)
