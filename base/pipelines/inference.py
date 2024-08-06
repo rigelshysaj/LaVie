@@ -337,7 +337,12 @@ class VideoGenPipeline(DiffusionPipeline):
             self.attention_layer = self.attention_layer.to(torch.float16)
 
             combined_embeds = self.attention_layer(prompt_embeds, image_features, image_features)
+
+            combined_embeds = combined_embeds.transpose(0, 1)
+
             prompt_embeds = combined_embeds
+
+            print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
