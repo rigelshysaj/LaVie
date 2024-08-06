@@ -302,7 +302,7 @@ def train_lora_model(data, video_folder, args):
     unet = get_peft_model(unet, lora_config)
 
     for name, param in unet.named_parameters():
-        if "lora" in name and "attn2" in name:
+        if "lora" in name and ("attn1" in name or "attn2" in name or "ff" in name):
             param.requires_grad = True
         else:
             param.requires_grad = False
@@ -317,9 +317,10 @@ def train_lora_model(data, video_folder, args):
 
     #optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
 
-    trainable_params = (
-        [p for n, p in unet.named_parameters() if "lora" in n and "attn2" in n]
-    )
+    trainable_params = [
+        p for n, p in unet.named_parameters() 
+        if "lora" in n and ("attn1" in n or "attn2" in n or "ff" in n)
+    ]
 
     optimizer = torch.optim.AdamW(trainable_params, lr=1e-6)
 
