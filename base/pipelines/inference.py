@@ -437,7 +437,7 @@ class VideoGenPipeline(DiffusionPipeline):
         return video
     
     def decode_latents(self, latents):
-        #latents = latents.to(torch.float16)
+        self.vae = self.vae.to(torch.float32)
         video_length = latents.shape[2]
         latents = 1 / 0.18215 * latents
         latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
@@ -686,7 +686,7 @@ class VideoGenPipeline(DiffusionPipeline):
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)
 
-            latents = latents.to(self.unet.dtype)
+        
             # 8. Post-processing
             video = self.decode_latents(latents)
 
