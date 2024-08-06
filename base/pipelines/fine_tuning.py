@@ -464,7 +464,7 @@ def train_lora_model(data, video_folder, args):
         print(f"Epoch {epoch}/{num_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)
 
-        if (epoch + 1) % 1 == 0:
+        if (epoch + 1) % 10 == 0:
             with torch.no_grad():
                 videogen_pipeline = VideoGenPipeline(vae=vae, 
                             text_encoder=text_encoder, 
