@@ -57,6 +57,15 @@ def load_model_for_inference(args):
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
     state_dict = find_model(args.ckpt_path)
     unet.load_state_dict(state_dict)
+
+    lora_config = LoraConfig(
+        r=32,
+        lora_alpha=16,
+        target_modules=["attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0"]
+    )
+    
+    # Applica LoRA al modello
+    unet = get_peft_model(unet, lora_config)
     
     # Carica l'ultimo checkpoint
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
@@ -276,6 +285,14 @@ def train_lora_model(data, video_folder, args):
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
     clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
+    lora_config = LoraConfig(
+        r=32,
+        lora_alpha=16,
+        target_modules=["attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0"]
+    )
+
+    unet = get_peft_model(unet, lora_config)
+
     for name, param in unet.named_parameters():
         if "lora" in name and "attn2" in name:
             param.requires_grad = True
@@ -296,7 +313,7 @@ def train_lora_model(data, video_folder, args):
         [p for n, p in unet.named_parameters() if "lora" in n and "attn2" in n]
     )
 
-    optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-6)
+    optimizer = torch.optim.AdamW(trainable_params, lr=1e-6)
 
     lr_scheduler = get_cosine_schedule_with_warmup(
         optimizer=optimizer,
@@ -410,7 +427,7 @@ def train_lora_model(data, video_folder, args):
             optimizer.zero_grad()
 
 
-        avg_epoch_loss = sum(batch_losses) / len(batch_losses)
+            
         print(f"Epoch {epoch}/{num_epochs} completed with loss: {loss.item()}")
         print(f"Epoch {epoch}/{num_epochs} completed with average loss: {avg_epoch_loss}")
         avg_epoch_loss = sum(batch_losses) / len(batch_losses)
