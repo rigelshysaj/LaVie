@@ -159,11 +159,14 @@ class VideoGenPipeline(DiffusionPipeline):
         self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
         self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(self.device)
         self.attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(self.device)
+        
         dtype = torch.float32
     
         self.image_projection = nn.Linear(768, 768).to(self.device).to(dtype)
         self.text_projection = nn.Linear(768, 768).to(self.device).to(dtype)
         self.combination_layer = nn.Linear(768 * 2, 768).to(self.device).to(dtype)
+        self.image_alignment = nn.Linear(50, 77).to(self.device).to(dtype)
+
     def enable_vae_slicing(self):
         r"""
         Enable sliced VAE decoding.
@@ -331,6 +334,7 @@ class VideoGenPipeline(DiffusionPipeline):
             print(f"image_features1 shape: {image_features.shape}, dtype: {image_features.dtype}")
              # Proietta gli embedding nello stesso spazio
             projected_image = self.image_projection(image_features)
+            projected_image = self.image_alignment(projected_image.transpose(1, 2)).transpose(1, 2)
             prompt_embeds = prompt_embeds.to(self.text_projection.weight.dtype)
             projected_text = self.text_projection(prompt_embeds)
 
