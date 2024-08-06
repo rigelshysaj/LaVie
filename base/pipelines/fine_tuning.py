@@ -64,6 +64,7 @@ def load_model_for_inference(args):
         target_modules=[
             "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
             "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
+            "attn_temp.to_q", "attn_temp.to_k", "attn_temp.to_v",
             "ff.net.0.proj", "ff.net.2"
         ]
     )
@@ -126,7 +127,8 @@ def load_model_for_inference(args):
     video_grids = []
     for prompt in args.text_prompt:
         print('Processing the ({}) prompt'.format(prompt))
-        videos = videogen_pipeline(prompt, 
+        videos = videogen_pipeline(prompt,
+                                image_path="/content/drive/My Drive/chih.jpeg", 
                                 video_length=args.video_length, 
                                 height=args.image_size[0], 
                                 width=args.image_size[1], 
