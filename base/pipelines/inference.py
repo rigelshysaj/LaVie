@@ -539,6 +539,8 @@ class VideoGenPipeline(DiffusionPipeline):
         
         print("-----------------------aaaaaaaa-------------------------------")
         print(image_path)
+        print("-----")
+        print(prompt)
         print("-----------------------bbbbbbbb-------------------------------")
         
         # 0. Default height and width to unet
