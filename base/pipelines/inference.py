@@ -331,7 +331,9 @@ class VideoGenPipeline(DiffusionPipeline):
             print(f"image_features1 shape: {image_features.shape}, dtype: {image_features.dtype}")
              # Proietta gli embedding nello stesso spazio
             projected_image = self.image_projection(image_features)
+            prompt_embeds = prompt_embeds.to(self.text_projection.weight.dtype)
             projected_text = self.text_projection(prompt_embeds)
+
             # Combina l'embedding del testo con l'embedding dell'immagine
             print(f"projected_image shape: {projected_image.shape}, dtype: {projected_image.dtype}")
             print(f"projected_text shape: {projected_text.shape}, dtype: {projected_text.dtype}")
