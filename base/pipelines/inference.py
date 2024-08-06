@@ -20,6 +20,7 @@ from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from diffusers.configuration_utils import FrozenDict
 from diffusers.models import AutoencoderKL
+from torch.utils.checkpoint import checkpoint
 from diffusers.schedulers import KarrasDiffusionSchedulers
 from diffusers.utils import (
     deprecate,
@@ -403,13 +404,50 @@ class VideoGenPipeline(DiffusionPipeline):
 
         return prompt_embeds
 
-    def decode_latents(self, latents):
+    def decode_latents_(self, latents):
         video_length = latents.shape[2]
         latents = 1 / 0.18215 * latents
         latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
         video = self.vae.decode(latents).sample
         video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
         video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
+        return video
+    
+    def decode_latents(self, latents):
+        latents = latents.to(torch.float16)
+        video_length = latents.shape[2]
+        #latents = 1 / 0.18215 * latents
+        latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
+        
+        decoded_parts = []
+        batch_size = 1  # Puoi aumentare questo valore se la tua GPU lo consente
+
+        def decode_batch(batch):
+            return self.vae.decode(batch).sample
+
+        #print(f"latents shape: {latents.shape}, dtype: {latents.dtype}") #[16, 4, 40, 64] torch.float16
+        
+        for i in range(0, latents.shape[0], batch_size):
+            latents_batch = latents[i:i+batch_size]
+            latents_batch = latents_batch.requires_grad_(True)
+            # Usa checkpoint per risparmiare memoria
+            decoded_batch = checkpoint(decode_batch, latents_batch, use_reentrant=False)
+            decoded_parts.append(decoded_batch)
+            # Libera un po' di memoria
+            #torch.cuda.empty_cache()
+        
+        #print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}") #[1, 4, 40, 64] torch.float16
+
+
+        # Concatena tutte le parti decodificate
+        video = torch.cat(decoded_parts, dim=0)
+        
+        # Riorganizza le dimensioni del video
+        video = einops.rearrange(video, "(b f) c h w -> b f h w c", f=video_length)
+        
+       
+        video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
+
         return video
 
     def prepare_extra_step_kwargs(self, generator, eta):

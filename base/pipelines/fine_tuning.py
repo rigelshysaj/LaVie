@@ -211,12 +211,49 @@ class VideoDatasetMsvd(Dataset):
             return None, None, None
 
 
-def encode_latents(video, vae):
+def encode_latents_(video, vae):
     video = video.to(torch.float16)
     b, c, f, h, w = video.shape
     video = einops.rearrange(video, "b c f h w -> (b f) c h w")
     
     latents = vae.encode(video).latent_dist.sample()
+    latents = einops.rearrange(latents, "(b f) c h w -> b c f h w", b=b)
+    
+    return latents
+
+def encode_latents(video, vae):
+    video = video.to(torch.float16)
+
+    # video ha forma [b, c, f, h, w]
+    b, c, f, h, w = video.shape
+    
+    # Riarrangia il video in una serie di immagini
+    video = einops.rearrange(video, "b c f h w -> (b f) c h w")
+    
+    encode_parts = []
+    batch_size = 1  # Puoi aumentare questo valore se la tua GPU lo consente
+
+
+    def encode_batch(batch):
+        return vae.encode(batch).latent_dist.sample()
+    
+    for i in range(0, video.shape[0], batch_size):
+        latents_batch = video[i:i+batch_size]
+        latents_batch = latents_batch.requires_grad_(True)
+        #print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}") #shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
+
+        # Usa checkpoint per risparmiare memoria
+        encoded_batch = checkpoint(encode_batch, latents_batch, use_reentrant=False)
+
+        #print(f"encoded_batch shape: {encoded_batch.shape}, dtype: {encoded_batch.dtype}") #shape: torch.Size([1, 4, 40, 64]), dtype: torch.float32
+
+        encode_parts.append(encoded_batch)
+        # Libera un po' di memoria
+        #torch.cuda.empty_cache()
+
+    latents = torch.cat(encode_parts, dim=0)
+        
+    # Riarrangia i latents per reintrodurre la dimensione temporale
     latents = einops.rearrange(latents, "(b f) c h w -> b c f h w", b=b)
     
     return latents
