@@ -271,6 +271,11 @@ class VideoGenPipeline(DiffusionPipeline):
         input_image: Optional[torch.FloatTensor] = None,
     ):
         
+
+        print("-----------------------aaaaaaaa-------------------------------")
+        print(input_image)
+        print("-----------------------bbbbbbbb-------------------------------")
+
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
         elif prompt is not None and isinstance(prompt, list):
