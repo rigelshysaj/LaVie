@@ -318,31 +318,7 @@ class VideoGenPipeline(DiffusionPipeline):
         prompt_embeds = prompt_embeds.repeat(1, num_images_per_prompt, 1)
         prompt_embeds = prompt_embeds.view(bs_embed * num_images_per_prompt, seq_len, -1)
 
-        if input_image is not None:
-            # Processa l'immagine con CLIP
-            image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
-            outputs = self.clip_model.vision_model(image_inputs, output_hidden_states=True)
-            image_features = outputs.hidden_states[-1].to(torch.float16)
-            # Combina l'embedding del testo con l'embedding dell'immagine
-            print(f"prompt_embeds shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
-            print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
-
-            prompt_embeds = prompt_embeds.transpose(0, 1)
-            image_features = image_features.transpose(0, 1)
-
-            assert prompt_embeds.dtype == image_features.dtype, "prompt_embeds and image_features must have the same dtype"
-
-            prompt_embeds = prompt_embeds.to(torch.float16)
-            image_features = image_features.to(torch.float16)
-            self.attention_layer = self.attention_layer.to(torch.float16)
-
-            combined_embeds, _ = self.attention_layer(prompt_embeds, image_features, image_features)
-
-            combined_embeds = combined_embeds.transpose(0, 1)
-
-            prompt_embeds = combined_embeds
-
-            print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
+        
 
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
