@@ -229,6 +229,7 @@ def encode_latents_(video, vae):
     return latents
 
 def encode_latents(video, vae):
+    vae = vae.to(torch.float16)
     video = video.to(torch.float16)
 
     # video ha forma [b, c, f, h, w]
