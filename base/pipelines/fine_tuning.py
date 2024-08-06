@@ -47,68 +47,89 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 def load_model_for_inference(args):
-	if args.seed is not None:
-		torch.manual_seed(args.seed)
-	torch.set_grad_enabled(False)
-	device = "cuda" if torch.cuda.is_available() else "cpu"
+    if args.seed is not None:
+        torch.manual_seed(args.seed)
+    torch.set_grad_enabled(False)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
-	sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
-	unet = get_models(args, sd_path).to(device, dtype=torch.float16)
-	state_dict = find_model(args.ckpt_path)
-	unet.load_state_dict(state_dict)
-	
-	vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae", torch_dtype=torch.float16).to(device)
-	tokenizer_one = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
-	text_encoder_one = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder", torch_dtype=torch.float16).to(device) # huge
+    sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
+    unet = get_models(args, sd_path).to(device, dtype=torch.float16)
+    state_dict = find_model(args.ckpt_path)
+    unet.load_state_dict(state_dict)
 
-	# set eval mode
-	unet.eval()
-	vae.eval()
-	text_encoder_one.eval()
-	
-	if args.sample_method == 'ddim':
-		scheduler = DDIMScheduler.from_pretrained(sd_path, 
-											   subfolder="scheduler",
-											   beta_start=args.beta_start, 
-											   beta_end=args.beta_end, 
-											   beta_schedule=args.beta_schedule)
-	elif args.sample_method == 'eulerdiscrete':
-		scheduler = EulerDiscreteScheduler.from_pretrained(sd_path,
-											   subfolder="scheduler",
-											   beta_start=args.beta_start,
-											   beta_end=args.beta_end,
-											   beta_schedule=args.beta_schedule)
-	elif args.sample_method == 'ddpm':
-		scheduler = DDPMScheduler.from_pretrained(sd_path,
-											  subfolder="scheduler",
-											  beta_start=args.beta_start,
-											  beta_end=args.beta_end,
-											  beta_schedule=args.beta_schedule)
-	else:
-		raise NotImplementedError
+    lora_config = LoraConfig(
+        r=32,
+        lora_alpha=16,
+        target_modules=["attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0"]
+    )
+    
+    # Applica LoRA al modello
+    unet = get_peft_model(unet, lora_config)
+    
+    # Carica l'ultimo checkpoint
+    checkpoint_dir = "/content/drive/My Drive/checkpoints"
+    checkpoint_path = os.path.join(checkpoint_dir, "latest_checkpoint.pth")
 
-	videogen_pipeline = VideoGenPipeline(vae=vae, 
-								 text_encoder=text_encoder_one, 
-								 tokenizer=tokenizer_one, 
-								 scheduler=scheduler, 
-								 unet=unet).to(device)
-	videogen_pipeline.enable_xformers_memory_efficient_attention()
+    
+    if os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path)
+        unet.load_state_dict(checkpoint['model_state_dict'])
+        print(f"Caricato checkpoint dall'epoca {checkpoint['epoch']}, iterazione {checkpoint['iteration']}")
+    else:
+        print("Nessun checkpoint trovato. Utilizzo del modello non addestrato.")
+    
+    vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae", torch_dtype=torch.float16).to(device)
+    tokenizer_one = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
+    text_encoder_one = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder", torch_dtype=torch.float16).to(device) # huge
 
-	if not os.path.exists(args.output_folder):
-		os.makedirs(args.output_folder)
+    # set eval mode
+    unet.eval()
+    vae.eval()
+    text_encoder_one.eval()
+    
+    if args.sample_method == 'ddim':
+        scheduler = DDIMScheduler.from_pretrained(sd_path, 
+                                            subfolder="scheduler",
+                                            beta_start=args.beta_start, 
+                                            beta_end=args.beta_end, 
+                                            beta_schedule=args.beta_schedule)
+    elif args.sample_method == 'eulerdiscrete':
+        scheduler = EulerDiscreteScheduler.from_pretrained(sd_path,
+                                            subfolder="scheduler",
+                                            beta_start=args.beta_start,
+                                            beta_end=args.beta_end,
+                                            beta_schedule=args.beta_schedule)
+    elif args.sample_method == 'ddpm':
+        scheduler = DDPMScheduler.from_pretrained(sd_path,
+                                            subfolder="scheduler",
+                                            beta_start=args.beta_start,
+                                            beta_end=args.beta_end,
+                                            beta_schedule=args.beta_schedule)
+    else:
+        raise NotImplementedError
 
-	video_grids = []
-	for prompt in args.text_prompt:
-		print('Processing the ({}) prompt'.format(prompt))
-		videos = videogen_pipeline(prompt, 
-								video_length=args.video_length, 
-								height=args.image_size[0], 
-								width=args.image_size[1], 
-								num_inference_steps=args.num_sampling_steps,
-								guidance_scale=args.guidance_scale).video
-		imageio.mimwrite(args.output_folder + prompt.replace(' ', '_') + '.mp4', videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
-	
-	print('save path {}'.format(args.output_folder))
+    videogen_pipeline = VideoGenPipeline(vae=vae, 
+                                text_encoder=text_encoder_one, 
+                                tokenizer=tokenizer_one, 
+                                scheduler=scheduler, 
+                                unet=unet).to(device)
+    videogen_pipeline.enable_xformers_memory_efficient_attention()
+
+    if not os.path.exists(args.output_folder):
+        os.makedirs(args.output_folder)
+
+    video_grids = []
+    for prompt in args.text_prompt:
+        print('Processing the ({}) prompt'.format(prompt))
+        videos = videogen_pipeline(prompt, 
+                                video_length=args.video_length, 
+                                height=args.image_size[0], 
+                                width=args.image_size[1], 
+                                num_inference_steps=args.num_sampling_steps,
+                                guidance_scale=args.guidance_scale).video
+        imageio.mimwrite(args.output_folder + prompt.replace(' ', '_') + '.mp4', videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+    
+    print('save path {}'.format(args.output_folder))
     
 
 
@@ -208,6 +229,8 @@ def custom_collate(batch):
     return torch.utils.data.dataloader.default_collate(batch)
 
 
+
+
 def train_lora_model(data, video_folder, args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     # Carica il modello UNet e applica LoRA
@@ -224,10 +247,21 @@ def train_lora_model(data, video_folder, args):
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
     clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
-    # Imposta tutti i parametri per l'addestramento
-    for param in unet.parameters():
-        param.requires_grad = False
+    lora_config = LoraConfig(
+        r=32,
+        lora_alpha=16,
+        target_modules=["attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0"]
+    )
 
+    unet = get_peft_model(unet, lora_config)
+
+    for name, param in unet.named_parameters():
+        if "lora" in name and "attn2" in name:
+            param.requires_grad = True
+        else:
+            param.requires_grad = False
+
+    batch_size=1
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
@@ -237,11 +271,19 @@ def train_lora_model(data, video_folder, args):
 
     #optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
 
+    trainable_params = (
+        [p for n, p in unet.named_parameters() if "lora" in n and "attn2" in n]
+    )
 
+    optimizer = torch.optim.AdamW(trainable_params, lr=1e-7)
 
-    optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
+    lr_scheduler = get_cosine_schedule_with_warmup(
+        optimizer=optimizer,
+        num_warmup_steps=100,
+        num_training_steps=(len(dataloader) * batch_size),
+    )
 
-    num_epochs = 1000
+    num_epochs = 100
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
     checkpoint_interval = 100  # Salva un checkpoint ogni 100 iterazioni
@@ -252,6 +294,7 @@ def train_lora_model(data, video_folder, args):
         checkpoint = torch.load(os.path.join(checkpoint_dir, "latest_checkpoint.pth"))
         unet.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
         start_epoch = checkpoint['epoch']
         iteration = checkpoint['iteration']
         print(f"Ripresa dell'addestramento dall'epoca {start_epoch}, iterazione {iteration}")
@@ -263,6 +306,11 @@ def train_lora_model(data, video_folder, args):
     text_encoder.eval()
     vae.eval()
     
+    attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
+    #projection_layer = nn.Linear(64, 224).to(unet.device)
+
+    accumulation_steps = 8
+
     noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
 
 
@@ -281,7 +329,7 @@ def train_lora_model(data, video_folder, args):
             if batch[0] is None:
                 continue
 
-            video, description, frame = batch
+            video, description, frame_tensor = batch
 
             #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
@@ -326,7 +374,7 @@ def train_lora_model(data, video_folder, args):
                 #Qui, output rappresenta ϵ_θ(x_t, t)
 
             loss = F.mse_loss(output, noise) #calcola || \epsilon - \epsilon_{\theta}(x_{t}, t) ||^{2}
-                
+
             loss.backward()
 
             torch.nn.utils.clip_grad_norm_(unet.parameters(), max_norm=1.0)
@@ -335,15 +383,50 @@ def train_lora_model(data, video_folder, args):
             optimizer.step()
             optimizer.zero_grad()
 
-            # Genera e salva un campione ogni 10 epoche
-            if epoch % 100 == 0:
-                with torch.no_grad():
-                    video = inference(unet, tokenizer, text_encoder, vae, noise_scheduler, description, device).video
-                    imageio.mimwrite(args.output_folder + f"sample_epoch_{epoch}.mp4", video[0], fps=8, quality=9)
-                    print('save path {}'.format(args.output_folder))
 
-    return unet
+            if i % len(dataloader) == 0:
+                print(f"Epoch {epoch}/{num_epochs} completed with loss: {loss.item()}")
+
+            if epoch % 10 == 0:
+                with torch.no_grad():
+                    videogen_pipeline = VideoGenPipeline(vae=vae, 
+                                text_encoder=text_encoder, 
+                                tokenizer=tokenizer, 
+                                scheduler=noise_scheduler, 
+                                unet=unet).to(device)
+                    videogen_pipeline.enable_xformers_memory_efficient_attention()
+
+                    video = videogen_pipeline(description, 
+                                video_length=args.video_length, 
+                                height=args.image_size[0], 
+                                width=args.image_size[1], 
+                                num_inference_steps=args.num_sampling_steps,
+                                guidance_scale=args.guidance_scale).video
+                    
+                    imageio.mimwrite("/content/drive/My Drive/" + f"sample_epoch_{epoch}.mp4", video[0], fps=8, quality=9)
+                    print('save path {}'.format(args.output_folder))
     
+    return unet
+
+
+def training(args):
+    
+    # Determina se sei su Google Colab
+    on_colab = 'COLAB_GPU' in os.environ
+
+    if on_colab:
+        # Percorso del dataset su Google Colab
+        dataset_path = '/content/drive/My Drive/msvd_small'
+    else:
+        # Percorso del dataset locale (sincronizzato con Google Drive)
+        dataset_path = '/path/to/your/Google_Drive/sync/folder/path/to/your/dataset'
+    
+    # Percorsi dei file
+    video_folder = os.path.join(dataset_path, 'YouTubeClips')
+    data = os.path.join(dataset_path, 'annotations.txt')
+    
+    train_lora_model(data, video_folder, args)
+
 
 
 if __name__ == "__main__":
@@ -351,4 +434,5 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
-    load_model_for_inference(OmegaConf.load(args.config))
+    training(OmegaConf.load(args.config))
+    #load_model_for_inference(OmegaConf.load(args.config))
