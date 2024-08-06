@@ -7,6 +7,7 @@ import json
 from tqdm import tqdm
 from transformers import CLIPProcessor, CLIPModel
 from peft import LoraConfig, get_peft_model
+from torchvision import transforms
 import argparse
 from omegaconf import OmegaConf
 import imageio

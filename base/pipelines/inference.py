@@ -324,6 +324,8 @@ class VideoGenPipeline(DiffusionPipeline):
             outputs = self.clip_model.vision_model(image_inputs, output_hidden_states=True)
             image_features = outputs.hidden_states[-1].to(torch.float16)
             # Combina l'embedding del testo con l'embedding dell'immagine
+            print(f"prompt_embeds shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
+            print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") 
             combined_embeds = self.attention_layer(prompt_embeds, image_features, image_features)
             prompt_embeds = combined_embeds
 
