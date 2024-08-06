@@ -387,7 +387,7 @@ def train_lora_model(data, video_folder, args):
             if i % len(dataloader) == 0:
                 print(f"Epoch {epoch}/{num_epochs} completed with loss: {loss.item()}")
 
-            if epoch % 10 == 0:
+            if (epoch + 1) % 10 == 0:
                 with torch.no_grad():
                     videogen_pipeline = VideoGenPipeline(vae=vae, 
                                 text_encoder=text_encoder, 
@@ -396,15 +396,17 @@ def train_lora_model(data, video_folder, args):
                                 unet=unet).to(device)
                     videogen_pipeline.enable_xformers_memory_efficient_attention()
 
-                    video = videogen_pipeline(description, 
-                                video_length=args.video_length, 
-                                height=args.image_size[0], 
-                                width=args.image_size[1], 
-                                num_inference_steps=args.num_sampling_steps,
-                                guidance_scale=args.guidance_scale).video
-                    
-                    imageio.mimwrite("/content/drive/My Drive/" + f"sample_epoch_{epoch}.mp4", video[0], fps=8, quality=9)
-                    print('save path {}'.format(args.output_folder))
+                    for prompt in args.text_prompt:
+                        print('Processing the ({}) prompt'.format(prompt))
+                        videos = videogen_pipeline(prompt, 
+                                                video_length=args.video_length, 
+                                                height=args.image_size[0], 
+                                                width=args.image_size[1], 
+                                                num_inference_steps=args.num_sampling_steps,
+                                                guidance_scale=args.guidance_scale).video
+                        imageio.mimwrite("/content/drive/My Drive/" + f"sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+
+                    print('save path {}'.format("/content/drive/My Drive/"))
     
     return unet
 
