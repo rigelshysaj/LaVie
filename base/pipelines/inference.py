@@ -271,11 +271,6 @@ class VideoGenPipeline(DiffusionPipeline):
         input_image: Optional[torch.FloatTensor] = None,
     ):
         
-
-        print("-----------------------aaaaaaaa-------------------------------")
-        print(input_image)
-        print("-----------------------bbbbbbbb-------------------------------")
-
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
         elif prompt is not None and isinstance(prompt, list):
@@ -541,6 +536,10 @@ class VideoGenPipeline(DiffusionPipeline):
         callback_steps: int = 1,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
     ):
+        
+        print("-----------------------aaaaaaaa-------------------------------")
+        print(image_path)
+        print("-----------------------bbbbbbbb-------------------------------")
         
         # 0. Default height and width to unet
         height = height or self.unet.config.sample_size * self.vae_scale_factor
