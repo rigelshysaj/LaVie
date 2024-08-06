@@ -29,7 +29,6 @@ from dataclasses import dataclass
 from peft import PeftModel, LoraConfig
 from PIL import Image
 from torchvision import transforms
-import matplotlib.pyplot as plt
 from inference import VideoGenPipeline
 
 from diffusers.utils import (
@@ -466,11 +465,6 @@ def train_lora_model(data, video_folder, args):
 
                 print('save path {}'.format("/content/drive/My Drive/"))
 
-    plt.plot(epoch_losses)
-    plt.title('Training Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.savefig('/content/drive/My Drive/training_loss.png')
     
     return unet
 
