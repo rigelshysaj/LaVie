@@ -159,9 +159,9 @@ class VideoGenPipeline(DiffusionPipeline):
         self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
         self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(self.device)
         self.attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(self.device)
-        self.image_projection = nn.Linear(768, 768)  # Assumendo che le dimensioni siano 768
-        self.text_projection = nn.Linear(768, 768)
-        self.combination_layer = nn.Linear(768 * 2, 768)
+        self.image_projection = nn.Linear(768, 768).to(self.device)
+        self.text_projection = nn.Linear(768, 768).to(self.device)
+        self.combination_layer = nn.Linear(768 * 2, 768).to(self.device)
 
     def enable_vae_slicing(self):
         r"""
