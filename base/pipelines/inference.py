@@ -338,7 +338,7 @@ class VideoGenPipeline(DiffusionPipeline):
 
             combined_embeds = self.attention_layer(prompt_embeds, image_features, image_features)
 
-            combined_embeds = combined_embeds.transpose(0, 1)
+            combined_embeds, _ = combined_embeds.transpose(0, 1)
 
             prompt_embeds = combined_embeds
 
