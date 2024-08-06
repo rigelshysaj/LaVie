@@ -657,6 +657,13 @@ class VideoGenPipeline(DiffusionPipeline):
                 #print(f"prompt_embeds shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
                 #print(f"t shape: {t.shape}, dtype: {t.dtype}")
 
+
+                dtype = torch.float32
+                latent_model_input = latent_model_input.to(self.unet.dtype)
+                prompt_embeds = prompt_embeds.to(self.unet.dtype)
+
+                self.unet = self.unet.to(dtype)
+
                 # predict the noise residual
                 noise_pred = self.unet(
                     latent_model_input, #torch.Size([2, 4, 16, 40, 64])
