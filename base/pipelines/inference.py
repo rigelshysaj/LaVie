@@ -336,9 +336,9 @@ class VideoGenPipeline(DiffusionPipeline):
             image_features = image_features.to(torch.float16)
             self.attention_layer = self.attention_layer.to(torch.float16)
 
-            combined_embeds = self.attention_layer(prompt_embeds, image_features, image_features)
+            combined_embeds, _ = self.attention_layer(prompt_embeds, image_features, image_features)
 
-            combined_embeds, _ = combined_embeds.transpose(0, 1)
+            combined_embeds = combined_embeds.transpose(0, 1)
 
             prompt_embeds = combined_embeds
 
