@@ -16,7 +16,7 @@ beta_schedule: "linear"
 # model speedup
 use_compile: False
 use_fp16: True
-
+image_path: "/content/drive/My Drive/chih.jpeg"
 # sample config:
 seed: #400
 run_time: 0

@@ -128,8 +128,7 @@ def load_model_for_inference(args):
     video_grids = []
     for prompt in args.text_prompt:
         print('Processing the ({}) prompt'.format(prompt))
-        videos = videogen_pipeline(prompt,
-                                image_path="/content/drive/My Drive/chih.jpeg", 
+        videos = videogen_pipeline(prompt, image_path=args.image_path, 
                                 video_length=args.video_length, 
                                 height=args.image_size[0], 
                                 width=args.image_size[1], 
