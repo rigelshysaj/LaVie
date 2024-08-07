@@ -493,7 +493,7 @@ def training(args):
 
     if on_colab:
         # Percorso del dataset su Google Colab
-        dataset_path = '/content/drive/My Drive/msvd_small'
+        dataset_path = '/content/drive/My Drive/msvd_one'
     else:
         # Percorso del dataset locale (sincronizzato con Google Drive)
         dataset_path = '/path/to/your/Google_Drive/sync/folder/path/to/your/dataset'
