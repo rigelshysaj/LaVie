@@ -29,6 +29,8 @@ from dataclasses import dataclass
 from peft import PeftModel, LoraConfig
 from PIL import Image
 from torchvision import transforms
+import seaborn as sns
+import matplotlib.pyplot as plt
 from inference import VideoGenPipeline
 
 from diffusers.utils import (
@@ -464,7 +466,7 @@ def train_lora_model(data, video_folder, args):
         print(f"Epoch {epoch}/{num_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)
 
-        if (epoch + 1) % 10 == 0:
+        if (epoch + 1) % 1 == 0:
             with torch.no_grad():
                 videogen_pipeline = VideoGenPipeline(vae=vae, 
                             text_encoder=text_encoder, 
@@ -485,6 +487,16 @@ def train_lora_model(data, video_folder, args):
                     imageio.mimwrite("/content/drive/My Drive/" + f"sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
                 print('save path {}'.format("/content/drive/My Drive/"))
+    
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(epoch_losses)
+    plt.title('Training Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Average Loss per Epoch')
+    plt.grid(True)
+    plt.savefig('/content/drive/My Drive/training_loss.png')
+    plt.show()
 
     
     return unet
@@ -497,7 +509,7 @@ def training(args):
 
     if on_colab:
         # Percorso del dataset su Google Colab
-        dataset_path = '/content/drive/My Drive/msvd_small'
+        dataset_path = '/content/drive/My Drive/msvd_one'
     else:
         # Percorso del dataset locale (sincronizzato con Google Drive)
         dataset_path = '/path/to/your/Google_Drive/sync/folder/path/to/your/dataset'
