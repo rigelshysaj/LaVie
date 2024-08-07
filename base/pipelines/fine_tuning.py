@@ -378,12 +378,10 @@ def train_lora_model(data, video_folder, args):
 
             count += 1
 
-            if epoch == start_epoch and i <= iteration:
-                print("--------------------------aaaaaaa--------------------")
-                continue
+            #if epoch == start_epoch and i <= iteration:
+                #continue
 
             if batch[0] is None:
-                print("--------------------------bbbbbbb--------------------")
                 continue
 
             video, description, frame_tensor = batch
