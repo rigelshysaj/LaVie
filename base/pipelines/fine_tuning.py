@@ -463,9 +463,12 @@ def train_lora_model(data, video_folder, args):
 
                 print('save path {}'.format("/content/drive/My Drive/"))
 
-    # Crea il grafico alla fine dell'addestramento
+    
+    num_epochs = len(epoch_losses)
+    epochs = list(range(1, num_epochs + 1))  # Crea una lista [1, 2, 3, ..., num_epochs]
+
     fig = go.Figure()
-    fig.add_trace(go.Scatter(y=epoch_losses, mode='lines'))
+    fig.add_trace(go.Scatter(x=epochs, y=epoch_losses, mode='lines'))
 
     # Personalizza il layout
     fig.update_layout(
