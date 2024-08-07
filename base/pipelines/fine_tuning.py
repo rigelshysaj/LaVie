@@ -332,7 +332,7 @@ def train_lora_model(data, video_folder, args):
         num_training_steps=(len(dataloader) * batch_size),
     )
 
-    num_epochs = 1
+    num_epochs = 1000
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
     checkpoint_interval = 100  # Salva un checkpoint ogni 100 iterazioni
@@ -442,7 +442,7 @@ def train_lora_model(data, video_folder, args):
         print(f"Epoch {epoch}/{num_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)
 
-        if (epoch + 1) % 1 == 0:
+        if (epoch + 1) % 100 == 0:
             with torch.no_grad():
                 videogen_pipeline = VideoGenPipeline(vae=vae, 
                             text_encoder=text_encoder, 
@@ -482,6 +482,8 @@ def train_lora_model(data, video_folder, args):
 
     # Opzionale: visualizza il grafico interattivo in Colab
     fig.show()
+
+    print(epoch_losses)
     
     return unet
 
