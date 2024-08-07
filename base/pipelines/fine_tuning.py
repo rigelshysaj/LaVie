@@ -459,8 +459,6 @@ def train_lora_model(data, video_folder, args):
             optimizer.zero_grad()
 
 
-            
-        print(f"Epoch {epoch}/{num_epochs} completed with loss: {loss.item()}")
         avg_epoch_loss = sum(batch_losses) / len(batch_losses)
         print(f"Epoch {epoch}/{num_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)
