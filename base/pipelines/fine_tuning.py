@@ -29,7 +29,6 @@ from dataclasses import dataclass
 from peft import PeftModel, LoraConfig
 from PIL import Image
 from torchvision import transforms
-import seaborn as sns
 import matplotlib.pyplot as plt
 from inference import VideoGenPipeline
 
