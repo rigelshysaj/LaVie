@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from peft import PeftModel, LoraConfig
 from PIL import Image
 from torchvision import transforms
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from inference import VideoGenPipeline
 
 from diffusers.utils import (
@@ -463,11 +463,22 @@ def train_lora_model(data, video_folder, args):
 
                 print('save path {}'.format("/content/drive/My Drive/"))
 
-    plt.plot(epoch_losses)
-    plt.title('Training Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.savefig('/content/drive/My Drive/training_loss.png')
+    # Crea il grafico alla fine dell'addestramento
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(y=epoch_losses, mode='lines'))
+
+    # Personalizza il layout
+    fig.update_layout(
+        title='Training Loss',
+        xaxis_title='Epoch',
+        yaxis_title='Loss'
+    )
+
+    # Salva il grafico come immagine
+    fig.write_image("/content/drive/My Drive/training_loss.png")
+
+    # Opzionale: visualizza il grafico interattivo in Colab
+    fig.show()
     
     return unet
 
