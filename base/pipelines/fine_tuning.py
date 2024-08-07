@@ -376,8 +376,6 @@ def train_lora_model(data, video_folder, args):
 
         for i, batch in enumerate(dataloader):
 
-            print("--------------------------------------------")
-
             count += 1
 
             if epoch == start_epoch and i <= iteration:
@@ -450,7 +448,10 @@ def train_lora_model(data, video_folder, args):
 
             loss = F.mse_loss(output, noise) #calcola || \epsilon - \epsilon_{\theta}(x_{t}, t) ||^{2}
 
+            print("----aaaaaaaa--------")
+
             batch_losses.append(loss.item())
+            print(len(batch_losses))
 
             loss.backward()
 
