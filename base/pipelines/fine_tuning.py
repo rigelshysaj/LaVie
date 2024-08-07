@@ -7,7 +7,6 @@ import json
 from tqdm import tqdm
 from transformers import CLIPProcessor, CLIPModel
 from peft import LoraConfig, get_peft_model
-from torchvision import transforms
 import argparse
 from omegaconf import OmegaConf
 import imageio
@@ -129,7 +128,6 @@ def load_model_for_inference(args):
     for prompt in args.text_prompt:
         print('Processing the ({}) prompt'.format(prompt))
         videos = videogen_pipeline(prompt, 
-                                image_path=args.image_path, 
                                 video_length=args.video_length, 
                                 height=args.image_size[0], 
                                 width=args.image_size[1], 
@@ -230,7 +228,6 @@ def encode_latents_(video, vae):
     return latents
 
 def encode_latents(video, vae):
-    vae = vae.to(torch.float16)
     video = video.to(torch.float16)
 
     # video ha forma [b, c, f, h, w]
@@ -335,7 +332,7 @@ def train_lora_model(data, video_folder, args):
         num_training_steps=(len(dataloader) * batch_size),
     )
 
-    num_epochs = 100
+    num_epochs = 1
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
     checkpoint_interval = 100  # Salva un checkpoint ogni 100 iterazioni
@@ -399,26 +396,8 @@ def train_lora_model(data, video_folder, args):
             text_features = text_encoder(text_inputs)[0].to(torch.float16)
             #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
-            image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
-            outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
-            last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
-            #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
-            
-            # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
-            text_features = text_features.transpose(0, 1)
-            last_hidden_state = last_hidden_state.transpose(0, 1)
-
-            assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
-
-            attention_layer = attention_layer.to(torch.float16)
-
-            # Calcola l'attenzione
-            attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
-
-            #print(f"train_lora_model attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
-            
             # Ritorna alle dimensioni originali
-            encoder_hidden_states = attention_output.transpose(0, 1)
+            encoder_hidden_states = text_features
 
             #print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
 
@@ -458,11 +437,12 @@ def train_lora_model(data, video_folder, args):
             optimizer.step()
             optimizer.zero_grad()
 
+
         avg_epoch_loss = sum(batch_losses) / len(batch_losses)
         print(f"Epoch {epoch}/{num_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)
 
-        if (epoch + 1) % 1 == 0:
+        if (epoch + 1) % 10 == 0:
             with torch.no_grad():
                 videogen_pipeline = VideoGenPipeline(vae=vae, 
                             text_encoder=text_encoder, 
@@ -474,7 +454,6 @@ def train_lora_model(data, video_folder, args):
                 for prompt in args.text_prompt:
                     print('Processing the ({}) prompt'.format(prompt))
                     videos = videogen_pipeline(prompt, 
-                                            image_path=args.image_path, 
                                             video_length=args.video_length, 
                                             height=args.image_size[0], 
                                             width=args.image_size[1], 
@@ -483,17 +462,12 @@ def train_lora_model(data, video_folder, args):
                     imageio.mimwrite("/content/drive/My Drive/" + f"sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
                 print('save path {}'.format("/content/drive/My Drive/"))
-    
-    
-    plt.figure(figsize=(10, 6))
+
     plt.plot(epoch_losses)
     plt.title('Training Loss')
     plt.xlabel('Epoch')
-    plt.ylabel('Average Loss per Epoch')
-    plt.grid(True)
+    plt.ylabel('Loss')
     plt.savefig('/content/drive/My Drive/training_loss.png')
-    plt.show()
-
     
     return unet
 
@@ -505,7 +479,7 @@ def training(args):
 
     if on_colab:
         # Percorso del dataset su Google Colab
-        dataset_path = '/content/drive/My Drive/msvd_one'
+        dataset_path = '/content/drive/My Drive/msvd_small'
     else:
         # Percorso del dataset locale (sincronizzato con Google Drive)
         dataset_path = '/path/to/your/Google_Drive/sync/folder/path/to/your/dataset'

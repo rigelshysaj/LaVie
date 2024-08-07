@@ -15,11 +15,6 @@ import inspect
 from typing import Any, Callable, Dict, List, Optional, Union
 import einops
 import torch
-from PIL import Image
-from torchvision import transforms
-from transformers import CLIPTokenizer, CLIPTextModel
-import torch.nn as nn
-from transformers import CLIPProcessor, CLIPModel
 from packaging import version
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
@@ -57,6 +52,21 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
+
+EXAMPLE_DOC_STRING = """
+    Examples:
+        ```py
+        >>> import torch
+        >>> from diffusers import StableDiffusionPipeline
+
+        >>> pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", torch_dtype=torch.float16)
+        >>> pipe = pipe.to("cuda")
+
+        >>> prompt = "a photo of an astronaut riding a horse on mars"
+        >>> image = pipe(prompt).images[0]
+        ```
+"""
+
 
 class VideoGenPipeline(DiffusionPipeline):
     r"""
@@ -156,16 +166,6 @@ class VideoGenPipeline(DiffusionPipeline):
         )
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
         # self.register_to_config(requires_safety_checker=requires_safety_checker)
-        self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-        self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(self.device)
-        self.attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(self.device)
-        
-        dtype = torch.float32
-    
-        self.image_projection = nn.Linear(768, 768).to(self.device).to(dtype)
-        self.text_projection = nn.Linear(768, 768).to(self.device).to(dtype)
-        self.combination_layer = nn.Linear(768 * 2, 768).to(self.device).to(dtype)
-        self.image_alignment = nn.Linear(50, 77).to(self.device).to(dtype)
 
     def enable_vae_slicing(self):
         r"""
@@ -275,9 +275,31 @@ class VideoGenPipeline(DiffusionPipeline):
         negative_prompt=None,
         prompt_embeds: Optional[torch.FloatTensor] = None,
         negative_prompt_embeds: Optional[torch.FloatTensor] = None,
-        input_image: Optional[torch.FloatTensor] = None,
     ):
-        
+        r"""
+        Encodes the prompt into text encoder hidden states.
+
+        Args:
+             prompt (`str` or `List[str]`, *optional*):
+                prompt to be encoded
+            device: (`torch.device`):
+                torch device
+            num_images_per_prompt (`int`):
+                number of images that should be generated per prompt
+            do_classifier_free_guidance (`bool`):
+                whether to use classifier free guidance or not
+            negative_prompt (`str` or `List[str]`, *optional*):
+                The prompt or prompts not to guide the image generation. If not defined, one has to pass
+                `negative_prompt_embeds`. instead. If not defined, one has to pass `negative_prompt_embeds`. instead.
+                Ignored when not using guidance (i.e., ignored if `guidance_scale` is less than `1`).
+            prompt_embeds (`torch.FloatTensor`, *optional*):
+                Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
+                provided, text embeddings will be generated from `prompt` input argument.
+            negative_prompt_embeds (`torch.FloatTensor`, *optional*):
+                Pre-generated negative text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt
+                weighting. If not provided, negative_prompt_embeds will be generated from `negative_prompt` input
+                argument.
+        """
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
         elif prompt is not None and isinstance(prompt, list):
@@ -324,51 +346,6 @@ class VideoGenPipeline(DiffusionPipeline):
         # duplicate text embeddings for each generation per prompt, using mps friendly method
         prompt_embeds = prompt_embeds.repeat(1, num_images_per_prompt, 1)
         prompt_embeds = prompt_embeds.view(bs_embed * num_images_per_prompt, seq_len, -1)
-
-        if input_image is not None:
-            # Processa l'immagine con CLIP
-            image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
-            outputs = self.clip_model.vision_model(image_inputs, output_hidden_states=True)
-            #image_features = outputs.hidden_states[-1].to(torch.float16)
-            image_features = outputs.last_hidden_state.to(torch.float32)
-            print(f"image_features1 shape: {image_features.shape}, dtype: {image_features.dtype}")
-             # Proietta gli embedding nello stesso spazio
-            projected_image = self.image_projection(image_features)
-            projected_image = self.image_alignment(projected_image.transpose(1, 2)).transpose(1, 2)
-            prompt_embeds = prompt_embeds.to(self.text_projection.weight.dtype)
-            projected_text = self.text_projection(prompt_embeds)
-
-            # Combina l'embedding del testo con l'embedding dell'immagine
-            print(f"projected_image shape: {projected_image.shape}, dtype: {projected_image.dtype}")
-            print(f"projected_text shape: {projected_text.shape}, dtype: {projected_text.dtype}")
-
-            combined = torch.cat([projected_text, projected_image], dim=-1)
-
-            print(f"combined shape: {combined.shape}, dtype: {combined.dtype}")
-
-
-            prompt_embeds = self.combination_layer(combined)
-
-            print(f"prompt_embeds shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
-
-            '''
-            prompt_embeds = prompt_embeds.transpose(0, 1)
-            image_features = image_features.transpose(0, 1)
-
-            assert prompt_embeds.dtype == image_features.dtype, "prompt_embeds and image_features must have the same dtype"
-
-            prompt_embeds = prompt_embeds.to(torch.float16)
-            image_features = image_features.to(torch.float16)
-            self.attention_layer = self.attention_layer.to(torch.float16)
-
-            combined_embeds, _ = self.attention_layer(prompt_embeds, image_features, image_features)
-
-            combined_embeds = combined_embeds.transpose(0, 1)
-
-            prompt_embeds = combined_embeds
-            '''
-
-            print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
@@ -437,7 +414,7 @@ class VideoGenPipeline(DiffusionPipeline):
         return video
     
     def decode_latents(self, latents):
-        self.vae = self.vae.to(torch.float32)
+        #latents = latents.to(torch.float16)
         video_length = latents.shape[2]
         latents = 1 / 0.18215 * latents
         latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
@@ -555,10 +532,10 @@ class VideoGenPipeline(DiffusionPipeline):
         return latents
 
     @torch.no_grad()
+    @replace_example_docstring(EXAMPLE_DOC_STRING)
     def __call__(
         self,
         prompt: Union[str, List[str]] = None,
-        image_path: str = None,  # Nuovo parametro
         height: Optional[int] = None,
         width: Optional[int] = None,
         video_length: int = 16,
@@ -577,21 +554,78 @@ class VideoGenPipeline(DiffusionPipeline):
         callback_steps: int = 1,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
     ):
-         
+        r"""
+        Function invoked when calling the pipeline for generation.
+
+        Args:
+            prompt (`str` or `List[str]`, *optional*):
+                The prompt or prompts to guide the image generation. If not defined, one has to pass `prompt_embeds`.
+                instead.
+            height (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
+                The height in pixels of the generated image.
+            width (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
+                The width in pixels of the generated image.
+            num_inference_steps (`int`, *optional*, defaults to 50):
+                The number of denoising steps. More denoising steps usually lead to a higher quality image at the
+                expense of slower inference.
+            guidance_scale (`float`, *optional*, defaults to 7.5):
+                Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
+                `guidance_scale` is defined as `w` of equation 2. of [Imagen
+                Paper](https://arxiv.org/pdf/2205.11487.pdf). Guidance scale is enabled by setting `guidance_scale >
+                1`. Higher guidance scale encourages to generate images that are closely linked to the text `prompt`,
+                usually at the expense of lower image quality.
+            negative_prompt (`str` or `List[str]`, *optional*):
+                The prompt or prompts not to guide the image generation. If not defined, one has to pass
+                `negative_prompt_embeds`. instead. If not defined, one has to pass `negative_prompt_embeds`. instead.
+                Ignored when not using guidance (i.e., ignored if `guidance_scale` is less than `1`).
+            num_images_per_prompt (`int`, *optional*, defaults to 1):
+                The number of images to generate per prompt.
+            eta (`float`, *optional*, defaults to 0.0):
+                Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
+                [`schedulers.DDIMScheduler`], will be ignored for others.
+            generator (`torch.Generator` or `List[torch.Generator]`, *optional*):
+                One or a list of [torch generator(s)](https://pytorch.org/docs/stable/generated/torch.Generator.html)
+                to make generation deterministic.
+            latents (`torch.FloatTensor`, *optional*):
+                Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
+                generation. Can be used to tweak the same generation with different prompts. If not provided, a latents
+                tensor will ge generated by sampling using the supplied random `generator`.
+            prompt_embeds (`torch.FloatTensor`, *optional*):
+                Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
+                provided, text embeddings will be generated from `prompt` input argument.
+            negative_prompt_embeds (`torch.FloatTensor`, *optional*):
+                Pre-generated negative text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt
+                weighting. If not provided, negative_prompt_embeds will be generated from `negative_prompt` input
+                argument.
+            output_type (`str`, *optional*, defaults to `"pil"`):
+                The output format of the generate image. Choose between
+                [PIL](https://pillow.readthedocs.io/en/stable/): `PIL.Image.Image` or `np.array`.
+            return_dict (`bool`, *optional*, defaults to `True`):
+                Whether or not to return a [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] instead of a
+                plain tuple.
+            callback (`Callable`, *optional*):
+                A function that will be called every `callback_steps` steps during inference. The function will be
+                called with the following arguments: `callback(step: int, timestep: int, latents: torch.FloatTensor)`.
+            callback_steps (`int`, *optional*, defaults to 1):
+                The frequency at which the `callback` function will be called. If not specified, the callback will be
+                called at every step.
+            cross_attention_kwargs (`dict`, *optional*):
+                A kwargs dictionary that if specified is passed along to the `AttnProcessor` as defined under
+                `self.processor` in
+                [diffusers.cross_attention](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/cross_attention.py).
+
+        Examples:
+
+        Returns:
+            [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] or `tuple`:
+            [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] if `return_dict` is True, otherwise a `tuple.
+            When returning a tuple, the first element is a list with the generated images, and the second element is a
+            list of `bool`s denoting whether the corresponding generated image likely represents "not-safe-for-work"
+            (nsfw) content, according to the `safety_checker`.
+        """
         # 0. Default height and width to unet
         height = height or self.unet.config.sample_size * self.vae_scale_factor
         width = width or self.unet.config.sample_size * self.vae_scale_factor
-
-        # Caricamento e preparazione dell'immagine
-        if image_path is not None:
-            image = Image.open(image_path)
-            transform = transforms.Compose([
-                transforms.Resize((256, 256)),
-                transforms.ToTensor()
-            ])
-            input_image = transform(image).unsqueeze(0).to(self.device)
-        else:
-            input_image = None
 
         # 1. Check inputs. Raise error if not correct
         self.check_inputs(
@@ -621,7 +655,6 @@ class VideoGenPipeline(DiffusionPipeline):
             negative_prompt,
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
-            input_image=input_image
         )
 
         # 4. Prepare timesteps
@@ -656,13 +689,6 @@ class VideoGenPipeline(DiffusionPipeline):
                 #print(f"latent_model_input shape: {latent_model_input.shape}, dtype: {latent_model_input.dtype}")
                 #print(f"prompt_embeds shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
                 #print(f"t shape: {t.shape}, dtype: {t.dtype}")
-
-
-                dtype = torch.float32
-
-                self.unet = self.unet.to(dtype)
-                latent_model_input = latent_model_input.to(self.unet.dtype)
-                prompt_embeds = prompt_embeds.to(self.unet.dtype)
 
                 # predict the noise residual
                 noise_pred = self.unet(
