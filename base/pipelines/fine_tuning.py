@@ -372,6 +372,8 @@ def train_lora_model(data, video_folder, args):
 
             video, description, frame_tensor = batch
 
+            print(f"epoca {epoch}, iterazione {i}")
+
             video = video.to(device)
         
             # Esegui check_inputs prima di elaborare il prompt
