@@ -418,6 +418,8 @@ def train_lora_model(data, video_folder, args):
             # Calcolo della loss
             loss = F.mse_loss(noise_pred, noise)
 
+            batch_losses.append(loss.item())
+
             # Backpropagation e step dell'ottimizzatore
             loss.backward()
             torch.nn.utils.clip_grad_norm_(unet.parameters(), max_norm=1.0)
