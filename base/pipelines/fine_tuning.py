@@ -140,7 +140,7 @@ def load_model_for_inference(args):
 
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None, target_size=(320, 512), fixed_frame_count=16):
+    def __init__(self, annotations_file, video_dir, transform=None, target_size=(256, 256), fixed_frame_count=5):
         self.video_dir = video_dir
         self.transform = transform
         self.target_size = target_size
