@@ -313,13 +313,6 @@ def train_lora_model(data, video_folder, args):
 
     #optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
 
-    videogen_pipeline = VideoGenPipeline(vae=vae, 
-                            text_encoder=text_encoder, 
-                            tokenizer=tokenizer, 
-                            scheduler=noise_scheduler, 
-                            unet=unet).to(device)
-    videogen_pipeline.enable_xformers_memory_efficient_attention()
-
     trainable_params = [
         p for n, p in unet.named_parameters() 
         if "lora" in n and ("attn1" in n or "attn2" in n or "ff" in n or "attn_temp" in n)
@@ -350,6 +343,13 @@ def train_lora_model(data, video_folder, args):
     vae.eval()
 
     noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
+
+    videogen_pipeline = VideoGenPipeline(vae=vae, 
+                            text_encoder=text_encoder, 
+                            tokenizer=tokenizer, 
+                            scheduler=noise_scheduler, 
+                            unet=unet).to(device)
+    videogen_pipeline.enable_xformers_memory_efficient_attention()
 
     epoch_losses = []
 
