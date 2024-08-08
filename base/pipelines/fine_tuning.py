@@ -286,10 +286,6 @@ def train_lora_model(data, video_folder, args):
     text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder", torch_dtype=torch.float16).to(device)
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae", torch_dtype=torch.float16).to(device)
 
-    # Load CLIP model and processor for image conditioning
-    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
-    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-
     lora_config = LoraConfig(
         r=32,
         lora_alpha=32,
@@ -308,8 +304,6 @@ def train_lora_model(data, video_folder, args):
             param.requires_grad = True
         else:
             param.requires_grad = False
-
-    batch_size=1
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
@@ -319,6 +313,13 @@ def train_lora_model(data, video_folder, args):
 
     #optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
 
+    videogen_pipeline = VideoGenPipeline(vae=vae, 
+                            text_encoder=text_encoder, 
+                            tokenizer=tokenizer, 
+                            scheduler=noise_scheduler, 
+                            unet=unet).to(device)
+    videogen_pipeline.enable_xformers_memory_efficient_attention()
+
     trainable_params = [
         p for n, p in unet.named_parameters() 
         if "lora" in n and ("attn1" in n or "attn2" in n or "ff" in n or "attn_temp" in n)
@@ -326,16 +327,10 @@ def train_lora_model(data, video_folder, args):
 
     optimizer = torch.optim.AdamW(trainable_params, lr=1e-6)
 
-    lr_scheduler = get_cosine_schedule_with_warmup(
-        optimizer=optimizer,
-        num_warmup_steps=100,
-        num_training_steps=(len(dataloader) * batch_size),
-    )
 
     num_epochs = 100
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
-    checkpoint_interval = 100  # Salva un checkpoint ogni 100 iterazioni
     count = 0
     start_epoch = 0
     iteration = 0
@@ -343,7 +338,6 @@ def train_lora_model(data, video_folder, args):
         checkpoint = torch.load(os.path.join(checkpoint_dir, "latest_checkpoint.pth"))
         unet.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
         start_epoch = checkpoint['epoch']
         iteration = checkpoint['iteration']
         print(f"Ripresa dell'addestramento dall'epoca {start_epoch}, iterazione {iteration}")
@@ -354,11 +348,6 @@ def train_lora_model(data, video_folder, args):
     unet.enable_gradient_checkpointing()
     text_encoder.eval()
     vae.eval()
-    
-    attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
-    #projection_layer = nn.Linear(64, 224).to(unet.device)
-
-    accumulation_steps = 8
 
     noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
 
@@ -383,60 +372,55 @@ def train_lora_model(data, video_folder, args):
 
             video, description, frame_tensor = batch
 
-            #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
-
-            print(f"epoca {epoch}, iterazione {i}")
-
             video = video.to(device)
-            optimizer.zero_grad()
-
-            #print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
-
-            text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
-            text_features = text_encoder(text_inputs)[0].to(torch.float16)
-            #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
-
-            # Ritorna alle dimensioni originali
-            encoder_hidden_states = text_features
-
-            #print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 10, 768] torch.float16
-
-            latents = encode_latents(video, vae)
-            #print(f"train_lora_model latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
-
-            latents = latents * vae.config.scaling_factor #Campiona x_0 ∼ q(x_0). Qui, latents rappresenta x_0
-
-            #print(f"train_lora_model latents2 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
-
-            noise = torch.randn_like(latents) #campiona ϵ ∼ N(0, I). Qui, noise rappresenta ϵ
-
-            timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (latents.shape[0],), device=latents.device) #Campiona t ∼ Uniform({1, . . . , T}). Qui, timesteps rappresenta il campionamento di t
-
-            noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps) #Qui, noisy_latents rappresenta x_{t} = \sqrt{\overline{a}_{t}}x_{0} + \sqrt{1 - \overline{a}_{t}} \epsilon
-
-            #print(f"train_lora_model noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
-
-            with torch.cuda.amp.autocast():
-                # Forward pass
-                output = unet(
-                    sample=noisy_latents,
-                    timestep=timesteps,
-                    encoder_hidden_states=encoder_hidden_states
-                ).sample
-                #Qui, output rappresenta ϵ_θ(x_t, t)
-
-            loss = F.mse_loss(output, noise) #calcola || \epsilon - \epsilon_{\theta}(x_{t}, t) ||^{2}
-
-            batch_losses.append(loss.item())
-
-            loss.backward()
-
-            torch.nn.utils.clip_grad_norm_(unet.parameters(), max_norm=1.0)
-
+        
+            # Esegui check_inputs prima di elaborare il prompt
+            videogen_pipeline.check_inputs(
+                prompt=description,
+                height=video.shape[2],  # Altezza del video
+                width=video.shape[3],   # Larghezza del video
+                callback_steps=1        # O il valore appropriato per il tuo caso
+            )
             
-            optimizer.step()
+            # Utilizzo di _encode_prompt per elaborare il testo
+            text_embeddings = videogen_pipeline._encode_prompt(
+                description,
+                device,
+                num_images_per_prompt=1,
+                do_classifier_free_guidance=False  # Impostiamo questo a False per il training
+            )
+
             optimizer.zero_grad()
 
+            # Codifica i latenti dal video di input
+            latents = encode_latents(video, vae)
+            latents = latents * vae.config.scaling_factor
+
+            # Genera rumore e timesteps
+            noise = torch.randn_like(latents)
+            timesteps = torch.randint(0, videogen_pipeline.scheduler.config.num_train_timesteps, (latents.shape[0],), device=latents.device)
+            
+            # Aggiungi rumore ai latenti
+            noisy_latents = videogen_pipeline.scheduler.add_noise(latents, noise, timesteps)
+
+            # Preparazione dell'input per l'UNet
+            latent_model_input = videogen_pipeline.scheduler.scale_model_input(noisy_latents, timesteps)
+
+            # Forward pass attraverso l'UNet
+            noise_pred = unet(
+                sample=latent_model_input,
+                timestep=timesteps,
+                encoder_hidden_states=text_embeddings
+            ).sample
+
+            # Calcolo della loss
+            loss = F.mse_loss(noise_pred, noise)
+
+            # Backpropagation e step dell'ottimizzatore
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(unet.parameters(), max_norm=1.0)
+            optimizer.step()
+            
 
         avg_epoch_loss = sum(batch_losses) / len(batch_losses)
         print(f"Epoch {epoch}/{num_epochs} completed with average loss: {avg_epoch_loss}")
@@ -444,13 +428,6 @@ def train_lora_model(data, video_folder, args):
 
         if (epoch + 1) % 20 == 0:
             with torch.no_grad():
-                videogen_pipeline = VideoGenPipeline(vae=vae, 
-                            text_encoder=text_encoder, 
-                            tokenizer=tokenizer, 
-                            scheduler=noise_scheduler, 
-                            unet=unet).to(device)
-                videogen_pipeline.enable_xformers_memory_efficient_attention()
-
                 for prompt in args.text_prompt:
                     print('Processing the ({}) prompt'.format(prompt))
                     videos = videogen_pipeline(prompt, 
