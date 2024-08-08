@@ -373,12 +373,6 @@ def train_lora_model(data, video_folder, args):
             video, description, frame_tensor = batch
 
             video = video.to(device)
-
-            print("---------------aaaa--------------")
-            print(description[0])
-            print(type(description[0]))
-            print("---------------bbbb--------------")
-
         
             # Esegui check_inputs prima di elaborare il prompt
             videogen_pipeline.check_inputs(
@@ -390,7 +384,7 @@ def train_lora_model(data, video_folder, args):
             
             # Utilizzo di _encode_prompt per elaborare il testo
             text_embeddings = videogen_pipeline._encode_prompt(
-                description,
+                description[0],
                 device,
                 num_images_per_prompt=1,
                 do_classifier_free_guidance=False  # Impostiamo questo a False per il training
