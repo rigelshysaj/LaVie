@@ -376,6 +376,7 @@ def train_lora_model(data, video_folder, args):
 
             print("---------------aaaa--------------")
             print(description[0])
+            print(type(description[0]))
             print("---------------bbbb--------------")
 
         
