@@ -140,7 +140,7 @@ def load_model_for_inference(args):
 
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None, target_size=(256, 256), fixed_frame_count=5):
+    def __init__(self, annotations_file, video_dir, transform=None, target_size=(256, 256), fixed_frame_count=8):
         self.video_dir = video_dir
         self.transform = transform
         self.target_size = target_size
@@ -375,13 +375,13 @@ def train_lora_model(data, video_folder, args):
             video = video.to(device)
 
             print("---------------aaaa--------------")
-            print(description)
+            print(description[0])
             print("---------------bbbb--------------")
 
         
             # Esegui check_inputs prima di elaborare il prompt
             videogen_pipeline.check_inputs(
-                prompt=description,
+                prompt=description[0],
                 height=video.shape[2],  # Altezza del video
                 width=video.shape[3],   # Larghezza del video
                 callback_steps=1        # O il valore appropriato per il tuo caso
