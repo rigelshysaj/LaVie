@@ -373,6 +373,11 @@ def train_lora_model(data, video_folder, args):
             video, description, frame_tensor = batch
 
             video = video.to(device)
+
+            print("---------------aaaa--------------")
+            print(description)
+            print("---------------bbbb--------------")
+
         
             # Esegui check_inputs prima di elaborare il prompt
             videogen_pipeline.check_inputs(
