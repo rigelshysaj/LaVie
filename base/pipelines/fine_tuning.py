@@ -321,7 +321,7 @@ def train_lora_model(data, video_folder, args):
     optimizer = torch.optim.AdamW(trainable_params, lr=1e-6)
 
 
-    num_epochs = 100
+    num_epochs = 60
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
     count = 0
