@@ -138,7 +138,7 @@ def load_model_for_inference(args):
 
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None, target_size=(320, 512), fixed_frame_count=16):
+    def __init__(self, annotations_file, video_dir, transform=None, target_size=(320, 512), fixed_frame_count=16, debug=False):
         self.video_dir = video_dir
         self.transform = transform or transforms.Compose([
             transforms.ToTensor(),
@@ -146,6 +146,7 @@ class VideoDatasetMsvd(Dataset):
         ])
         self.target_size = target_size
         self.fixed_frame_count = fixed_frame_count
+        self.debug = debug
         
         self.video_descriptions = {}
         with open(annotations_file, 'r') as f:
@@ -158,9 +159,6 @@ class VideoDatasetMsvd(Dataset):
                     self.video_descriptions[video_id].append(description)
         
         self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
-
-        print(f"video_files: {self.video_files}")
-        print(f"video_descriptions: {self.video_descriptions}")
 
     def __len__(self):
         return len(self.video_files)
@@ -186,16 +184,26 @@ class VideoDatasetMsvd(Dataset):
             
             frames = np.array(frames)
             
+            if self.debug:
+                print(f"Raw frames shape: {frames.shape}")
+            
             if self.transform:
                 frames = torch.stack([self.transform(frame) for frame in frames])
             else:
-                frames = torch.from_numpy(frames).permute(3, 0, 1, 2).float() / 255.0
+                frames = torch.from_numpy(frames).permute(0, 3, 1, 2).float() / 255.0
+            
+            if self.debug:
+                print(f"Transformed frames shape: {frames.shape}")
             
             video_id = os.path.splitext(video_file)[0]
             descriptions = self.video_descriptions.get(video_id, ["No description available"])
             description = np.random.choice(descriptions)
             
-            mid_frame = frames[:, len(frames) // 2, :, :]
+            mid_frame_idx = len(frames) // 2
+            mid_frame = frames[mid_frame_idx]
+            
+            if self.debug:
+                print(f"Mid-frame shape: {mid_frame.shape}")
             
             return frames, description, mid_frame
 
@@ -255,7 +263,14 @@ def custom_collate(batch):
         return None, None, None
     return torch.utils.data.dataloader.default_collate(batch)
 
-
+def debug_dataset(dataset, num_samples=5):
+    for i in range(num_samples):
+        frames, description, mid_frame = dataset[i]
+        print(f"Sample {i}:")
+        print(f"  Frames shape: {frames.shape}")
+        print(f"  Description: {description}")
+        print(f"  Mid-frame shape: {mid_frame.shape}")
+        print()
 
 
 def train_lora_model(data, video_folder, args):
@@ -314,7 +329,10 @@ def train_lora_model(data, video_folder, args):
     unet = get_peft_model(unet, lora_config)
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
-    dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
+    dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder, debug=True)
+    debug_dataset(dataset)
+
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=VideoDatasetMsvd.collate_fn)
     #dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
     print(f"Numero totale di elementi nel dataloader: {len(dataloader)}")
