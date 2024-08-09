@@ -329,8 +329,8 @@ def train_lora_model(data, video_folder, args):
     vae.to(accelerator.device, dtype=weight_dtype)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
 
-    # Add adapter and make sure the trainable params are in float32.
-    unet.add_adapter(lora_config)
+    
+    unet = get_peft_model(unet, lora_config)
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
