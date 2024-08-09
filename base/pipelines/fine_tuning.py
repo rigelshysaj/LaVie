@@ -306,7 +306,7 @@ def train_lora_model(data, video_folder, args):
     vae.requires_grad_(False)
     text_encoder.requires_grad_(False)
 
-    weight_dtype = torch.float32
+    weight_dtype = torch.float16
     if accelerator.mixed_precision == "fp16":
         weight_dtype = torch.float16
     elif accelerator.mixed_precision == "bf16":
@@ -421,7 +421,7 @@ def train_lora_model(data, video_folder, args):
             '''
 
             text_inputs = tokenizer(description[0], return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
-            text_features = text_encoder(text_inputs)[0].to(torch.float32)
+            text_features = text_encoder(text_inputs)[0].to(torch.float16)
 
             # Codifica i latenti dal video di input
             latents = encode_latents(video, vae)
