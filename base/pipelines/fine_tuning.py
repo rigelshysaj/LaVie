@@ -405,6 +405,7 @@ def train_lora_model(data, video_folder, args):
 
             video = video.to(device)
         
+            '''
             # Esegui check_inputs prima di elaborare il prompt
             videogen_pipeline.check_inputs(
                 prompt=description[0],
@@ -420,8 +421,10 @@ def train_lora_model(data, video_folder, args):
                 num_images_per_prompt=1,
                 do_classifier_free_guidance=False  # Impostiamo questo a False per il training
             )
+            '''
 
-            optimizer.zero_grad()
+            text_inputs = tokenizer(description[0], return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
+            text_features = text_encoder(text_inputs)[0].to(torch.float16)
 
             # Codifica i latenti dal video di input
             latents = encode_latents(video, vae)
@@ -441,7 +444,7 @@ def train_lora_model(data, video_folder, args):
             noise_pred = unet(
                 sample=latent_model_input,
                 timestep=timesteps,
-                encoder_hidden_states=text_embeddings
+                encoder_hidden_states=text_features
             ).sample
 
             # Calcolo della loss
@@ -453,7 +456,7 @@ def train_lora_model(data, video_folder, args):
             loss.backward()
             torch.nn.utils.clip_grad_norm_(unet.parameters(), max_norm=1.0)
             optimizer.step()
-            
+            optimizer.zero_grad()
 
         avg_epoch_loss = sum(batch_losses) / len(batch_losses)
         print(f"Epoch {epoch}/{num_epochs} completed with average loss: {avg_epoch_loss}")
