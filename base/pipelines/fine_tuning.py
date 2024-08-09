@@ -263,6 +263,14 @@ def custom_collate(batch):
         return None, None, None
     return torch.utils.data.dataloader.default_collate(batch)
 
+@staticmethod
+def collate_fn(batch):
+    batch = list(filter(lambda x: x[0] is not None, batch))
+    if len(batch) == 0:
+        return None, None, None
+    return torch.utils.data.dataloader.default_collate(batch)
+
+
 def debug_dataset(dataset, num_samples=5):
     for i in range(num_samples):
         frames, description, mid_frame = dataset[i]
