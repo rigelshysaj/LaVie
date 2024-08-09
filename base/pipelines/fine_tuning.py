@@ -340,9 +340,8 @@ def train_lora_model(data, video_folder, args):
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder, debug=True)
     debug_dataset(dataset)
 
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=VideoDatasetMsvd.collate_fn)
     #dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collate_fn)
     print(f"Numero totale di elementi nel dataloader: {len(dataloader)}")
 
     #optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
