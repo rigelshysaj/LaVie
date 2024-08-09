@@ -421,7 +421,7 @@ def train_lora_model(data, video_folder, args):
             '''
 
             text_inputs = tokenizer(description[0], return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
-            text_features = text_encoder(text_inputs)[0].to(torch.float16)
+            text_features = text_encoder(text_inputs)[0].to(torch.float32)
 
             # Codifica i latenti dal video di input
             latents = encode_latents(video, vae)
