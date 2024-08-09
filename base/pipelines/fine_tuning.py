@@ -62,16 +62,11 @@ def load_model_for_inference(args):
     unet.load_state_dict(state_dict)
 
     lora_config = LoraConfig(
-        r=32,
-        lora_alpha=32,
-        target_modules=[
-            "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
-            "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
-            "attn_temp.to_q", "attn_temp.to_k", "attn_temp.to_v",
-            "ff.net.0.proj", "ff.net.2"
-        ]
+        r=4,
+        lora_alpha=4,
+        init_lora_weights="gaussian",
+        target_modules=["to_k", "to_q", "to_v", "to_out.0"],
     )
-    
     # Applica LoRA al modello
     unet = get_peft_model(unet, lora_config)
     
@@ -194,12 +189,12 @@ class VideoDatasetMsvd(Dataset):
                 # Prendi i primi fixed_frame_count frame
                 frames = frames[:self.fixed_frame_count]
             
-            frames_np = np.array(frames, dtype=np.float32)
+            frames_np = np.array(frames)
             video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
             
             # Estrarre un frame centrale
             mid_frame = frames[len(frames) // 2]
-            mid_frame_np = np.array(mid_frame, dtype=np.float32)
+            mid_frame_np = np.array(mid_frame)
             mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
             
             # Ottieni le descrizioni del video
