@@ -350,7 +350,7 @@ def train_lora_model(data, video_folder, args):
     )
 
 
-    num_epochs = 60
+    num_epochs = 100
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
     count = 0
