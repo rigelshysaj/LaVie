@@ -138,27 +138,28 @@ def load_model_for_inference(args):
 
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None, target_size=(320, 512), fixed_frame_count=16, debug=False):
+    def __init__(self, annotations_file, video_dir, transform=None, target_size=(320, 512), fixed_frame_count=16):
         self.video_dir = video_dir
-        self.transform = transform or transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])
+        self.transform = transform
         self.target_size = target_size
         self.fixed_frame_count = fixed_frame_count
-        self.debug = debug
         
+        # Legge il file annotations.txt e memorizza le descrizioni in un dizionario
         self.video_descriptions = {}
         with open(annotations_file, 'r') as f:
-            for line in f:
-                parts = line.strip().split(' ', 1)
-                if len(parts) == 2:
-                    video_id, description = parts
-                    if video_id not in self.video_descriptions:
-                        self.video_descriptions[video_id] = []
-                    self.video_descriptions[video_id].append(description)
+            lines = f.readlines()
+            for line in lines:
+                parts = line.strip().split(' ')
+                video_id = parts[0]
+                description = ' '.join(parts[1:])
+                if video_id not in self.video_descriptions:
+                    self.video_descriptions[video_id] = description
         
+        # Ottieni la lista dei file video nella cartella YouTubeClips
         self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
+
+        print(f"video_files: {self.video_files}")
+        print(f"video_descriptions: {self.video_descriptions}")
 
     def __len__(self):
         return len(self.video_files)
@@ -168,47 +169,56 @@ class VideoDatasetMsvd(Dataset):
         video_path = os.path.join(self.video_dir, video_file)
 
         try:
+
+            # Carica il video utilizzando OpenCV
             cap = cv2.VideoCapture(video_path)
             frames = []
-            while len(frames) < self.fixed_frame_count and cap.isOpened():
+            while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret:
                     break
                 frame = cv2.resize(frame, self.target_size)
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 frames.append(frame)
             cap.release()
 
+            
+            # Se il numero di frame è inferiore a fixed_frame_count, ripeti l'ultimo frame
             if len(frames) < self.fixed_frame_count:
-                frames += [frames[-1]] * (self.fixed_frame_count - len(frames))
-            
-            frames = np.array(frames)
-            
-            if self.debug:
-                print(f"Raw frames shape: {frames.shape}")
-            
-            if self.transform:
-                frames = torch.stack([self.transform(frame) for frame in frames])
+                frames += [frames[-1]] * (self.fixed_frame_count - len(frames))  # Ripeti l'ultimo frame
             else:
-                frames = torch.from_numpy(frames).permute(0, 3, 1, 2).float() / 255.0
+                # Prendi i primi fixed_frame_count frame
+                frames = frames[:self.fixed_frame_count]
             
-            if self.debug:
-                print(f"Transformed frames shape: {frames.shape}")
-            
-            video_id = os.path.splitext(video_file)[0]
-            descriptions = self.video_descriptions.get(video_id, ["No description available"])
-            description = np.random.choice(descriptions)
-            
-            mid_frame_idx = len(frames) // 2
-            mid_frame = frames[mid_frame_idx]
-            
-            if self.debug:
-                print(f"Mid-frame shape: {mid_frame.shape}")
-            
-            return frames, description, mid_frame
+            frames_np = np.array(frames)
+            frames_np = frames_np.astype(np.float32) / 255.0  # Normalizza in [0, 1]
+            frames_np = (frames_np - 0.5) / 0.5
 
+            video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
+            
+            # Estrarre un frame centrale
+            mid_frame = frames[len(frames) // 2]
+            mid_frame_np = np.array(mid_frame)
+
+            mid_frame_np = mid_frame_np.astype(np.float32) / 255.0  # Normalizza in [0, 1]
+            mid_frame_np = (mid_frame_np - 0.5) / 0.5
+
+            mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
+            
+            # Ottieni le descrizioni del video
+            video_id = os.path.splitext(video_file)[0]
+            descriptions = self.video_descriptions.get(video_id, [])
+
+            #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
+            
+            # Applica trasformazioni, se presenti
+            if self.transform:
+                video = self.transform(video)
+                mid_frame = self.transform(mid_frame)
+            
+            return video, descriptions, mid_frame
+        
         except Exception as e:
-            print(f"Error processing video {video_file}: {e}")
+            print(f"Skipping video {video_file} due to error: {e}")
             return None, None, None
 
 
@@ -223,9 +233,6 @@ def encode_latents_(video, vae):
     return latents
 
 def encode_latents(video, vae):
-
-    video = video.to(torch.float16)
-
     # video ha forma [b, c, f, h, w]
     b, c, f, h, w = video.shape
     
@@ -266,22 +273,7 @@ def custom_collate(batch):
         return None, None, None
     return torch.utils.data.dataloader.default_collate(batch)
 
-@staticmethod
-def collate_fn(batch):
-    batch = list(filter(lambda x: x[0] is not None, batch))
-    if len(batch) == 0:
-        return None, None, None
-    return torch.utils.data.dataloader.default_collate(batch)
 
-
-def debug_dataset(dataset, num_samples=5):
-    for i in range(num_samples):
-        frames, description, mid_frame = dataset[i]
-        print(f"Sample {i}:")
-        print(f"  Frames shape: {frames.shape}")
-        print(f"  Description: {description}")
-        print(f"  Mid-frame shape: {mid_frame.shape}")
-        print()
 
 
 def train_lora_model(data, video_folder, args):
@@ -340,11 +332,9 @@ def train_lora_model(data, video_folder, args):
     unet = get_peft_model(unet, lora_config)
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
-    dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder, debug=True)
-    debug_dataset(dataset)
-
+    dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
     #dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collate_fn)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
     print(f"Numero totale di elementi nel dataloader: {len(dataloader)}")
 
     #optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
