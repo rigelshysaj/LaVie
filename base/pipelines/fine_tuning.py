@@ -231,8 +231,6 @@ def encode_latents_(video, vae):
     return latents
 
 def encode_latents(video, vae):
-    video = video.to(torch.float16)
-
     # video ha forma [b, c, f, h, w]
     b, c, f, h, w = video.shape
     
@@ -248,7 +246,6 @@ def encode_latents(video, vae):
     
     for i in range(0, video.shape[0], batch_size):
         latents_batch = video[i:i+batch_size]
-        latents_batch = latents_batch.requires_grad_(True)
         #print(f"latents_batch shape: {latents_batch.shape}, dtype: {latents_batch.dtype}") #shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
         # Usa checkpoint per risparmiare memoria
