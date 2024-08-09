@@ -11,6 +11,9 @@ import argparse
 from omegaconf import OmegaConf
 import imageio
 import sys
+from pathlib import Path
+from accelerate.utils import ProjectConfiguration, set_seed
+from accelerate import Accelerator
 sys.path.append(os.path.split(sys.path[0])[0])
 from models import get_models
 from download import find_model
@@ -275,6 +278,22 @@ def custom_collate(batch):
 
 
 def train_lora_model(data, video_folder, args):
+
+    logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
+
+    accelerator_project_config = ProjectConfiguration(project_dir="/content/drive/My Drive/", logging_dir=logging_dir)
+
+    accelerator = Accelerator(
+        gradient_accumulation_steps=1,
+        mixed_precision=None,
+        log_with="tensorboard",
+        project_config=accelerator_project_config,
+    )
+
+    # Disable AMP for MPS.
+    if torch.backends.mps.is_available():
+        accelerator.native_amp = False
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     # Carica il modello UNet e applica LoRA
     sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
@@ -286,24 +305,32 @@ def train_lora_model(data, video_folder, args):
     text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder", torch_dtype=torch.float16).to(device)
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae", torch_dtype=torch.float16).to(device)
 
+    unet.requires_grad_(False)
+    vae.requires_grad_(False)
+    text_encoder.requires_grad_(False)
+
+    weight_dtype = torch.float32
+    if accelerator.mixed_precision == "fp16":
+        weight_dtype = torch.float16
+    elif accelerator.mixed_precision == "bf16":
+        weight_dtype = torch.bfloat16
+
+    for param in unet.parameters():
+        param.requires_grad_(False)
+
     lora_config = LoraConfig(
-        r=32,
-        lora_alpha=32,
-        target_modules=[
-            "attn1.to_q", "attn1.to_k", "attn1.to_v", "attn1.to_out.0",
-            "attn2.to_q", "attn2.to_k", "attn2.to_v", "attn2.to_out.0",
-            "attn_temp.to_q", "attn_temp.to_k", "attn_temp.to_v",
-            "ff.net.0.proj", "ff.net.2"
-        ]
+        r=4,
+        lora_alpha=4,
+        init_lora_weights="gaussian",
+        target_modules=["to_k", "to_q", "to_v", "to_out.0"],
     )
 
-    unet = get_peft_model(unet, lora_config)
+    unet.to(accelerator.device, dtype=weight_dtype)
+    vae.to(accelerator.device, dtype=weight_dtype)
+    text_encoder.to(accelerator.device, dtype=weight_dtype)
 
-    for name, param in unet.named_parameters():
-        if "lora" in name and ("attn1" in name or "attn2" in name or "ff" in name or "attn_temp" in name):
-            param.requires_grad = True
-        else:
-            param.requires_grad = False
+    # Add adapter and make sure the trainable params are in float32.
+    unet.add_adapter(lora_config)
     
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
@@ -313,12 +340,14 @@ def train_lora_model(data, video_folder, args):
 
     #optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
 
-    trainable_params = [
-        p for n, p in unet.named_parameters() 
-        if "lora" in n and ("attn1" in n or "attn2" in n or "ff" in n or "attn_temp" in n)
-    ]
+    lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
 
-    optimizer = torch.optim.AdamW(trainable_params, lr=1e-6)
+    optimizer = torch.optim.AdamW(lora_layers, 
+        lr=1e-4, 
+        betas=(0.9, 0.999),
+        weight_decay=1e-2,
+        eps=1e-08,
+    )
 
 
     num_epochs = 60
