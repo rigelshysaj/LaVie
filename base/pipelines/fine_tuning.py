@@ -40,6 +40,7 @@ from torchvision import transforms
 import plotly.graph_objects as go
 from inference import VideoGenPipeline
 from arguments import Details
+from msvd import VideoDatasetMsvd
 
 from diffusers.utils import (
     deprecate,
@@ -142,91 +143,6 @@ def load_model_for_inference(args):
     
     print('save path {}'.format(args.output_folder))
     
-
-
-class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None, target_size=(320, 512), fixed_frame_count=16):
-        self.video_dir = video_dir
-        self.transform = transform
-        self.target_size = target_size
-        self.fixed_frame_count = fixed_frame_count
-        
-        # Legge il file annotations.txt e memorizza le descrizioni in un dizionario
-        self.video_descriptions = {}
-        with open(annotations_file, 'r') as f:
-            lines = f.readlines()
-            for line in lines:
-                parts = line.strip().split(' ')
-                video_id = parts[0]
-                description = ' '.join(parts[1:])
-                if video_id not in self.video_descriptions:
-                    self.video_descriptions[video_id] = description
-        
-        # Ottieni la lista dei file video nella cartella YouTubeClips
-        self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
-
-        print(f"video_files: {self.video_files}")
-        print(f"video_descriptions: {self.video_descriptions}")
-
-    def __len__(self):
-        return len(self.video_files)
-
-    def __getitem__(self, idx):
-        video_file = self.video_files[idx]
-        video_path = os.path.join(self.video_dir, video_file)
-
-        try:
-
-            # Carica il video utilizzando OpenCV
-            cap = cv2.VideoCapture(video_path)
-            frames = []
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                frame = cv2.resize(frame, self.target_size)
-                frames.append(frame)
-            cap.release()
-
-            
-            # Se il numero di frame è inferiore a fixed_frame_count, ripeti l'ultimo frame
-            if len(frames) < self.fixed_frame_count:
-                frames += [frames[-1]] * (self.fixed_frame_count - len(frames))  # Ripeti l'ultimo frame
-            else:
-                # Prendi i primi fixed_frame_count frame
-                frames = frames[:self.fixed_frame_count]
-            
-            frames_np = np.array(frames)
-            frames_np = frames_np.astype(np.float32) / 255.0  # Normalizza in [0, 1]
-            frames_np = (frames_np - 0.5) / 0.5
-
-            video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
-            
-            # Estrarre un frame centrale
-            mid_frame = frames[len(frames) // 2]
-            mid_frame_np = np.array(mid_frame)
-
-            mid_frame_np = mid_frame_np.astype(np.float32) / 255.0  # Normalizza in [0, 1]
-            mid_frame_np = (mid_frame_np - 0.5) / 0.5
-
-            mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
-            
-            # Ottieni le descrizioni del video
-            video_id = os.path.splitext(video_file)[0]
-            descriptions = self.video_descriptions.get(video_id, [])
-
-            #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
-            
-            # Applica trasformazioni, se presenti
-            if self.transform:
-                video = self.transform(video)
-                mid_frame = self.transform(mid_frame)
-            
-            return video, descriptions, mid_frame
-        
-        except Exception as e:
-            print(f"Skipping video {video_file} due to error: {e}")
-            return None, None, None
 
 
 def encode_latents(video, vae):
@@ -398,7 +314,6 @@ def train_lora_model(data, video_folder, args_base):
 
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
-    #dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
     train_dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
     print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
 
@@ -552,13 +467,6 @@ def train_lora_model(data, video_folder, args_base):
 
     noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
 
-    videogen_pipeline = VideoGenPipeline(vae=vae, 
-                            text_encoder=text_encoder, 
-                            tokenizer=tokenizer, 
-                            scheduler=noise_scheduler, 
-                            unet=unet).to(device)
-    videogen_pipeline.enable_xformers_memory_efficient_attention()
-
     epoch_losses = []
 
     for epoch in range(first_epoch, args.num_train_epochs):
@@ -652,8 +560,17 @@ def train_lora_model(data, video_folder, args_base):
         print(f"Epoch {epoch}/{num_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)      
 
-        if (epoch + 1) % 20 == 0:
+        if (epoch + 1) % 1 == 0:
             with torch.no_grad():
+
+                videogen_pipeline = VideoGenPipeline(vae=vae, 
+                            text_encoder=text_encoder, 
+                            tokenizer=tokenizer, 
+                            scheduler=noise_scheduler, 
+                            unet=unet).to(device)
+                videogen_pipeline.enable_xformers_memory_efficient_attention()
+
+
                 for prompt in args_base.text_prompt:
                     print('Processing the ({}) prompt'.format(prompt))
                     videos = videogen_pipeline(prompt, 
