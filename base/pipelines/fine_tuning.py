@@ -569,8 +569,6 @@ def train_lora_model(data, video_folder, args_base):
 
                 latents = encode_latents(video, vae)
 
-                # Convert images to latent space
-                latents = latents.latent_dist.sample()
                 latents = latents * vae.config.scaling_factor
 
                 # Sample noise that we'll add to the latents
