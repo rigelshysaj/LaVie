@@ -564,8 +564,13 @@ def train_lora_model(data, video_folder, args_base):
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(unet):
+
+                video, description, frame_tensor = batch
+
+                latents = encode_latents(video, vae)
+
                 # Convert images to latent space
-                latents = vae.encode(batch["pixel_values"].to(dtype=weight_dtype)).latent_dist.sample()
+                latents = latents.latent_dist.sample()
                 latents = latents * vae.config.scaling_factor
 
                 # Sample noise that we'll add to the latents
@@ -586,7 +591,9 @@ def train_lora_model(data, video_folder, args_base):
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
                 # Get the text embedding for conditioning
-                encoder_hidden_states = text_encoder(batch["input_ids"], return_dict=False)[0]
+                text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids
+                text_features = text_encoder(text_inputs, return_dict=False)[0]
+                encoder_hidden_states = text_features
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
