@@ -44,7 +44,7 @@ class Details:
         parser.add_argument(
             "--train_data_dir",
             type=str,
-            default=None,
+            default="/content/drive/My Drive/msvd_small",
             help=(
                 "A folder containing the training data. Folder contents must follow the structure described in"
                 " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file"
