@@ -33,7 +33,7 @@ import torchvision.models as models
 import torch.nn.functional as F
 from diffusers.utils import check_min_version, convert_state_dict_to_diffusers, is_wandb_available
 import einops
-from diffusers import AutoencoderKL, DiffusionPipeline, StableDiffusionPipeline, convert_state_dict_to_diffusers
+from diffusers import AutoencoderKL, DiffusionPipeline, StableDiffusionPipeline
 from torch.utils.checkpoint import checkpoint
 from diffusers.schedulers import DDIMScheduler, DDPMScheduler, PNDMScheduler, EulerDiscreteScheduler
 from transformers import get_cosine_schedule_with_warmup
