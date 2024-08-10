@@ -10,6 +10,11 @@ from peft import LoraConfig, get_peft_model
 import argparse
 from omegaconf import OmegaConf
 import imageio
+import math
+import transformers
+from diffusers.optimization import get_scheduler
+import datasets
+import diffusers
 import sys
 from pathlib import Path
 from accelerate.utils import ProjectConfiguration, set_seed
@@ -33,6 +38,7 @@ from PIL import Image
 from torchvision import transforms
 import plotly.graph_objects as go
 from inference import VideoGenPipeline
+from arguments import Details
 
 from diffusers.utils import (
     deprecate,
@@ -275,19 +281,54 @@ def custom_collate(batch):
         return None, None, None
     return torch.utils.data.dataloader.default_collate(batch)
 
+def compute_snr(noise_scheduler, timesteps):
+    """
+    Computes SNR as per
+    https://github.com/TiankaiHang/Min-SNR-Diffusion-Training/blob/521b624bd70c67cee4bdf49225915f5945a872e3/guided_diffusion/gaussian_diffusion.py#L847-L849
+    """
+    alphas_cumprod = noise_scheduler.alphas_cumprod
+    sqrt_alphas_cumprod = alphas_cumprod**0.5
+    sqrt_one_minus_alphas_cumprod = (1.0 - alphas_cumprod) ** 0.5
+
+    # Expand the tensors.
+    # Adapted from https://github.com/TiankaiHang/Min-SNR-Diffusion-Training/blob/521b624bd70c67cee4bdf49225915f5945a872e3/guided_diffusion/gaussian_diffusion.py#L1026
+    sqrt_alphas_cumprod = sqrt_alphas_cumprod.to(device=timesteps.device)[timesteps].float()
+    while len(sqrt_alphas_cumprod.shape) < len(timesteps.shape):
+        sqrt_alphas_cumprod = sqrt_alphas_cumprod[..., None]
+    alpha = sqrt_alphas_cumprod.expand(timesteps.shape)
+
+    sqrt_one_minus_alphas_cumprod = sqrt_one_minus_alphas_cumprod.to(device=timesteps.device)[timesteps].float()
+    while len(sqrt_one_minus_alphas_cumprod.shape) < len(timesteps.shape):
+        sqrt_one_minus_alphas_cumprod = sqrt_one_minus_alphas_cumprod[..., None]
+    sigma = sqrt_one_minus_alphas_cumprod.expand(timesteps.shape)
+
+    # Compute SNR.
+    snr = (alpha / sigma) ** 2
+    return snr
 
 
+def cast_training_params(model: Union[torch.nn.Module, List[torch.nn.Module]], dtype=torch.float32):
+    if not isinstance(model, list):
+        model = [model]
+    for m in model:
+        for param in m.parameters():
+            # only upcast trainable parameters into fp32
+            if param.requires_grad:
+                param.data = param.to(dtype)
 
-def train_lora_model(data, video_folder, args):
+
+def train_lora_model(data, video_folder, args_base):
+
+    args = Details.parse_args()
 
     logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
 
     accelerator_project_config = ProjectConfiguration(project_dir="/content/drive/My Drive/", logging_dir=logging_dir)
 
     accelerator = Accelerator(
-        gradient_accumulation_steps=1,
-        mixed_precision=None,
-        log_with="tensorboard",
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        mixed_precision=args.mixed_precision,
+        log_with=args.report_to,
         project_config=accelerator_project_config,
     )
 
@@ -295,22 +336,43 @@ def train_lora_model(data, video_folder, args):
     if torch.backends.mps.is_available():
         accelerator.native_amp = False
 
+    # Make one log on every process with the configuration for debugging.
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+        datefmt="%m/%d/%Y %H:%M:%S",
+        level=logging.INFO,
+    )
+    logger.info(accelerator.state, main_process_only=False)
+    if accelerator.is_local_main_process:
+        datasets.utils.logging.set_verbosity_warning()
+        transformers.utils.logging.set_verbosity_warning()
+        diffusers.utils.logging.set_verbosity_info()
+    else:
+        datasets.utils.logging.set_verbosity_error()
+        transformers.utils.logging.set_verbosity_error()
+        diffusers.utils.logging.set_verbosity_error()
+
+    # If passed along, set the training seed now.
+    if args.seed is not None:
+        set_seed(args.seed)
+
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     # Carica il modello UNet e applica LoRA
-    sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
-    unet = get_models(args, sd_path).to(device, dtype=torch.float16)
-    state_dict = find_model(args.ckpt_path)
+    sd_path = args_base.pretrained_path + "/stable-diffusion-v1-4"
+    unet = get_models(args_base, sd_path).to(device, dtype=torch.float16)
+    state_dict = find_model(args_base.ckpt_path)
     unet.load_state_dict(state_dict)
 
     tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
-    text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder", torch_dtype=torch.float16).to(device)
-    vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae", torch_dtype=torch.float16).to(device)
+    text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
+    vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
 
     unet.requires_grad_(False)
     vae.requires_grad_(False)
     text_encoder.requires_grad_(False)
 
-    weight_dtype = torch.float16
+    weight_dtype = torch.float32
     if accelerator.mixed_precision == "fp16":
         weight_dtype = torch.float16
     elif accelerator.mixed_precision == "bf16":
@@ -320,8 +382,8 @@ def train_lora_model(data, video_folder, args):
         param.requires_grad_(False)
 
     lora_config = LoraConfig(
-        r=4,
-        lora_alpha=4,
+        r=args.rank,
+        lora_alpha=args.rank,
         init_lora_weights="gaussian",
         target_modules=["to_k", "to_q", "to_v", "to_out.0"],
     )
@@ -332,7 +394,11 @@ def train_lora_model(data, video_folder, args):
 
     
     unet = get_peft_model(unet, lora_config)
-    
+
+    if args.mixed_precision == "fp16":
+        # only upcast trainable parameters (LoRA) into fp32
+        cast_training_params(unet, dtype=torch.float32)
+
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
     #dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
@@ -343,11 +409,126 @@ def train_lora_model(data, video_folder, args):
 
     lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
 
-    optimizer = torch.optim.AdamW(lora_layers, 
-        lr=1e-4, 
-        betas=(0.9, 0.999),
-        weight_decay=1e-2,
-        eps=1e-08,
+    if args.gradient_checkpointing:
+        unet.enable_gradient_checkpointing()
+
+    # Enable TF32 for faster training on Ampere GPUs,
+    # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
+    if args.allow_tf32:
+        torch.backends.cuda.matmul.allow_tf32 = True
+
+    if args.scale_lr:
+        args.learning_rate = (
+            args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
+        )
+
+    # Initialize the optimizer
+    if args.use_8bit_adam:
+        try:
+            import bitsandbytes as bnb
+        except ImportError:
+            raise ImportError(
+                "Please install bitsandbytes to use 8-bit Adam. You can do so by running `pip install bitsandbytes`"
+            )
+
+        optimizer_cls = bnb.optim.AdamW8bit
+    else:
+        optimizer_cls = torch.optim.AdamW
+
+    optimizer = optimizer_cls(
+        lora_layers,
+        lr=args.learning_rate,
+        betas=(args.adam_beta1, args.adam_beta2),
+        weight_decay=args.adam_weight_decay,
+        eps=args.adam_epsilon,
+    )
+
+    num_warmup_steps_for_scheduler = args.lr_warmup_steps * accelerator.num_processes
+    if args.max_train_steps is None:
+        len_train_dataloader_after_sharding = math.ceil(len(train_dataloader) / accelerator.num_processes)
+        num_update_steps_per_epoch = math.ceil(len_train_dataloader_after_sharding / args.gradient_accumulation_steps)
+        num_training_steps_for_scheduler = (
+            args.num_train_epochs * num_update_steps_per_epoch * accelerator.num_processes
+        )
+    else:
+        num_training_steps_for_scheduler = args.max_train_steps * accelerator.num_processes
+
+    lr_scheduler = get_scheduler(
+        args.lr_scheduler,
+        optimizer=optimizer,
+        num_warmup_steps=num_warmup_steps_for_scheduler,
+        num_training_steps=num_training_steps_for_scheduler,
+    )
+
+    # Prepare everything with our `accelerator`.
+    unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+        unet, optimizer, train_dataloader, lr_scheduler
+    )
+
+    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    if args.max_train_steps is None:
+        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+        if num_training_steps_for_scheduler != args.max_train_steps * accelerator.num_processes:
+            logger.warning(
+                f"The length of the 'train_dataloader' after 'accelerator.prepare' ({len(train_dataloader)}) does not match "
+                f"the expected length ({len_train_dataloader_after_sharding}) when the learning rate scheduler was created. "
+                f"This inconsistency may result in the learning rate scheduler not functioning properly."
+            )
+    # Afterwards we recalculate our number of training epochs
+    args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
+
+    # We need to initialize the trackers we use, and also store our configuration.
+    # The trackers initializes automatically on the main process.
+    if accelerator.is_main_process:
+        accelerator.init_trackers("text2image-fine-tune", config=vars(args))
+
+    # Train!
+    total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
+
+    logger.info("***** Running training *****")
+    logger.info(f"  Num examples = {len(dataloader)}")
+    logger.info(f"  Num Epochs = {args.num_train_epochs}")
+    logger.info(f"  Instantaneous batch size per device = {args.train_batch_size}")
+    logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
+    logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
+    logger.info(f"  Total optimization steps = {args.max_train_steps}")
+    global_step = 0
+    first_epoch = 0
+
+    # Potentially load in the weights and states from a previous save
+    if args.resume_from_checkpoint:
+        if args.resume_from_checkpoint != "latest":
+            path = os.path.basename(args.resume_from_checkpoint)
+        else:
+            # Get the most recent checkpoint
+            dirs = os.listdir(args.output_dir)
+            dirs = [d for d in dirs if d.startswith("checkpoint")]
+            dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
+            path = dirs[-1] if len(dirs) > 0 else None
+
+        if path is None:
+            accelerator.print(
+                f"Checkpoint '{args.resume_from_checkpoint}' does not exist. Starting a new training run."
+            )
+            args.resume_from_checkpoint = None
+            initial_global_step = 0
+        else:
+            accelerator.print(f"Resuming from checkpoint {path}")
+            accelerator.load_state(os.path.join(args.output_dir, path))
+            global_step = int(path.split("-")[1])
+
+            initial_global_step = global_step
+            first_epoch = global_step // num_update_steps_per_epoch
+    else:
+        initial_global_step = 0
+
+    progress_bar = tqdm(
+        range(0, args.max_train_steps),
+        initial=initial_global_step,
+        desc="Steps",
+        # Only show the progress bar once on each machine.
+        disable=not accelerator.is_local_main_process,
     )
 
 
@@ -381,125 +562,95 @@ def train_lora_model(data, video_folder, args):
                             unet=unet).to(device)
     videogen_pipeline.enable_xformers_memory_efficient_attention()
 
-    epoch_losses = []
+    for epoch in range(first_epoch, args.num_train_epochs):
+        unet.train()
+        train_loss = 0.0
+        for step, batch in enumerate(train_dataloader):
+            with accelerator.accumulate(unet):
+                # Convert images to latent space
+                latents = vae.encode(batch["pixel_values"].to(dtype=weight_dtype)).latent_dist.sample()
+                latents = latents * vae.config.scaling_factor
 
-    for epoch in range(num_epochs):
+                # Sample noise that we'll add to the latents
+                noise = torch.randn_like(latents)
+                if args.noise_offset:
+                    # https://www.crosslabs.org//blog/diffusion-with-offset-noise
+                    noise += args.noise_offset * torch.randn(
+                        (latents.shape[0], latents.shape[1], 1, 1), device=latents.device
+                    )
 
-        batch_losses = []
+                bsz = latents.shape[0]
+                # Sample a random timestep for each image
+                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
+                timesteps = timesteps.long()
 
-        if epoch < start_epoch:
-            continue  # Salta le epoche già completate
+                # Add noise to the latents according to the noise magnitude at each timestep
+                # (this is the forward diffusion process)
+                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
-        for i, batch in enumerate(dataloader):
+                # Get the text embedding for conditioning
+                encoder_hidden_states = text_encoder(batch["input_ids"], return_dict=False)[0]
 
-            count += 1
+                # Get the target for loss depending on the prediction type
+                if args.prediction_type is not None:
+                    # set prediction_type of scheduler if defined
+                    noise_scheduler.register_to_config(prediction_type=args.prediction_type)
 
-            if epoch == start_epoch and i <= iteration and (start_epoch != 0 or iteration != 0):
-                continue
+                if noise_scheduler.config.prediction_type == "epsilon":
+                    target = noise
+                elif noise_scheduler.config.prediction_type == "v_prediction":
+                    target = noise_scheduler.get_velocity(latents, noise, timesteps)
+                else:
+                    raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
-            if batch[0] is None:
-                continue
+                # Predict the noise residual and compute loss
+                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states, return_dict=False)[0]
 
-            video, description, frame_tensor = batch
+                if args.snr_gamma is None:
+                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+                else:
+                    # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
+                    # Since we predict the noise instead of x_0, the original formulation is slightly changed.
+                    # This is discussed in Section 4.2 of the same paper.
+                    snr = compute_snr(noise_scheduler, timesteps)
+                    mse_loss_weights = torch.stack([snr, args.snr_gamma * torch.ones_like(timesteps)], dim=1).min(
+                        dim=1
+                    )[0]
+                    if noise_scheduler.config.prediction_type == "epsilon":
+                        mse_loss_weights = mse_loss_weights / snr
+                    elif noise_scheduler.config.prediction_type == "v_prediction":
+                        mse_loss_weights = mse_loss_weights / (snr + 1)
 
-            print(f"epoca {epoch}, iterazione {i}")
+                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
+                    loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
+                    loss = loss.mean()
 
-            video = video.to(device)
-        
-            '''
-            # Esegui check_inputs prima di elaborare il prompt
-            videogen_pipeline.check_inputs(
-                prompt=description[0],
-                height=video.shape[2],  # Altezza del video
-                width=video.shape[3],   # Larghezza del video
-                callback_steps=1        # O il valore appropriato per il tuo caso
-            )
-            
-            # Utilizzo di _encode_prompt per elaborare il testo
-            text_embeddings = videogen_pipeline._encode_prompt(
-                description[0],
-                device,
-                num_images_per_prompt=1,
-                do_classifier_free_guidance=False  # Impostiamo questo a False per il training
-            )
-            '''
+                # Gather the losses across all processes for logging (if we use distributed training).
+                avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
+                train_loss += avg_loss.item() / args.gradient_accumulation_steps
 
-            text_inputs = tokenizer(description[0], return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
-            text_features = text_encoder(text_inputs)[0].to(torch.float16)
-
-            # Codifica i latenti dal video di input
-            latents = encode_latents(video, vae)
-            latents = latents * vae.config.scaling_factor
-
-            # Genera rumore e timesteps
-            noise = torch.randn_like(latents)
-            timesteps = torch.randint(0, videogen_pipeline.scheduler.config.num_train_timesteps, (latents.shape[0],), device=latents.device)
-            
-            # Aggiungi rumore ai latenti
-            noisy_latents = videogen_pipeline.scheduler.add_noise(latents, noise, timesteps)
-
-            # Preparazione dell'input per l'UNet
-            latent_model_input = videogen_pipeline.scheduler.scale_model_input(noisy_latents, timesteps)
-
-            # Forward pass attraverso l'UNet
-            noise_pred = unet(
-                sample=latent_model_input,
-                timestep=timesteps,
-                encoder_hidden_states=text_features
-            ).sample
-
-            # Calcolo della loss
-            loss = F.mse_loss(noise_pred, noise)
-
-            batch_losses.append(loss.item())
-
-            # Backpropagation e step dell'ottimizzatore
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(unet.parameters(), max_norm=1.0)
-            optimizer.step()
-            optimizer.zero_grad()
-
-        avg_epoch_loss = sum(batch_losses) / len(batch_losses)
-        print(f"Epoch {epoch}/{num_epochs} completed with average loss: {avg_epoch_loss}")
-        epoch_losses.append(avg_epoch_loss)
+                # Backpropagate
+                accelerator.backward(loss)
+                if accelerator.sync_gradients:
+                    params_to_clip = lora_layers
+                    accelerator.clip_grad_norm_(params_to_clip, args.max_grad_norm)
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.zero_grad()
 
         if (epoch + 1) % 20 == 0:
             with torch.no_grad():
-                for prompt in args.text_prompt:
+                for prompt in args_base.text_prompt:
                     print('Processing the ({}) prompt'.format(prompt))
                     videos = videogen_pipeline(prompt, 
-                                            video_length=args.video_length, 
-                                            height=args.image_size[0], 
-                                            width=args.image_size[1], 
-                                            num_inference_steps=args.num_sampling_steps,
-                                            guidance_scale=args.guidance_scale).video
+                                            video_length=args_base.video_length, 
+                                            height=args_base.image_size[0], 
+                                            width=args_base.image_size[1], 
+                                            num_inference_steps=args_base.num_sampling_steps,
+                                            guidance_scale=args_base.guidance_scale).video
                     imageio.mimwrite("/content/drive/My Drive/" + f"sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
                 print('save path {}'.format("/content/drive/My Drive/"))
-
-    
-    num_epochs = len(epoch_losses)
-    epochs = list(range(1, num_epochs + 1))  # Crea una lista [1, 2, 3, ..., num_epochs]
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=epochs, y=epoch_losses, mode='lines'))
-
-    # Personalizza il layout
-    fig.update_layout(
-        title='Training Loss',
-        xaxis_title='Epoch',
-        yaxis_title='Loss'
-    )
-
-    # Salva il grafico come immagine
-    fig.write_image("/content/drive/My Drive/training_loss.png")
-
-    # Opzionale: visualizza il grafico interattivo in Colab
-    fig.show()
-
-    print(epoch_losses)
-    
-    return unet
 
 
 def training(args):
