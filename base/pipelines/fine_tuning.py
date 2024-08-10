@@ -338,12 +338,7 @@ def train_lora_model(data, video_folder, args_base):
     if torch.backends.mps.is_available():
         accelerator.native_amp = False
 
-    # Make one log on every process with the configuration for debugging.
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S",
-        level=logging.INFO,
-    )
+    
     logger.info(accelerator.state, main_process_only=False)
     if accelerator.is_local_main_process:
         datasets.utils.logging.set_verbosity_warning()
