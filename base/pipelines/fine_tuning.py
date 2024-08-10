@@ -399,8 +399,8 @@ def train_lora_model(data, video_folder, args_base):
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
     #dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
-    print(f"Numero totale di elementi nel dataloader: {len(dataloader)}")
+    train_dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
+    print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
 
     #optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
 
@@ -484,7 +484,7 @@ def train_lora_model(data, video_folder, args_base):
     total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
 
     logger.info("***** Running training *****")
-    logger.info(f"  Num examples = {len(dataloader)}")
+    logger.info(f"  Num examples = {len(train_dataloader)}")
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
     logger.info(f"  Instantaneous batch size per device = {args.train_batch_size}")
     logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
