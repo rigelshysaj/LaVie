@@ -318,6 +318,8 @@ def cast_training_params(model: Union[torch.nn.Module, List[torch.nn.Module]], d
 
 def train_lora_model(data, video_folder, args_base):
 
+    sys.argv = [sys.argv[0], '--pretrained_model_name_or_path', args_base.pretrained_path]
+
     args = Details.parse_args()
 
     logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
