@@ -559,7 +559,11 @@ def train_lora_model(data, video_folder, args_base):
                             unet=unet).to(device)
     videogen_pipeline.enable_xformers_memory_efficient_attention()
 
+    epoch_losses = []
+
     for epoch in range(first_epoch, args.num_train_epochs):
+        batch_losses = []
+
         unet.train()
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
@@ -633,6 +637,7 @@ def train_lora_model(data, video_folder, args_base):
                 # Gather the losses across all processes for logging (if we use distributed training).
                 avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
                 train_loss += avg_loss.item() / args.gradient_accumulation_steps
+                batch_losses.append(train_loss)
 
                 # Backpropagate
                 accelerator.backward(loss)
@@ -642,6 +647,10 @@ def train_lora_model(data, video_folder, args_base):
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
+
+        avg_epoch_loss = sum(batch_losses) / len(batch_losses)
+        print(f"Epoch {epoch}/{num_epochs} completed with average loss: {avg_epoch_loss}")
+        epoch_losses.append(avg_epoch_loss)      
 
         if (epoch + 1) % 20 == 0:
             with torch.no_grad():
