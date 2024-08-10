@@ -31,6 +31,7 @@ import torch.nn as nn
 import numpy as np
 import torchvision.models as models
 import torch.nn.functional as F
+from diffusers.utils import check_min_version, convert_state_dict_to_diffusers, is_wandb_available
 import einops
 from diffusers import AutoencoderKL, DiffusionPipeline, StableDiffusionPipeline, convert_state_dict_to_diffusers
 from torch.utils.checkpoint import checkpoint
