@@ -5,9 +5,12 @@ import cv2
 import os
 import json
 from tqdm import tqdm
+import shutil
 from transformers import CLIPProcessor, CLIPModel
 from peft import LoraConfig, get_peft_model
 import argparse
+from diffusers.utils.torch_utils import is_compiled_module
+from peft.utils import get_peft_model_state_dict
 from omegaconf import OmegaConf
 import imageio
 import logging
@@ -28,8 +31,9 @@ import torch.nn as nn
 import numpy as np
 import torchvision.models as models
 import torch.nn.functional as F
+from diffusers.utils import check_min_version, convert_state_dict_to_diffusers, is_wandb_available
 import einops
-from diffusers.models import AutoencoderKL
+from diffusers.models import AutoencoderKL, DiffusionPipeline, StableDiffusionPipeline
 from torch.utils.checkpoint import checkpoint
 from diffusers.schedulers import DDIMScheduler, DDPMScheduler, PNDMScheduler, EulerDiscreteScheduler
 from transformers import get_cosine_schedule_with_warmup
@@ -222,6 +226,10 @@ def compute_snr(noise_scheduler, timesteps):
     snr = (alpha / sigma) ** 2
     return snr
 
+def unwrap_model(model, accelerator):
+    model = accelerator.unwrap_model(model)
+    model = model._orig_mod if is_compiled_module(model) else model
+    return model
 
 def cast_training_params(model: Union[torch.nn.Module, List[torch.nn.Module]], dtype=torch.float32):
     if not isinstance(model, list):
@@ -555,6 +563,71 @@ def train_lora_model(data, video_folder, args_base):
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
+            # Checks if the accelerator has performed an optimization step behind the scenes
+            if accelerator.sync_gradients:
+                progress_bar.update(1)
+                global_step += 1
+                accelerator.log({"train_loss": train_loss}, step=global_step)
+                train_loss = 0.0
+
+                if global_step % args.checkpointing_steps == 0:
+                    if accelerator.is_main_process:
+                        # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
+                        if args.checkpoints_total_limit is not None:
+                            checkpoints = os.listdir(args.output_dir)
+                            checkpoints = [d for d in checkpoints if d.startswith("checkpoint")]
+                            checkpoints = sorted(checkpoints, key=lambda x: int(x.split("-")[1]))
+
+                            # before we save the new checkpoint, we need to have at _most_ `checkpoints_total_limit - 1` checkpoints
+                            if len(checkpoints) >= args.checkpoints_total_limit:
+                                num_to_remove = len(checkpoints) - args.checkpoints_total_limit + 1
+                                removing_checkpoints = checkpoints[0:num_to_remove]
+
+                                logger.info(
+                                    f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints"
+                                )
+                                logger.info(f"removing checkpoints: {', '.join(removing_checkpoints)}")
+
+                                for removing_checkpoint in removing_checkpoints:
+                                    removing_checkpoint = os.path.join(args.output_dir, removing_checkpoint)
+                                    shutil.rmtree(removing_checkpoint)
+
+                        save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
+                        accelerator.save_state(save_path)
+
+                        unwrapped_unet = unwrap_model(unet, accelerator=accelerator)
+                        unet_lora_state_dict = convert_state_dict_to_diffusers(
+                            get_peft_model_state_dict(unwrapped_unet)
+                        )
+
+                        StableDiffusionPipeline.save_lora_weights(
+                            save_directory=save_path,
+                            unet_lora_layers=unet_lora_state_dict,
+                            safe_serialization=True,
+                        )
+
+                        logger.info(f"Saved state to {save_path}")
+
+            logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
+            progress_bar.set_postfix(**logs)
+
+            if global_step >= args.max_train_steps:
+                break
+
+        if accelerator.is_main_process:
+            if args.validation_prompt is not None and epoch % args.validation_epochs == 0:
+                # create pipeline
+                pipeline = DiffusionPipeline.from_pretrained(
+                    args.pretrained_model_name_or_path,
+                    unet=unwrap_model(unet),
+                    revision=args.revision,
+                    variant=args.variant,
+                    torch_dtype=weight_dtype,
+                )
+                #images = log_validation(pipeline, args, accelerator, epoch)
+
+                del pipeline
+                torch.cuda.empty_cache()
 
         avg_epoch_loss = sum(batch_losses) / len(batch_losses)
         print(f"Epoch {epoch}/{num_epochs} completed with average loss: {avg_epoch_loss}")
