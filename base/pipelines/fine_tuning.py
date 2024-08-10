@@ -10,6 +10,7 @@ from peft import LoraConfig, get_peft_model
 import argparse
 from omegaconf import OmegaConf
 import imageio
+import logging
 import math
 import transformers
 from diffusers.optimization import get_scheduler
