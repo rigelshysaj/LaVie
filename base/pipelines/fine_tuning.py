@@ -567,6 +567,9 @@ def train_lora_model(data, video_folder, args_base):
 
                 video, description, frame_tensor = batch
 
+                print(f"epoca {epoch}, iterazione {step}")
+
+
                 latents = encode_latents(video, vae)
 
                 latents = latents * vae.config.scaling_factor
