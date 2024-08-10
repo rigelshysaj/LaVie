@@ -228,8 +228,7 @@ class VideoDatasetMsvd(Dataset):
             return None, None, None
 
 
-def encode_latents_(video, vae):
-    video = video.to(torch.float16)
+def encode_latents(video, vae):
     b, c, f, h, w = video.shape
     video = einops.rearrange(video, "b c f h w -> (b f) c h w")
     
@@ -238,7 +237,7 @@ def encode_latents_(video, vae):
     
     return latents
 
-def encode_latents(video, vae):
+def encode_latents_(video, vae):
     video = video.to(torch.float16)
 
     # video ha forma [b, c, f, h, w]
