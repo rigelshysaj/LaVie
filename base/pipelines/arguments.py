@@ -246,7 +246,7 @@ class Details:
         parser.add_argument(
             "--checkpointing_steps",
             type=int,
-            default=20,
+            default=400,
             help=(
                 "Save a checkpoint of the training state every X updates. These checkpoints are only suitable for resuming"
                 " training using `--resume_from_checkpoint`."
