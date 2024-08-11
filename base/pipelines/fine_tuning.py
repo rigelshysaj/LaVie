@@ -657,6 +657,26 @@ def train_lora_model(data, video_folder, args_base):
                     imageio.mimwrite("/content/drive/My Drive/" + f"sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
                 print('save path {}'.format("/content/drive/My Drive/"))
+                
+    
+    num_epochs = len(epoch_losses)
+    epochs = list(range(1, num_epochs + 1))  # Crea una lista [1, 2, 3, ..., num_epochs]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=epochs, y=epoch_losses, mode='lines'))
+
+    # Personalizza il layout
+    fig.update_layout(
+        title='Training Loss',
+        xaxis_title='Epoch',
+        yaxis_title='Loss'
+    )
+
+    # Salva il grafico come immagine
+    fig.write_image("/content/drive/My Drive/training_loss.png")
+
+    # Opzionale: visualizza il grafico interattivo in Colab
+    fig.show()
 
 
 def training(args):
