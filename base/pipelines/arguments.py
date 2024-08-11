@@ -225,7 +225,7 @@ class Details:
         parser.add_argument(
             "--mixed_precision",
             type=str,
-            default=None,
+            default="fp16",
             choices=["no", "fp16", "bf16"],
             help=(
                 "Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >="
@@ -246,7 +246,7 @@ class Details:
         parser.add_argument(
             "--checkpointing_steps",
             type=int,
-            default=500,
+            default=100,
             help=(
                 "Save a checkpoint of the training state every X updates. These checkpoints are only suitable for resuming"
                 " training using `--resume_from_checkpoint`."
@@ -255,13 +255,13 @@ class Details:
         parser.add_argument(
             "--checkpoints_total_limit",
             type=int,
-            default=None,
+            default=3,
             help=("Max number of checkpoints to store."),
         )
         parser.add_argument(
             "--resume_from_checkpoint",
             type=str,
-            default=None,
+            default="latest",
             help=(
                 "Whether training should be resumed from a previous checkpoint. Use a path saved by"
                 ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
