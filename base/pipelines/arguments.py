@@ -90,7 +90,7 @@ class Details:
         parser.add_argument(
             "--output_dir",
             type=str,
-            default="sd-model-finetuned-lora",
+            default="/content/drive/My Drive/checkpoints",
             help="The output directory where the model predictions and checkpoints will be written.",
         )
         parser.add_argument(
