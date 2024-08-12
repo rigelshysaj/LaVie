@@ -638,7 +638,7 @@ def train_lora_model(data, video_folder, args_base):
         print(f"Epoch {epoch}/{num_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)      
 
-        if (epoch + 1) % 20 == 0:
+        if (epoch + 1) % 100 == 0:
             with torch.no_grad():
 
                 videogen_pipeline = VideoGenPipeline(vae=vae, 
@@ -689,7 +689,7 @@ def training(args):
 
     if on_colab:
         # Percorso del dataset su Google Colab
-        dataset_path = '/content/drive/My Drive/msvd_small'
+        dataset_path = '/content/drive/My Drive/msvd_one'
     else:
         # Percorso del dataset locale (sincronizzato con Google Drive)
         dataset_path = '/path/to/your/Google_Drive/sync/folder/path/to/your/dataset'

@@ -126,7 +126,7 @@ class Details:
         parser.add_argument(
             "--train_batch_size", type=int, default=16, help="Batch size (per device) for the training dataloader."
         )
-        parser.add_argument("--num_train_epochs", type=int, default=100)
+        parser.add_argument("--num_train_epochs", type=int, default=1000)
         parser.add_argument(
             "--max_train_steps",
             type=int,
@@ -246,7 +246,7 @@ class Details:
         parser.add_argument(
             "--checkpointing_steps",
             type=int,
-            default=400,
+            default=2000,
             help=(
                 "Save a checkpoint of the training state every X updates. These checkpoints are only suitable for resuming"
                 " training using `--resume_from_checkpoint`."
