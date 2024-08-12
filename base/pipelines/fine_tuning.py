@@ -196,19 +196,11 @@ def encode_latents_(video, vae):
     return latents
 
 
-def collate_fn(examples):
-    examples = [example for example in examples if example is not None]
-    if not examples:
-        return None
-    
-    pixel_values = torch.stack([example["pixel_values"] for example in examples])
-    pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
-    input_ids = torch.stack([example["input_ids"] for example in examples])
-    mid_frames = torch.stack([example["mid_frame"] for example in examples])
-    mid_frames = mid_frames.to(memory_format=torch.contiguous_format).float()
-    
-    return {"pixel_values": pixel_values, "input_ids": input_ids, "mid_frames": mid_frames}
-
+def custom_collate(batch):
+    batch = list(filter(lambda x: x[0] is not None and x[1] is not None and x[2] is not None, batch))
+    if len(batch) == 0:
+        return None, None, None
+    return torch.utils.data.dataloader.default_collate(batch)
 
 def compute_snr(noise_scheduler, timesteps):
     """
@@ -329,9 +321,9 @@ def train_lora_model(data, video_folder, args_base):
         # only upcast trainable parameters (LoRA) into fp32
         cast_training_params(unet, dtype=torch.float32)
 
-    dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder, tokenizer=tokenizer, is_train=True)
-    train_dataloader = DataLoader(dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=collate_fn)
-
+    #dataset = VideoDatasetMsrvtt(data, video_folder)
+    dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
+    train_dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
     print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
 
     #optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
@@ -494,10 +486,14 @@ def train_lora_model(data, video_folder, args_base):
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(unet):
 
-                
+                video, description, frame_tensor = batch
+
                 print(f"epoca {epoch}, iterazione {step}")
 
-                latents = encode_latents(batch["pixel_values"], vae)
+                print(f"description: {description}")
+
+
+                latents = encode_latents(video, vae)
 
                 latents = latents * vae.config.scaling_factor
 
@@ -519,10 +515,9 @@ def train_lora_model(data, video_folder, args_base):
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
                 # Get the text embedding for conditioning
-                text_features = text_encoder(batch["input_ids"], return_dict=False)[0]
+                text_inputs = tokenizer(list(description), return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
+                text_features = text_encoder(text_inputs, return_dict=False)[0]
                 encoder_hidden_states = text_features
-
-                mid_frames = batch["mid_frames"]
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
