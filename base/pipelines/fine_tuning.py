@@ -150,6 +150,7 @@ def load_model_for_inference(args):
 
 
 def encode_latents(video, vae):
+    vae = vae.to(torch.float16)
     video = video.to(torch.float16)
     b, c, f, h, w = video.shape
     video = einops.rearrange(video, "b c f h w -> (b f) c h w")
