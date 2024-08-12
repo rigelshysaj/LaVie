@@ -405,7 +405,7 @@ class VideoGenPipeline(DiffusionPipeline):
         return prompt_embeds
 
     def decode_latents(self, latents):
-        #self.vae = self.vae.to(torch.float32)
+        vae = vae.to(torch.float32)
         video_length = latents.shape[2]
         latents = 1 / 0.18215 * latents
         latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
