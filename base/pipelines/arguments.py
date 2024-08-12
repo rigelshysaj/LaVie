@@ -18,7 +18,6 @@ class Details:
         parser.add_argument("--use_compile", action="store_true")
         parser.add_argument("--use_fp16", action="store_true")
         parser.add_argument("--image_path", type=str, default="/content/drive/My Drive/chih.jpeg")
-        parser.add_argument("--seed", type=int, default=None)
         parser.add_argument("--run_time", type=int, default=0)
         parser.add_argument("--guidance_scale", type=float, default=7.5)
         parser.add_argument("--sample_method", type=str, default="ddpm")
