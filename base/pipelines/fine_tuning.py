@@ -94,9 +94,9 @@ def load_model_for_inference(args):
     else:
         print("Nessun checkpoint trovato. Utilizzo del modello non addestrato.")
     
-    vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae", torch_dtype=torch.float16).to(device)
+    vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
     tokenizer_one = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
-    text_encoder_one = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder", torch_dtype=torch.float16).to(device) # huge
+    text_encoder_one = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device) # huge
 
     # set eval mode
     unet.eval()
@@ -290,6 +290,7 @@ def train_lora_model(data, video_folder, args):
     tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
     text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
+    noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
 
     unet.requires_grad_(False)
     vae.requires_grad_(False)
@@ -326,8 +327,6 @@ def train_lora_model(data, video_folder, args):
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
     train_dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
     print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
-
-    #optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
 
     lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
 
@@ -455,7 +454,6 @@ def train_lora_model(data, video_folder, args):
 
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
-    count = 0
     start_epoch = 0
     iteration = 0
     if os.path.exists(os.path.join(checkpoint_dir, "latest_checkpoint.pth")):
@@ -466,21 +464,14 @@ def train_lora_model(data, video_folder, args):
         iteration = checkpoint['iteration']
         print(f"Ripresa dell'addestramento dall'epoca {start_epoch}, iterazione {iteration}")
 
-    
-    unet.train()
     unet.enable_xformers_memory_efficient_attention()
-    unet.enable_gradient_checkpointing()
-    text_encoder.eval()
-    vae.eval()
-
-    noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
 
     epoch_losses = []
 
     for epoch in range(first_epoch, args.num_train_epochs):
+        unet.train()
         batch_losses = []
 
-        unet.train()
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(unet):
