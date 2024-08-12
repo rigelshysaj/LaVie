@@ -512,7 +512,7 @@ def train_lora_model(data, video_folder, args_base):
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
                 # Get the text embedding for conditioning
-                text_inputs = tokenizer(description, return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
+                text_inputs = tokenizer(description[0], return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
                 text_features = text_encoder(text_inputs, return_dict=False)[0]
                 encoder_hidden_states = text_features
 
