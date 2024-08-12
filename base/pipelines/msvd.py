@@ -97,7 +97,7 @@ class VideoDatasetMsvd(Dataset):
             # Choose a random description if in training mode, otherwise take the first one
             description = random.choice(descriptions) if self.is_train else descriptions[0]
 
-            print(f"description shape: {description.shape}, dtype: {description.dtype}")
+            print(f"description: {description}")
 
             
             input_ids = self.tokenize_caption(description)
