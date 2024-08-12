@@ -5,8 +5,6 @@ import cv2
 import os
 import json
 from tqdm import tqdm
-from datasets import load_dataset
-import random
 import shutil
 from transformers import CLIPProcessor, CLIPModel
 from peft import LoraConfig, get_peft_model
@@ -63,118 +61,6 @@ logger = logging.get_logger(__name__)
 @dataclass
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
-
-
-def load_video_dataset(args):
-    if args.dataset_name is not None:
-        dataset = load_dataset(
-            args.dataset_name,
-            args.dataset_config_name,
-            cache_dir=args.cache_dir,
-            data_dir=args.train_data_dir,
-        )
-    else:
-        data_files = {}
-        if args.train_data_dir is not None:
-            data_files["train"] = os.path.join(args.train_data_dir, "**")
-        dataset = load_dataset(
-            "video",
-            data_files=data_files,
-            cache_dir=args.cache_dir,
-            split="all"
-        )
-    
-    return dataset
-
-def preprocess_video(video_path, target_size=(320, 512), fixed_frame_count=16):
-    try:
-        cap = cv2.VideoCapture(video_path)
-        frames = []
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-            frame = cv2.resize(frame, target_size)
-            frames.append(frame)
-        cap.release()
-
-        # Se il numero di frame è inferiore a fixed_frame_count, ripeti l'ultimo frame
-        if len(frames) < fixed_frame_count:
-            frames += [frames[-1]] * (fixed_frame_count - len(frames))
-        # Altrimenti, prendi i primi fixed_frame_count frame
-        else:
-            frames = frames[:fixed_frame_count]
-
-        frames_np = np.array(frames)
-        frames_np = frames_np.astype(np.float32) / 255.0  # Normalizza in [0, 1]
-        frames_np = (frames_np - 0.5) / 0.5  # Normalizza in [-1, 1]
-        
-        video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
-
-        # Estrarre un frame centrale
-        mid_frame = frames[len(frames) // 2]
-        mid_frame_np = np.array(mid_frame)
-        mid_frame_np = mid_frame_np.astype(np.float32) / 255.0  # Normalizza in [0, 1]
-        mid_frame_np = (mid_frame_np - 0.5) / 0.5  # Normalizza in [-1, 1]
-        mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
-
-        return video, mid_frame
-    except Exception as e:
-        print(f"Errore nel preprocessamento del video {video_path}: {e}")
-        return None, None
-
-def tokenize_captions(examples, caption_column, tokenizer):
-    captions = []
-    for caption in examples[caption_column]:
-        if isinstance(caption, str):
-            captions.append(caption)
-        elif isinstance(caption, (list, np.ndarray)):
-            captions.append(random.choice(caption))
-        else:
-            raise ValueError(f"Caption column `{caption_column}` should contain either strings or lists of strings.")
-    
-    inputs = tokenizer(
-        captions, max_length=tokenizer.model_max_length, padding="max_length", truncation=True, return_tensors="pt"
-    )
-    return inputs.input_ids
-
-def preprocess_train(examples, video_column, caption_column, tokenizer, args):
-    videos = []
-    mid_frames = []
-    for video_path in examples[video_column]:
-        video, mid_frame = preprocess_video(video_path, target_size=args.target_size, fixed_frame_count=args.fixed_frame_count)
-        if video is not None and mid_frame is not None:
-            videos.append(video)
-            mid_frames.append(mid_frame)
-    
-    examples["pixel_values"] = videos
-    examples["mid_frames"] = mid_frames
-    examples["input_ids"] = tokenize_captions(examples, caption_column, tokenizer)
-    return examples
-
-def create_video_dataloader(accelerator, dataset, args, tokenizer):
-    with accelerator.main_process_first():
-        if args.max_train_samples is not None:
-            dataset["train"] = dataset["train"].shuffle(seed=args.seed).select(range(args.max_train_samples))
-        train_dataset = dataset["train"].with_transform(lambda examples: preprocess_train(examples, args.video_column, args.caption_column, tokenizer, args))
-
-    def collate_fn(examples):
-        pixel_values = torch.stack([example["pixel_values"] for example in examples])
-        pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
-        mid_frames = torch.stack([example["mid_frames"] for example in examples])
-        mid_frames = mid_frames.to(memory_format=torch.contiguous_format).float()
-        input_ids = torch.stack([example["input_ids"] for example in examples])
-        return {"pixel_values": pixel_values, "mid_frames": mid_frames, "input_ids": input_ids}
-
-    train_dataloader = DataLoader(
-        train_dataset,
-        shuffle=True,
-        collate_fn=collate_fn,
-        batch_size=args.train_batch_size,
-        num_workers=args.dataloader_num_workers,
-    )
-
-    return train_dataloader
 
 def load_model_for_inference(args):
     if args.seed is not None:
@@ -434,10 +320,9 @@ def train_lora_model(data, video_folder, args_base):
         # only upcast trainable parameters (LoRA) into fp32
         cast_training_params(unet, dtype=torch.float32)
 
-
-    dataset = load_video_dataset(args)
-    train_dataloader = create_video_dataloader(accelerator, dataset, args, tokenizer)
-
+    #dataset = VideoDatasetMsrvtt(data, video_folder)
+    dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
+    train_dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
     print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
 
     #optimizer = torch.optim.AdamW(unet.parameters(), lr=1e-5)
@@ -600,9 +485,14 @@ def train_lora_model(data, video_folder, args_base):
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(unet):
 
+                video, description, frame_tensor = batch
+
                 print(f"epoca {epoch}, iterazione {step}")
 
-                latents = encode_latents(batch["pixel_values"], vae)
+                print(f"description: {description}")
+
+
+                latents = encode_latents(video, vae)
 
                 latents = latents * vae.config.scaling_factor
 
@@ -624,7 +514,8 @@ def train_lora_model(data, video_folder, args_base):
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
                 # Get the text embedding for conditioning
-                text_features = text_encoder(batch["input_ids"], return_dict=False)[0]
+                text_inputs = tokenizer(list(description), return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
+                text_features = text_encoder(text_inputs, return_dict=False)[0]
                 encoder_hidden_states = text_features
 
                 # Get the target for loss depending on the prediction type
@@ -807,6 +698,7 @@ def training(args):
     data = os.path.join(dataset_path, 'annotations.txt')
     
     train_lora_model(data, video_folder, args)
+
 
 
 if __name__ == "__main__":
