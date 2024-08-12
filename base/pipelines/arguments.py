@@ -5,6 +5,27 @@ class Details:
     
     def parse_args():
         parser = argparse.ArgumentParser(description="Simple example of a training script.")
+
+        parser.add_argument("--ckpt_path", type=str, default="../pretrained_models/lavie_base.pt")
+        parser.add_argument("--output_folder", type=str, default="../res/base/")
+        parser.add_argument("--pretrained_path", type=str, default="../pretrained_models")
+        parser.add_argument("--model", type=str, default="UNet")
+        parser.add_argument("--video_length", type=int, default=16)
+        parser.add_argument("--image_size", nargs=2, type=int, default=[320, 512])
+        parser.add_argument("--beta_start", type=float, default=0.0001)
+        parser.add_argument("--beta_end", type=float, default=0.02)
+        parser.add_argument("--beta_schedule", type=str, default="linear")
+        parser.add_argument("--use_compile", action="store_true")
+        parser.add_argument("--use_fp16", action="store_true")
+        parser.add_argument("--image_path", type=str, default="/content/drive/My Drive/chih.jpeg")
+        parser.add_argument("--seed", type=int, default=None)
+        parser.add_argument("--run_time", type=int, default=0)
+        parser.add_argument("--guidance_scale", type=float, default=7.5)
+        parser.add_argument("--sample_method", type=str, default="ddpm")
+        parser.add_argument("--num_sampling_steps", type=int, default=50)
+        parser.add_argument("--text_prompt", nargs="+", default=['a person is slicing raw chicken'])
+
+
         parser.add_argument(
             "--pretrained_model_name_or_path",
             type=str,

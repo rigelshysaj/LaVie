@@ -808,22 +808,6 @@ def training(args):
     train_lora_model(data, video_folder, args)
 
 
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="")
-    config_args = parser.parse_args()
-
-    # Carica la configurazione
-    config = OmegaConf.load(config_args.config)
-
-    # Crea una lista di argomenti da passare al parser di Details
-    argv = []
-    for key, value in config.items():
-        if value is not None:
-            argv.extend([f"--{key}", str(value)])
-
-    # Usa il parser di Details con gli argomenti dal file di configurazione
-    args = Details.parse_args(argv)
-
+    args = Details.parse_args()
     training(args)
