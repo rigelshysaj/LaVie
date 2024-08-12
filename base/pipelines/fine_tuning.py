@@ -356,7 +356,7 @@ def cast_training_params(model: Union[torch.nn.Module, List[torch.nn.Module]], d
 
 def train_lora_model(data, video_folder, args_base):
 
-    #sys.argv = [sys.argv[0], '--pretrained_model_name_or_path', args_base.pretrained_path]
+    sys.argv = [sys.argv[0], '--pretrained_model_name_or_path', args_base.pretrained_path]
 
     args = Details.parse_args()
 
@@ -809,5 +809,9 @@ def training(args):
 
 
 if __name__ == "__main__":
-    args = Details.parse_args()
-    training(args)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="")
+    args = parser.parse_args()
+
+    training(OmegaConf.load(args.config))
+    #load_model_for_inference(OmegaConf.load(args.config))
