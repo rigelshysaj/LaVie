@@ -78,9 +78,10 @@ def load_video_dataset(args):
         if args.train_data_dir is not None:
             data_files["train"] = os.path.join(args.train_data_dir, "**")
         dataset = load_dataset(
-            "imagefolder",
+            "video",
             data_files=data_files,
             cache_dir=args.cache_dir,
+            split="all"
         )
     
     return dataset
