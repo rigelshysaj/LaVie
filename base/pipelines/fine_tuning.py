@@ -452,8 +452,6 @@ def train_lora_model(data, video_folder, args):
         disable=not accelerator.is_local_main_process,
     )
 
-
-    num_epochs = 100
     checkpoint_dir = "/content/drive/My Drive/checkpoints"
     os.makedirs(checkpoint_dir, exist_ok=True)
     count = 0
