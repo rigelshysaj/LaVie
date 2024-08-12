@@ -630,7 +630,7 @@ def train_lora_model(data, video_folder, args):
                 torch.cuda.empty_cache()
 
         avg_epoch_loss = sum(batch_losses) / len(batch_losses)
-        print(f"Epoch {epoch}/{num_epochs} completed with average loss: {avg_epoch_loss}")
+        print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)      
 
         if (epoch + 1) % 200 == 0:
@@ -659,6 +659,7 @@ def train_lora_model(data, video_folder, args):
     
     num_epochs = len(epoch_losses)
     epochs = list(range(1, num_epochs + 1))  # Crea una lista [1, 2, 3, ..., num_epochs]
+    print(f"num_epochs: {num_epochs}")
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=epochs, y=epoch_losses, mode='lines'))
