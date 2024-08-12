@@ -225,7 +225,7 @@ class Details:
         parser.add_argument(
             "--mixed_precision",
             type=str,
-            default="fp16",
+            default=None,
             choices=["no", "fp16", "bf16"],
             help=(
                 "Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >="
