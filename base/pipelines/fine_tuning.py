@@ -812,7 +812,18 @@ def training(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="")
-    args = parser.parse_args()
+    config_args = parser.parse_args()
 
-    training(OmegaConf.load(args.config))
-    #load_model_for_inference(OmegaConf.load(args.config))
+    # Carica la configurazione
+    config = OmegaConf.load(config_args.config)
+
+    # Crea una lista di argomenti da passare al parser di Details
+    argv = []
+    for key, value in config.items():
+        if value is not None:
+            argv.extend([f"--{key}", str(value)])
+
+    # Usa il parser di Details con gli argomenti dal file di configurazione
+    args = Details.parse_args(argv)
+
+    training(args)
