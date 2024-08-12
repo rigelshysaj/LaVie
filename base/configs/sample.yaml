@@ -15,7 +15,7 @@ logging_dir: "logs"
 model: UNet
 video_length: 16
 image_size: [320, 512]
-pretrained_model_name_or_path: null
+pretrained_model_name_or_path: "../pretrained_models"
 revision: null
 variant: null
 

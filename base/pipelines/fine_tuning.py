@@ -242,11 +242,11 @@ def cast_training_params(model: Union[torch.nn.Module, List[torch.nn.Module]], d
                 param.data = param.to(dtype)
 
 
-def train_lora_model(data, video_folder, args_base):
+def train_lora_model(data, video_folder, args):
 
-    sys.argv = [sys.argv[0], '--pretrained_model_name_or_path', args_base.pretrained_path]
+    #sys.argv = [sys.argv[0], '--pretrained_model_name_or_path', args_base.pretrained_path]
 
-    args = Details.parse_args()
+    #args = Details.parse_args()
 
     logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
 
@@ -281,9 +281,9 @@ def train_lora_model(data, video_folder, args_base):
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     # Carica il modello UNet e applica LoRA
-    sd_path = args_base.pretrained_path + "/stable-diffusion-v1-4"
-    unet = get_models(args_base, sd_path).to(device, dtype=torch.float16)
-    state_dict = find_model(args_base.ckpt_path)
+    sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
+    unet = get_models(args, sd_path).to(device, dtype=torch.float16)
+    state_dict = find_model(args.ckpt_path)
     unet.load_state_dict(state_dict)
 
     tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
@@ -646,14 +646,14 @@ def train_lora_model(data, video_folder, args_base):
                 videogen_pipeline.enable_xformers_memory_efficient_attention()
 
 
-                for prompt in args_base.text_prompt:
+                for prompt in args.text_prompt:
                     print('Processing the ({}) prompt'.format(prompt))
                     videos = videogen_pipeline(prompt, 
-                                            video_length=args_base.video_length, 
-                                            height=args_base.image_size[0], 
-                                            width=args_base.image_size[1], 
-                                            num_inference_steps=args_base.num_sampling_steps,
-                                            guidance_scale=args_base.guidance_scale).video
+                                            video_length=args.video_length, 
+                                            height=args.image_size[0], 
+                                            width=args.image_size[1], 
+                                            num_inference_steps=args.num_sampling_steps,
+                                            guidance_scale=args.guidance_scale).video
                     imageio.mimwrite("/content/drive/My Drive/" + f"sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
                 print('save path {}'.format("/content/drive/My Drive/"))
