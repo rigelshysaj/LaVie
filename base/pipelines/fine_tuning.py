@@ -489,6 +489,8 @@ def train_lora_model(data, video_folder, args_base):
 
                 print(f"epoca {epoch}, iterazione {step}")
 
+                print(f"description: {description}")
+
 
                 latents = encode_latents(video, vae)
 
