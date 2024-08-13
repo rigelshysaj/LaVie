@@ -105,8 +105,8 @@ class VideoGenPipeline(DiffusionPipeline):
         tokenizer: CLIPTokenizer,
         unet: UNet3DConditionModel,
         scheduler: KarrasDiffusionSchedulers,
-        clip_processor,
-        clip_model
+        clip_processor: CLIPProcessor,
+        clip_model: CLIPModel
     ):
         super().__init__()
 
@@ -166,10 +166,12 @@ class VideoGenPipeline(DiffusionPipeline):
             tokenizer=tokenizer,
             unet=unet,
             scheduler=scheduler,
+            clip_processor=clip_processor,
+            clip_model=clip_model
         )
+
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
-        self.clip_processor = clip_processor
-        self.clip_model = clip_model.to(self.device)
+        
         # self.register_to_config(requires_safety_checker=requires_safety_checker)
 
     def enable_vae_slicing(self):
