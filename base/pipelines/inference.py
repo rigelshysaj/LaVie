@@ -105,6 +105,8 @@ class VideoGenPipeline(DiffusionPipeline):
         tokenizer: CLIPTokenizer,
         unet: UNet3DConditionModel,
         scheduler: KarrasDiffusionSchedulers,
+        clip_processor,
+        clip_model
     ):
         super().__init__()
 
@@ -166,8 +168,8 @@ class VideoGenPipeline(DiffusionPipeline):
             scheduler=scheduler,
         )
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
-        self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-        self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(self.device)
+        self.clip_processor = clip_processor
+        self.clip_model = clip_model.to(self.device)
         # self.register_to_config(requires_safety_checker=requires_safety_checker)
 
     def enable_vae_slicing(self):
@@ -310,6 +312,8 @@ class VideoGenPipeline(DiffusionPipeline):
             batch_size = len(prompt)
         else:
             batch_size = prompt_embeds.shape[0]
+
+        print(f"prompt: {list(prompt)}")
 
         if prompt_embeds is None:
             text_inputs = self.tokenizer(

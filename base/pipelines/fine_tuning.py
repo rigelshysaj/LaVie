@@ -97,6 +97,8 @@ def load_model_for_inference(args):
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
     tokenizer_one = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
     text_encoder_one = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device) # huge
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
     # set eval mode
     unet.eval()
@@ -128,7 +130,10 @@ def load_model_for_inference(args):
                                 text_encoder=text_encoder_one, 
                                 tokenizer=tokenizer_one, 
                                 scheduler=scheduler, 
-                                unet=unet).to(device)
+                                unet=unet,
+                                clip_processor=clip_processor,
+                                clip_model=clip_model
+                                ).to(device)
     videogen_pipeline.enable_xformers_memory_efficient_attention()
 
     if not os.path.exists(args.output_folder):
@@ -514,7 +519,7 @@ def train_lora_model(data, video_folder, args):
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
                 #print(f"train_lora_model noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
-
+                print(f"dscription: {list(description)}")
                 # Get the text embedding for conditioning
                 text_inputs = tokenizer(list(description), return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
                 text_features = text_encoder(text_inputs, return_dict=False)[0]
@@ -657,7 +662,10 @@ def train_lora_model(data, video_folder, args):
                             text_encoder=text_encoder, 
                             tokenizer=tokenizer, 
                             scheduler=noise_scheduler, 
-                            unet=unet).to(device)
+                            unet=unet,
+                            clip_processor=clip_processor,
+                            clip_model=clip_model
+                            ).to(device)
                 videogen_pipeline.enable_xformers_memory_efficient_attention()
 
 
