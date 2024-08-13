@@ -340,6 +340,7 @@ class VideoGenPipeline(DiffusionPipeline):
                 )
 
             if hasattr(self.text_encoder.config, "use_attention_mask") and self.text_encoder.config.use_attention_mask:
+                print("usa attention mask")
                 attention_mask = text_inputs.attention_mask.to(device)
             else:
                 attention_mask = None
