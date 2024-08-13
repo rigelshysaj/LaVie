@@ -439,7 +439,7 @@ class VideoGenPipeline(DiffusionPipeline):
                               device=device, 
                               dtype=negative_prompt_embeds.dtype)
             negative_prompt_embeds = torch.cat([negative_prompt_embeds, padding], dim=1)
-            print(f"negative_prompt_embeds1 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
+            print(f"negative_prompt_embeds4 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
 
 
             # For classifier free guidance, we need to do two forward passes.
