@@ -363,6 +363,8 @@ class VideoGenPipeline(DiffusionPipeline):
 
             assert prompt_embeds.dtype == image_features.dtype, "prompt_embeds and image_features must have the same dtype"
 
+            print(f"prompt_embeds1 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
+            
             prompt_embeds = torch.cat([prompt_embeds, image_features], dim=1)
 
             print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
