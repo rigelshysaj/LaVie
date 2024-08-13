@@ -527,7 +527,7 @@ def train_lora_model(data, video_folder, args):
                 #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
                 
                 combination_tensor = torch.cat([text_features, last_hidden_state], dim=1)
-                print(f"train_lora_model attention_output shape: {combination_tensor.shape}, dtype: {combination_tensor.dtype}") #[10, 1, 768] torch.float16
+                print(f"train_lora_model combination_tensor shape: {combination_tensor.shape}, dtype: {combination_tensor.dtype}") #[10, 1, 768] torch.float16
 
                 encoder_hidden_states = combination_tensor
 
