@@ -418,6 +418,9 @@ class VideoGenPipeline(DiffusionPipeline):
             )
             negative_prompt_embeds = negative_prompt_embeds[0]
 
+            print(f"negative_prompt_embeds1 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
+
+
         if do_classifier_free_guidance:
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = negative_prompt_embeds.shape[1]
@@ -425,7 +428,10 @@ class VideoGenPipeline(DiffusionPipeline):
             negative_prompt_embeds = negative_prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
 
             negative_prompt_embeds = negative_prompt_embeds.repeat(1, num_images_per_prompt, 1)
+            print(f"negative_prompt_embeds2 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
+
             negative_prompt_embeds = negative_prompt_embeds.view(batch_size * num_images_per_prompt, seq_len, -1)
+            print(f"negative_prompt_embeds3 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
 
             padding = torch.zeros(negative_prompt_embeds.shape[0], 
                               prompt_embeds.shape[1] - negative_prompt_embeds.shape[1], 
@@ -433,6 +439,8 @@ class VideoGenPipeline(DiffusionPipeline):
                               device=device, 
                               dtype=negative_prompt_embeds.dtype)
             negative_prompt_embeds = torch.cat([negative_prompt_embeds, padding], dim=1)
+            print(f"negative_prompt_embeds1 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
+
 
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and text embeddings into a single batch
