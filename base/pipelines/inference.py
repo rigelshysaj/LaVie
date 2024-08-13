@@ -168,7 +168,6 @@ class VideoGenPipeline(DiffusionPipeline):
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
         self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
         self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(self.device)
-        self.attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(self.device)
         # self.register_to_config(requires_safety_checker=requires_safety_checker)
 
     def enable_vae_slicing(self):
@@ -357,27 +356,14 @@ class VideoGenPipeline(DiffusionPipeline):
             # Processa l'immagine con CLIP
             image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
             outputs = self.clip_model.vision_model(image_inputs, output_hidden_states=True)
-            #image_features = outputs.hidden_states[-1].to(torch.float16)
-            image_features = outputs.last_hidden_state.to(torch.float32)
+            image_features = outputs.hidden_states[-1].to(torch.float32)
+            prova = outputs.last_hidden_state.to(torch.float32)
             print(f"image_features1 shape: {image_features.shape}, dtype: {image_features.dtype}")
-             # Proietta gli embedding nello stesso spazio
-
-            
-            prompt_embeds = prompt_embeds.transpose(0, 1)
-            image_features = image_features.transpose(0, 1)
+            print(f"prova shape: {prova.shape}, dtype: {prova.dtype}")
 
             assert prompt_embeds.dtype == image_features.dtype, "prompt_embeds and image_features must have the same dtype"
 
-            prompt_embeds = prompt_embeds.to(torch.float32)
-            image_features = image_features.to(torch.float32)
-            self.attention_layer = self.attention_layer.to(torch.float32)
-
-            combined_embeds, _ = self.attention_layer(prompt_embeds, image_features, image_features)
-
-            combined_embeds = combined_embeds.transpose(0, 1)
-
-            prompt_embeds = combined_embeds
-            
+            prompt_embeds = torch.cat([prompt_embeds, image_features], dim=1)
 
             print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 

@@ -526,17 +526,10 @@ def train_lora_model(data, video_folder, args):
                 last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
                 #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
                 
-                # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
-                text_features = text_features.transpose(0, 1)
-                last_hidden_state = last_hidden_state.transpose(0, 1)
+                combination_tensor = torch.cat([text_features, last_hidden_state], dim=1)
+                print(f"train_lora_model attention_output shape: {combination_tensor.shape}, dtype: {combination_tensor.dtype}") #[10, 1, 768] torch.float16
 
-                assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
-
-                # Calcola l'attenzione
-                attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
-                #print(f"train_lora_model attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
-
-                encoder_hidden_states = attention_output.transpose(0, 1)
+                encoder_hidden_states = combination_tensor
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
