@@ -519,7 +519,7 @@ def train_lora_model(data, video_folder, args):
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
                 #print(f"train_lora_model noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
-                print(f"dscription: {list(description)}")
+                print(f"description: {list(description)}")
                 # Get the text embedding for conditioning
                 text_inputs = tokenizer(list(description), return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
                 text_features = text_encoder(text_inputs, return_dict=False)[0]

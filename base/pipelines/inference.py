@@ -315,7 +315,7 @@ class VideoGenPipeline(DiffusionPipeline):
         else:
             batch_size = prompt_embeds.shape[0]
 
-        print(f"prompt: {list(prompt)}")
+        print(f"prompt1: {prompt}")
 
         if prompt_embeds is None:
             text_inputs = self.tokenizer(
@@ -657,6 +657,8 @@ class VideoGenPipeline(DiffusionPipeline):
         # 0. Default height and width to unet
         height = height or self.unet.config.sample_size * self.vae_scale_factor
         width = width or self.unet.config.sample_size * self.vae_scale_factor
+
+        print(f"prompt2: {prompt}")
 
         # 1. Check inputs. Raise error if not correct
         self.check_inputs(
