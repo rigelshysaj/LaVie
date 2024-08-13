@@ -483,11 +483,16 @@ def train_lora_model(data, video_folder, args):
 
                 video, description, frame_tensor = batch
 
+                print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
+                print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
+
                 frame = frame_tensor
 
                 print(f"epoca {epoch}, iterazione {step}")
 
                 latents = encode_latents(video, vae)
+                print(f"train_lora_model latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
+
 
                 latents = latents * vae.config.scaling_factor
 
@@ -507,16 +512,19 @@ def train_lora_model(data, video_folder, args):
                 # Add noise to the latents according to the noise magnitude at each timestep
                 # (this is the forward diffusion process)
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
+                print(f"train_lora_model noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
+
 
                 # Get the text embedding for conditioning
                 text_inputs = tokenizer(list(description), return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
                 text_features = text_encoder(text_inputs, return_dict=False)[0]
+                print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
 
                 image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
                 outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
                 last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
-                #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
+                print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
                 
                 # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
                 text_features = text_features.transpose(0, 1)
@@ -526,6 +534,9 @@ def train_lora_model(data, video_folder, args):
 
                 # Calcola l'attenzione
                 attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
+                print(f"train_lora_model attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
+
+                encoder_hidden_states = attention_output.transpose(0, 1)
 
                 encoder_hidden_states = attention_output
 
