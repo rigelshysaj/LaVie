@@ -345,6 +345,7 @@ class VideoGenPipeline(DiffusionPipeline):
             prompt_embeds = prompt_embeds[0]
 
         prompt_embeds = prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
+        print(f"prompt_embeds1 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
         bs_embed, seq_len, _ = prompt_embeds.shape
         # duplicate text embeddings for each generation per prompt, using mps friendly method
@@ -363,11 +364,11 @@ class VideoGenPipeline(DiffusionPipeline):
 
             assert prompt_embeds.dtype == image_features.dtype, "prompt_embeds and image_features must have the same dtype"
 
-            print(f"prompt_embeds1 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
+            print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
             
             prompt_embeds = torch.cat([prompt_embeds, image_features], dim=1)
 
-            print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
+            print(f"prompt_embeds3 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
