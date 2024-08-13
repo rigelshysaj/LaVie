@@ -469,7 +469,7 @@ def train_lora_model(data, video_folder, args):
 
     unet.enable_xformers_memory_efficient_attention()
 
-    attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
+    attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device).to(torch.float16)
 
     epoch_losses = []
 
