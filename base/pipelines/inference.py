@@ -412,11 +412,14 @@ class VideoGenPipeline(DiffusionPipeline):
             else:
                 attention_mask = None
 
+
+            print("fino qui arriva")
             negative_prompt_embeds = self.text_encoder(
                 uncond_input.input_ids.to(device),
                 attention_mask=attention_mask,
             )
             negative_prompt_embeds = negative_prompt_embeds[0]
+            print("anche qui?")
 
         if do_classifier_free_guidance:
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
