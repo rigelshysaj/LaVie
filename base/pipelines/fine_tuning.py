@@ -290,6 +290,9 @@ def train_lora_model(data, video_folder, args):
     tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
     text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
+    # Load CLIP model and processor for image conditioning
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
     noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
 
     unet.requires_grad_(False)
@@ -504,7 +507,25 @@ def train_lora_model(data, video_folder, args):
                 # Get the text embedding for conditioning
                 text_inputs = tokenizer(list(description), return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
                 text_features = text_encoder(text_inputs, return_dict=False)[0]
-                encoder_hidden_states = text_features
+
+
+                image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
+                outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
+                last_hidden_state = outputs.hidden_states[-1]
+                #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
+                
+                # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
+                text_features = text_features.transpose(0, 1)
+                last_hidden_state = last_hidden_state.transpose(0, 1)
+
+                assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
+
+                attention_layer = attention_layer
+
+                # Calcola l'attenzione
+                attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
+
+                encoder_hidden_states = attention_output
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
