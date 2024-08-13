@@ -469,6 +469,8 @@ def train_lora_model(data, video_folder, args):
 
     unet.enable_xformers_memory_efficient_attention()
 
+    attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device)
+
     epoch_losses = []
 
     for epoch in range(first_epoch, args.num_train_epochs):
@@ -521,8 +523,6 @@ def train_lora_model(data, video_folder, args):
                 last_hidden_state = last_hidden_state.transpose(0, 1)
 
                 assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
-
-                attention_layer = attention_layer
 
                 # Calcola l'attenzione
                 attention_output, _ = attention_layer(text_features, last_hidden_state, last_hidden_state)
