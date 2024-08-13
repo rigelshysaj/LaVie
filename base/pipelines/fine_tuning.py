@@ -521,8 +521,21 @@ def train_lora_model(data, video_folder, args):
 
                 print(f"description: {list(description)}")
                 # Get the text embedding for conditioning
-                text_inputs = tokenizer(list(description), return_tensors="pt", padding=True, truncation=True).input_ids.to(unet.device)
-                text_features = text_encoder(text_inputs, return_dict=False)[0]
+
+                text_inputs = tokenizer(
+                    list(description),
+                    padding="max_length",
+                    max_length=tokenizer.model_max_length,
+                    truncation=True,
+                    return_tensors="pt"
+                ).to(unet.device)
+
+                text_features = text_encoder(
+                    text_inputs.input_ids,
+                    return_dict=False
+                )[0]
+
+
                 print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
 
