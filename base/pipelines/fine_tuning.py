@@ -474,12 +474,14 @@ def train_lora_model(data, video_folder, args):
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
         batch_losses = []
-
+        frame = None
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(unet):
 
                 video, description, frame_tensor = batch
+
+                frame = frame_tensor
 
                 print(f"epoca {epoch}, iterazione {step}")
 
@@ -659,7 +661,8 @@ def train_lora_model(data, video_folder, args):
 
                 for prompt in args.text_prompt:
                     print('Processing the ({}) prompt'.format(prompt))
-                    videos = videogen_pipeline(prompt, 
+                    videos = videogen_pipeline(prompt,
+                                            image_tensor=frame, 
                                             video_length=args.video_length, 
                                             height=args.image_size[0], 
                                             width=args.image_size[1], 

@@ -570,6 +570,7 @@ class VideoGenPipeline(DiffusionPipeline):
     def __call__(
         self,
         prompt: Union[str, List[str]] = None,
+        image_tensor: Optional[torch.FloatTensor] = None,
         height: Optional[int] = None,
         width: Optional[int] = None,
         video_length: int = 16,
@@ -689,6 +690,7 @@ class VideoGenPipeline(DiffusionPipeline):
             negative_prompt,
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
+            input_image=image_tensor
         )
 
         # 4. Prepare timesteps
