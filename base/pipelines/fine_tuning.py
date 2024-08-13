@@ -538,8 +538,6 @@ def train_lora_model(data, video_folder, args):
 
                 encoder_hidden_states = attention_output.transpose(0, 1)
 
-                encoder_hidden_states = attention_output
-
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
                     # set prediction_type of scheduler if defined
