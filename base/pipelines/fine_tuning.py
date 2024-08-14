@@ -130,13 +130,13 @@ def load_model_for_inference(args):
     accelerator.print(f"Inference from checkpoint {path}")
     accelerator.load_state(os.path.join(args.output_dir, path))
 
-    image_path = "/content/drive/My Drive/chih.jpeg"
+    image_path = "/content/drive/My Drive/cutting.jpeg"
 
     image = Image.open(image_path)
 
     # Definisci la trasformazione
     transform = transforms.Compose([
-        transforms.Resize((320, 512)),
+        transforms.Resize((512, 320)),
         transforms.ToTensor()  # Converte l'immagine in un tensore
     ])
 
