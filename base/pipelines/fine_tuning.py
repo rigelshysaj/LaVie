@@ -67,10 +67,39 @@ def load_model_for_inference(args):
     torch.set_grad_enabled(False)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
+
+    accelerator_project_config = ProjectConfiguration(project_dir="/content/drive/My Drive/", logging_dir=logging_dir)
+
+    accelerator = Accelerator(
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        mixed_precision=args.mixed_precision,
+        log_with=args.report_to,
+        project_config=accelerator_project_config,
+    )
+
+    # Disable AMP for MPS.
+    if torch.backends.mps.is_available():
+        accelerator.native_amp = False
+
+    weight_dtype = torch.float32
+
     sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
     state_dict = find_model(args.ckpt_path)
     unet.load_state_dict(state_dict)
+
+    vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
+    tokenizer_one = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
+    text_encoder_one = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device) # huge
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+    scheduler = DDPMScheduler.from_pretrained(sd_path,
+                                            subfolder="scheduler",
+                                            beta_start=args.beta_start,
+                                            beta_end=args.beta_end,
+                                            beta_schedule=args.beta_schedule)
 
     lora_config = LoraConfig(
         r=4,
@@ -78,52 +107,45 @@ def load_model_for_inference(args):
         init_lora_weights="gaussian",
         target_modules=["to_k", "to_q", "to_v", "to_out.0"],
     )
+
+
+    unet.to(accelerator.device, dtype=weight_dtype)
+    vae.to(accelerator.device, dtype=weight_dtype)
+    text_encoder_one.to(accelerator.device, dtype=weight_dtype)
+
     # Applica LoRA al modello
     unet = get_peft_model(unet, lora_config)
-    
-    # Carica l'ultimo checkpoint
-    checkpoint_dir = "/content/drive/My Drive/checkpoints"
-    checkpoint_path = os.path.join(checkpoint_dir, "latest_checkpoint.pth")
 
+    unet = accelerator.prepare(unet)
     
-    if os.path.exists(checkpoint_path):
-        checkpoint = torch.load(checkpoint_path)
-        unet.load_state_dict(checkpoint['model_state_dict'])
-        print(f"Caricato checkpoint dall'epoca {checkpoint['epoch']}, iterazione {checkpoint['iteration']}")
+    if args.resume_from_checkpoint != "latest":
+        path = os.path.basename(args.resume_from_checkpoint)
     else:
-        print("Nessun checkpoint trovato. Utilizzo del modello non addestrato.")
-    
-    vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
-    tokenizer_one = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
-    text_encoder_one = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device) # huge
-    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
-    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+        # Get the most recent checkpoint
+        dirs = os.listdir(args.output_dir)
+        dirs = [d for d in dirs if d.startswith("checkpoint")]
+        dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
+        path = dirs[-1] if len(dirs) > 0 else None
 
-    # set eval mode
-    unet.eval()
-    vae.eval()
-    text_encoder_one.eval()
-    
-    if args.sample_method == 'ddim':
-        scheduler = DDIMScheduler.from_pretrained(sd_path, 
-                                            subfolder="scheduler",
-                                            beta_start=args.beta_start, 
-                                            beta_end=args.beta_end, 
-                                            beta_schedule=args.beta_schedule)
-    elif args.sample_method == 'eulerdiscrete':
-        scheduler = EulerDiscreteScheduler.from_pretrained(sd_path,
-                                            subfolder="scheduler",
-                                            beta_start=args.beta_start,
-                                            beta_end=args.beta_end,
-                                            beta_schedule=args.beta_schedule)
-    elif args.sample_method == 'ddpm':
-        scheduler = DDPMScheduler.from_pretrained(sd_path,
-                                            subfolder="scheduler",
-                                            beta_start=args.beta_start,
-                                            beta_end=args.beta_end,
-                                            beta_schedule=args.beta_schedule)
-    else:
-        raise NotImplementedError
+    accelerator.print(f"Inference from checkpoint {path}")
+    accelerator.load_state(os.path.join(args.output_dir, path))
+
+    image_path = "/content/drive/My Drive/chih.jpeg"
+
+    image = Image.open(image_path)
+
+    # Definisci la trasformazione
+    transform = transforms.Compose([
+        transforms.Resize((320, 512)),
+        transforms.ToTensor()  # Converte l'immagine in un tensore
+    ])
+
+    # Applica la trasformazione all'immagine
+    input_image = transform(image)
+
+    image_tensor = input_image.unsqueeze(0).to(torch.float32)  # Aggiunge una dimensione per il batch
+
+    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
 
     videogen_pipeline = VideoGenPipeline(vae=vae, 
                                 text_encoder=text_encoder_one, 
@@ -141,7 +163,8 @@ def load_model_for_inference(args):
     video_grids = []
     for prompt in args.text_prompt:
         print('Processing the ({}) prompt'.format(prompt))
-        videos = videogen_pipeline(prompt, 
+        videos = videogen_pipeline(prompt,
+                                image_tensor=image_tensor, 
                                 video_length=args.video_length, 
                                 height=args.image_size[0], 
                                 width=args.image_size[1], 
@@ -457,21 +480,7 @@ def train_lora_model(data, video_folder, args):
         disable=not accelerator.is_local_main_process,
     )
 
-    checkpoint_dir = "/content/drive/My Drive/checkpoints"
-    os.makedirs(checkpoint_dir, exist_ok=True)
-    start_epoch = 0
-    iteration = 0
-    if os.path.exists(os.path.join(checkpoint_dir, "latest_checkpoint.pth")):
-        checkpoint = torch.load(os.path.join(checkpoint_dir, "latest_checkpoint.pth"))
-        unet.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        start_epoch = checkpoint['epoch']
-        iteration = checkpoint['iteration']
-        print(f"Ripresa dell'addestramento dall'epoca {start_epoch}, iterazione {iteration}")
-
     unet.enable_xformers_memory_efficient_attention()
-
-    attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device).to(torch.float16)
 
     epoch_losses = []
 
@@ -745,5 +754,5 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
-    training(OmegaConf.load(args.config))
-    #load_model_for_inference(OmegaConf.load(args.config))
+    #training(OmegaConf.load(args.config))
+    load_model_for_inference(OmegaConf.load(args.config))
