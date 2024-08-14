@@ -475,10 +475,11 @@ def train_lora_model(data, video_folder, args):
 
     epoch_losses = []
 
+    frame = None
+
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
         batch_losses = []
-        frame = None
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(unet):
