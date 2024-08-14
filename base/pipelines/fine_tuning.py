@@ -486,9 +486,12 @@ def train_lora_model(data, video_folder, args):
                 video, description, frame_tensor = batch
 
                 #print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
+                
                 print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
-                frame = frame_tensor
+                if(description[0] == 'a man cutting photo with a sword'):
+                    print("yesssssssssss a man cutting photo with a sword")
+                    frame = frame_tensor
 
                 #print(f"epoca {epoch}, iterazione {step}")
 
