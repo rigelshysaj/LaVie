@@ -82,7 +82,7 @@ def load_model_for_inference(args):
     if torch.backends.mps.is_available():
         accelerator.native_amp = False
 
-    weight_dtype = torch.float32
+    weight_dtype = torch.float16
 
     sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
@@ -800,5 +800,5 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
-    training(OmegaConf.load(args.config))
-    #load_model_for_inference(OmegaConf.load(args.config))
+    #training(OmegaConf.load(args.config))
+    load_model_for_inference(OmegaConf.load(args.config))
