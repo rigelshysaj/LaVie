@@ -489,7 +489,7 @@ def train_lora_model(data, video_folder, args):
                 
                 #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
-                print(f"description: {description[0]}")
+                #print(f"description: {description[0]}")
                 
                 if(description[0] == 'a man cutting photo with a sword'):
                     print("yesssssssssss a man cutting photo with a sword")
@@ -670,7 +670,7 @@ def train_lora_model(data, video_folder, args):
         print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)      
 
-        if (epoch + 1) % 200 == 0:
+        if (epoch + 1) % 100 == 0:
             with torch.no_grad():
 
                 videogen_pipeline = VideoGenPipeline(vae=vae, 
