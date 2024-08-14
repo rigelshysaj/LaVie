@@ -495,7 +495,7 @@ def train_lora_model(data, video_folder, args):
                     print("yesssssssssss a man cutting photo with a sword")
                     frame = frame_tensor
 
-                #print(f"epoca {epoch}, iterazione {step}")
+                print(f"epoca {epoch}, iterazione {step}")
 
                 latents = encode_latents(video, vae)
                 #print(f"train_lora_model latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
