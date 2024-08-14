@@ -491,7 +491,7 @@ def train_lora_model(data, video_folder, args):
 
                 #print(f"description: {description[0]}")
                 
-                if(description[0] == 'a man cutting photo with a sword'):
+                if(description[0] == 'a man cutting photo with a sword' and frame is not None):
                     print("yesssssssssss a man cutting photo with a sword")
                     frame = frame_tensor
 
@@ -605,7 +605,7 @@ def train_lora_model(data, video_folder, args):
                 accelerator.log({"train_loss": train_loss}, step=global_step)
                 train_loss = 0.0
 
-                if global_step % args.checkpointing_steps == 0:
+                if (epoch + 1) % 100 == 0:
                     if accelerator.is_main_process:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
