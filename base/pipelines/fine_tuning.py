@@ -491,7 +491,7 @@ def train_lora_model(data, video_folder, args):
 
                 #print(f"description: {description[0]}")
                 
-                if(description[0] == 'a man cutting photo with a sword' and frame is not None):
+                if(description[0] == 'a man cutting photo with a sword' and frame is None):
                     print("yesssssssssss a man cutting photo with a sword")
                     frame = frame_tensor
 
