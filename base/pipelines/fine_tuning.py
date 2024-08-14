@@ -489,7 +489,6 @@ def train_lora_model(data, video_folder, args):
                 
                 #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
-                print(description[0])
                 if(description[0] == 'a man cutting photo with a sword'):
                     print("yesssssssssss a man cutting photo with a sword")
                     frame = frame_tensor
@@ -725,7 +724,7 @@ def training(args):
 
     if on_colab:
         # Percorso del dataset su Google Colab
-        dataset_path = '/content/drive/My Drive/msvd_one'
+        dataset_path = '/content/drive/My Drive/msvd_small'
     else:
         # Percorso del dataset locale (sincronizzato con Google Drive)
         dataset_path = '/path/to/your/Google_Drive/sync/folder/path/to/your/dataset'
