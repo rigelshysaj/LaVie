@@ -484,7 +484,7 @@ def train_lora_model(data, video_folder, args, inference):
 
     if(inference):
 
-        image_path = "/content/drive/My Drive/cutting.jpeg"
+        image_path = "/content/drive/My Drive/chih.jpeg"
 
         image = Image.open(image_path)
 
@@ -525,6 +525,8 @@ def train_lora_model(data, video_folder, args, inference):
                     imageio.mimwrite("/content/drive/My Drive/" + f"cutting.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
                 print('save path {}'.format("/content/drive/My Drive/"))
+
+                return
 
     epoch_losses = []
 
