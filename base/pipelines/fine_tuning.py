@@ -522,7 +522,7 @@ def train_lora_model(data, video_folder, args, inference):
                                             width=args.image_size[1], 
                                             num_inference_steps=args.num_sampling_steps,
                                             guidance_scale=args.guidance_scale).video
-                    imageio.mimwrite("/content/drive/My Drive/" + f"cutting.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+                    imageio.mimwrite("/content/drive/My Drive/" + f"chihuu.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
                 print('save path {}'.format("/content/drive/My Drive/"))
 
