@@ -17,7 +17,6 @@ import logging
 import math
 import transformers
 from diffusers.optimization import get_scheduler
-import datasets
 import diffusers
 import sys
 from pathlib import Path
@@ -272,11 +271,9 @@ def train_lora_model(data, video_folder, args):
     
     logger.info(accelerator.state, main_process_only=False)
     if accelerator.is_local_main_process:
-        datasets.utils.logging.set_verbosity_warning()
         transformers.utils.logging.set_verbosity_warning()
         diffusers.utils.logging.set_verbosity_info()
     else:
-        datasets.utils.logging.set_verbosity_error()
         transformers.utils.logging.set_verbosity_error()
         diffusers.utils.logging.set_verbosity_error()
 
