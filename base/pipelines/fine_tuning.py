@@ -270,7 +270,7 @@ def cast_training_params(model: Union[torch.nn.Module, List[torch.nn.Module]], d
                 param.data = param.to(dtype)
 
 
-def train_lora_model(data, video_folder, args):
+def train_lora_model(data, video_folder, args, inference):
 
     #sys.argv = [sys.argv[0], '--pretrained_model_name_or_path', args_base.pretrained_path]
 
@@ -481,6 +481,50 @@ def train_lora_model(data, video_folder, args):
     )
 
     unet.enable_xformers_memory_efficient_attention()
+
+    if(inference):
+
+        image_path = "/content/drive/My Drive/cutting.jpeg"
+
+        image = Image.open(image_path)
+
+        # Definisci la trasformazione
+        transform = transforms.Compose([
+            transforms.Resize((512, 320)),
+            transforms.ToTensor()  # Converte l'immagine in un tensore
+        ])
+
+        # Applica la trasformazione all'immagine
+        input_image = transform(image)
+
+        image_tensor = input_image.unsqueeze(0).to(torch.float32)
+
+
+        with torch.no_grad():
+
+                videogen_pipeline = VideoGenPipeline(vae=vae, 
+                            text_encoder=text_encoder, 
+                            tokenizer=tokenizer, 
+                            scheduler=noise_scheduler, 
+                            unet=unet,
+                            clip_processor=clip_processor,
+                            clip_model=clip_model
+                            ).to(device)
+                videogen_pipeline.enable_xformers_memory_efficient_attention()
+
+
+                for prompt in args.text_prompt:
+                    print('Processing the ({}) prompt'.format(prompt))
+                    videos = videogen_pipeline(prompt,
+                                            image_tensor=image_tensor, 
+                                            video_length=args.video_length, 
+                                            height=args.image_size[0], 
+                                            width=args.image_size[1], 
+                                            num_inference_steps=args.num_sampling_steps,
+                                            guidance_scale=args.guidance_scale).video
+                    imageio.mimwrite("/content/drive/My Drive/" + f"sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+
+                print('save path {}'.format("/content/drive/My Drive/"))
 
     epoch_losses = []
 
@@ -745,7 +789,7 @@ def training(args):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    train_lora_model(data, video_folder, args)
+    train_lora_model(data, video_folder, args, True)
 
 
 
@@ -754,5 +798,5 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
-    #training(OmegaConf.load(args.config))
-    load_model_for_inference(OmegaConf.load(args.config))
+    training(OmegaConf.load(args.config))
+    #load_model_for_inference(OmegaConf.load(args.config))
