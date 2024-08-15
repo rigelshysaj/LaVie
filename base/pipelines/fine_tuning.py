@@ -791,7 +791,7 @@ def training(args):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    train_lora_model(data, video_folder, args, True)
+    train_lora_model(data, video_folder, args, False)
 
 
 
