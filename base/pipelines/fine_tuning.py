@@ -129,7 +129,7 @@ def load_model_for_inference(args):
     accelerator.print(f"Inference from checkpoint {path}")
     accelerator.load_state(os.path.join(args.output_dir, path))
 
-    image_path = "/content/drive/My Drive/cutting.jpeg"
+    image_path = "/content/drive/My Drive/chih.jpeg"
 
     image = Image.open(image_path)
 
@@ -171,7 +171,7 @@ def load_model_for_inference(args):
                                 guidance_scale=args.guidance_scale).video
         imageio.mimwrite("/content/drive/My Drive/" + prompt.replace(' ', '_') + '.mp4', videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
     
-    print('save path {}'.format(args.output_folder))
+    print('save path {}'.format("/content/drive/My Drive/" + prompt.replace(' ', '_') + '.mp4'))
     
 
 
