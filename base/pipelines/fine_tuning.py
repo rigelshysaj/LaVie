@@ -82,10 +82,10 @@ def load_model_for_inference(args):
     if torch.backends.mps.is_available():
         accelerator.native_amp = False
 
-    weight_dtype = torch.float16
+    weight_dtype = torch.float32
 
     sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
-    unet = get_models(args, sd_path).to(device, dtype=torch.float16)
+    unet = get_models(args, sd_path).to(device)
     state_dict = find_model(args.ckpt_path)
     unet.load_state_dict(state_dict)
 
@@ -108,7 +108,7 @@ def load_model_for_inference(args):
         target_modules=["to_k", "to_q", "to_v", "to_out.0"],
     )
 
-    unet = unet.to(torch.float32)
+    unet.to(accelerator.device, dtype=weight_dtype)
     vae.to(accelerator.device, dtype=weight_dtype)
     text_encoder_one.to(accelerator.device, dtype=weight_dtype)
 
