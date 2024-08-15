@@ -108,8 +108,7 @@ def load_model_for_inference(args):
         target_modules=["to_k", "to_q", "to_v", "to_out.0"],
     )
 
-
-    unet.to(accelerator.device, dtype=weight_dtype)
+    unet = unet.to(torch.float32)
     vae.to(accelerator.device, dtype=weight_dtype)
     text_encoder_one.to(accelerator.device, dtype=weight_dtype)
 
@@ -800,5 +799,5 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
-    training(OmegaConf.load(args.config))
-    #load_model_for_inference(OmegaConf.load(args.config))
+    #training(OmegaConf.load(args.config))
+    load_model_for_inference(OmegaConf.load(args.config))
