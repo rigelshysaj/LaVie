@@ -169,7 +169,7 @@ def load_model_for_inference(args):
                                 width=args.image_size[1], 
                                 num_inference_steps=args.num_sampling_steps,
                                 guidance_scale=args.guidance_scale).video
-        imageio.mimwrite(args.output_folder + prompt.replace(' ', '_') + '.mp4', videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+        imageio.mimwrite("/content/drive/My Drive/" + prompt.replace(' ', '_') + '.mp4', videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
     
     print('save path {}'.format(args.output_folder))
     
