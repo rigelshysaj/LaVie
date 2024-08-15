@@ -546,8 +546,8 @@ def train_lora_model(data, video_folder, args, inference):
 
                 #print(f"description: {description[0]}")
                 
-                if(description[0] == 'a man cutting photo with a sword' and frame is None):
-                    print("yesssssssssss a man cutting photo with a sword")
+                if(description[0] == 'a kid hiding behind a skateboard' and frame is None):
+                    print("yesssssssssss a kid hiding behind a skateboard")
                     frame = frame_tensor
 
                 print(f"epoca {epoch}, iterazione {step}")
@@ -799,5 +799,5 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
-    #training(OmegaConf.load(args.config))
-    load_model_for_inference(OmegaConf.load(args.config))
+    training(OmegaConf.load(args.config))
+    #load_model_for_inference(OmegaConf.load(args.config))
