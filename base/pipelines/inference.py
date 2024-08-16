@@ -355,6 +355,8 @@ class VideoGenPipeline(DiffusionPipeline):
         prompt_embeds = prompt_embeds.view(bs_embed * num_images_per_prompt, seq_len, -1)
         prompt_embeds = prompt_embeds.to(torch.float32)
 
+        print(f"prompt_embeds1 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
+
         if input_image is not None:
             # Processa l'immagine con CLIP
             image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
