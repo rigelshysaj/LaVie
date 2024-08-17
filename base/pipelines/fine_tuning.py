@@ -561,13 +561,13 @@ def train_lora_model(data, video_folder, args):
                     text_inputs.input_ids,
                     return_dict=False
                 )[0]
-                print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
 
                 image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
                 outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
                 last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
-                print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
+                #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
                 
                 cross_attention = CrossAttentionTI(embed_dim=768, num_heads=8).to(unet.device).to(torch.float16)
                 
@@ -578,7 +578,7 @@ def train_lora_model(data, video_folder, args):
                 encoder_hidden_states = cross_attention(text_features, last_hidden_state)
                 encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
-                print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 50, 768] torch.float16
+                #print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 50, 768] torch.float16
 
 
                 # Get the target for loss depending on the prediction type
