@@ -23,7 +23,6 @@ from diffusers.configuration_utils import FrozenDict
 from diffusers.models import AutoencoderKL
 from torch.utils.checkpoint import checkpoint
 from diffusers.schedulers import KarrasDiffusionSchedulers
-from fine_tuning import CrossAttentionTI
 from diffusers.utils import (
     deprecate,
     is_accelerate_available,
@@ -54,6 +53,33 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
+
+
+class CrossAttentionTI(nn.Module):
+    def __init__(self, embed_dim, num_heads):
+        super().__init__()
+        self.attention = nn.MultiheadAttention(embed_dim, num_heads)
+        self.norm1 = nn.LayerNorm(embed_dim)
+        self.norm2 = nn.LayerNorm(embed_dim)
+        self.ff = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim * 4),
+            nn.ReLU(),
+            nn.Linear(embed_dim * 4, embed_dim)
+        )
+
+    def forward(self, text, image):
+        # Normalize inputs
+        text = self.norm1(text)
+        image = self.norm1(image)
+        
+        # Apply cross-attention
+        attention_output, _ = self.attention(text, image, image)
+        
+        # Add residual connection and apply feed-forward layer
+        text = text + attention_output
+        text = text + self.ff(self.norm2(text))
+        
+        return text
 
 EXAMPLE_DOC_STRING = """
     Examples:
