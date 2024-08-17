@@ -546,8 +546,8 @@ def train_lora_model(data, video_folder, args, inference):
 
                 #print(f"description: {description[0]}")
                 
-                if(description[0] == 'a kid hiding behind a skateboard' and frame is None):
-                    print("yesssssssssss a kid hiding behind a skateboard")
+                if(description[0] == 'a man fires a handgun' and frame is None):
+                    print("yesssssssssss a man fires a handgun")
                     frame = frame_tensor
 
                 print(f"epoca {epoch}, iterazione {step}")
@@ -660,7 +660,7 @@ def train_lora_model(data, video_folder, args, inference):
                 accelerator.log({"train_loss": train_loss}, step=global_step)
                 train_loss = 0.0
 
-                if global_step % args.checkpointing_steps == 0:
+                if (epoch + 1) % 10 == 0:
                     if accelerator.is_main_process:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
@@ -725,7 +725,7 @@ def train_lora_model(data, video_folder, args, inference):
         print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)      
 
-        if (epoch + 1) % 20 == 0:
+        if (epoch + 1) % 10 == 0:
             with torch.no_grad():
 
                 videogen_pipeline = VideoGenPipeline(vae=vae, 
@@ -799,5 +799,5 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
-    #training(OmegaConf.load(args.config))
-    load_model_for_inference(OmegaConf.load(args.config))
+    training(OmegaConf.load(args.config))
+    #load_model_for_inference(OmegaConf.load(args.config))
