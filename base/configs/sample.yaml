@@ -77,7 +77,7 @@ hub_model_id: null
 report_to: "tensorboard"
 local_rank: -1
 checkpointing_steps: 300
-checkpoints_total_limit: 2
+checkpoints_total_limit: 3
 resume_from_checkpoint: "latest"
 noise_offset: 0
 rank: 4 
