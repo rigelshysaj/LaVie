@@ -222,6 +222,32 @@ def encode_latents_(video, vae):
     
     return latents
 
+class CrossAttentionTI(nn.Module):
+    def __init__(self, embed_dim, num_heads):
+        super().__init__()
+        self.attention = nn.MultiheadAttention(embed_dim, num_heads)
+        self.norm1 = nn.LayerNorm(embed_dim)
+        self.norm2 = nn.LayerNorm(embed_dim)
+        self.ff = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim * 4),
+            nn.ReLU(),
+            nn.Linear(embed_dim * 4, embed_dim)
+        )
+
+    def forward(self, text, image):
+        # Normalize inputs
+        text = self.norm1(text)
+        image = self.norm1(image)
+        
+        # Apply cross-attention
+        attention_output, _ = self.attention(text, image, image)
+        
+        # Add residual connection and apply feed-forward layer
+        text = text + attention_output
+        text = text + self.ff(self.norm2(text))
+        
+        return text
+
 
 def custom_collate(batch):
     batch = list(filter(lambda x: x[0] is not None and x[1] is not None and x[2] is not None, batch))
@@ -270,10 +296,6 @@ def cast_training_params(model: Union[torch.nn.Module, List[torch.nn.Module]], d
 
 
 def train_lora_model(data, video_folder, args):
-
-    #sys.argv = [sys.argv[0], '--pretrained_model_name_or_path', args_base.pretrained_path]
-
-    #args = Details.parse_args()
 
     logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
 
@@ -539,25 +561,25 @@ def train_lora_model(data, video_folder, args):
                     text_inputs.input_ids,
                     return_dict=False
                 )[0]
-                #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
 
                 image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
                 outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
                 last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
-                #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
+                print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
+                
+                cross_attention = CrossAttentionTI(embed_dim=768, num_heads=8).to(unet.device)
                 
                 # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
                 text_features = text_features.transpose(0, 1)
                 last_hidden_state = last_hidden_state.transpose(0, 1)
 
-                assert text_features.dtype == last_hidden_state.dtype, "text_features and last_hidden_state must have the same dtype"
+                encoder_hidden_states = cross_attention(text_features, last_hidden_state)
+                encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
-                # Calcola l'attenzione
-                attention_output, _ = attention_layer(last_hidden_state, text_features, text_features)
-                #print(f"train_lora_model attention_output shape: {attention_output.shape}, dtype: {attention_output.dtype}") #[10, 1, 768] torch.float16
+                print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 50, 768] torch.float16
 
-                encoder_hidden_states = attention_output.transpose(0, 1)
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:

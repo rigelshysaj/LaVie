@@ -23,6 +23,7 @@ from diffusers.configuration_utils import FrozenDict
 from diffusers.models import AutoencoderKL
 from torch.utils.checkpoint import checkpoint
 from diffusers.schedulers import KarrasDiffusionSchedulers
+from fine_tuning import CrossAttentionTI
 from diffusers.utils import (
     deprecate,
     is_accelerate_available,
@@ -170,7 +171,7 @@ class VideoGenPipeline(DiffusionPipeline):
             clip_model=clip_model,
         )
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
-        self.attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(self.device)
+        self.attention_layer = CrossAttentionTI(embed_dim=768, num_heads=8).to(self.device)
         # self.register_to_config(requires_safety_checker=requires_safety_checker)
 
     def enable_vae_slicing(self):
