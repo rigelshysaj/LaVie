@@ -546,8 +546,8 @@ def train_lora_model(data, video_folder, args, inference):
 
                 #print(f"description: {description[0]}")
                 
-                if(description[0] == 'a man fires a handgun' and frame is None):
-                    print("yesssssssssss a man fires a handgun")
+                if(description[0] == 'a baseball player throwing ball' and frame is None):
+                    print("yesssssssssss a baseball player throwing ball")
                     frame = frame_tensor
 
                 print(f"epoca {epoch}, iterazione {step}")
@@ -660,7 +660,7 @@ def train_lora_model(data, video_folder, args, inference):
                 accelerator.log({"train_loss": train_loss}, step=global_step)
                 train_loss = 0.0
 
-                if (4 + 1) % 10 == 0:
+                if (epoch + 1) % 10 == 0:
                     if accelerator.is_main_process:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
