@@ -546,8 +546,8 @@ def train_lora_model(data, video_folder, args, inference):
 
                 #print(f"description: {description[0]}")
                 
-                if(description[0] == 'children are dancing' and frame is None):
-                    print("yesssssssssss children are dancing")
+                if(description[0] == 'a baseball player throwing ball' and frame is None):
+                    print("yesssssssssss a baseball player throwing ball")
                     frame = frame_tensor
 
                 print(f"epoca {epoch}, iterazione {step}")
@@ -725,7 +725,7 @@ def train_lora_model(data, video_folder, args, inference):
         print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)      
 
-        if (epoch + 1) % 10 == 0:
+        if (epoch + 1) % 20 == 0:
             with torch.no_grad():
 
                 videogen_pipeline = VideoGenPipeline(vae=vae, 
