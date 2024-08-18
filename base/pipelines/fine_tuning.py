@@ -546,8 +546,8 @@ def train_lora_model(data, video_folder, args, inference):
 
                 #print(f"description: {description[0]}")
                 
-                if(description[0] == 'a man cutting photo with a sword' and frame is None):
-                    print("yesssssssssss a man cutting photo with a sword")
+                if(description[0] == 'children are dancing' and frame is None):
+                    print("yesssssssssss children are dancing")
                     frame = frame_tensor
 
                 print(f"epoca {epoch}, iterazione {step}")
