@@ -684,11 +684,7 @@ def train_lora_model(data, video_folder, args):
         #print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)      
 
-        if (epoch + 1) % 40 == 0:
-
-            #original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
-            #state_dict = find_model(args.ckpt_path)
-            #original_unet.load_state_dict(state_dict)
+        if (epoch + 1) % 5 == 0:
 
             with torch.no_grad():
 
@@ -702,7 +698,26 @@ def train_lora_model(data, video_folder, args):
                             ).to(device)
                 videogen_pipeline.enable_xformers_memory_efficient_attention()
 
-                '''
+                for prompt in args.text_prompt:
+                    print('Processing the ({}) prompt'.format(prompt))
+                    videos = videogen_pipeline(prompt,
+                                            image_tensor=frame, 
+                                            video_length=args.video_length, 
+                                            height=args.image_size[0], 
+                                            width=args.image_size[1], 
+                                            num_inference_steps=args.num_sampling_steps,
+                                            guidance_scale=args.guidance_scale).video
+                    imageio.mimwrite("/content/drive/My Drive/" + f"fine_tuned_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+                    del videos
+
+                    
+                del videogen_pipeline
+                torch.cuda.empty_cache()
+
+                original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
+                state_dict = find_model(args.ckpt_path)
+                original_unet.load_state_dict(state_dict)
+
                 # Pipeline per il modello originale
                 videogen_pipeline_original = VideoGenPipeline(
                     vae=vae, 
@@ -714,19 +729,9 @@ def train_lora_model(data, video_folder, args):
                     clip_model=clip_model
                 ).to(device)
                 videogen_pipeline_original.enable_xformers_memory_efficient_attention()
-                '''
 
                 for prompt in args.text_prompt:
                     print('Processing the ({}) prompt'.format(prompt))
-                    videos = videogen_pipeline(prompt,
-                                            image_tensor=frame, 
-                                            video_length=args.video_length, 
-                                            height=args.image_size[0], 
-                                            width=args.image_size[1], 
-                                            num_inference_steps=args.num_sampling_steps,
-                                            guidance_scale=args.guidance_scale).video
-                    
-                    '''
                     # Generazione con il modello originale
                     videos_original = videogen_pipeline_original(
                         prompt, 
@@ -736,10 +741,12 @@ def train_lora_model(data, video_folder, args):
                         num_inference_steps=args.num_sampling_steps,
                         guidance_scale=args.guidance_scale
                     ).video
-                    '''
-
-                    imageio.mimwrite("/content/drive/My Drive/" + f"fine_tuned_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
-                    #imageio.mimwrite("/content/drive/My Drive/" + f"original_sample_epoch_{epoch}.mp4", videos_original[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+                    
+                    imageio.mimwrite("/content/drive/My Drive/" + f"original_sample_epoch_{epoch}.mp4", videos_original[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+                    del videos_original
+                
+                del videogen_pipeline_original, original_unet
+                torch.cuda.empty_cache()
 
                 print('save path {}'.format("/content/drive/My Drive/"))
                 
