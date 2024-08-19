@@ -268,6 +268,11 @@ def cast_training_params(model: Union[torch.nn.Module, List[torch.nn.Module]], d
             if param.requires_grad:
                 param.data = param.to(dtype)
 
+def log_lora_weights(model, step, accelerator):
+       for name, param in model.named_parameters():
+           if 'lora' in name:
+               accelerator.log({f"lora_weight/{name}": param.data.mean().item()}, step=step)
+
 
 def train_lora_model(data, video_folder, args, inference):
 
@@ -659,6 +664,9 @@ def train_lora_model(data, video_folder, args, inference):
                 global_step += 1
                 accelerator.log({"train_loss": train_loss}, step=global_step)
                 train_loss = 0.0
+
+                if global_step % args.logging_steps == 0:
+                    log_lora_weights(unet, global_step)
 
                 if global_step % args.checkpointing_steps == 0:
                     if accelerator.is_main_process:

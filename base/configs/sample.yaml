@@ -82,3 +82,4 @@ resume_from_checkpoint: "latest"
 noise_offset: 0
 rank: 4 
 resolution: 512
+logging_steps: 100
