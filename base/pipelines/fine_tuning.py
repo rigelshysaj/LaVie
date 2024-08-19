@@ -268,7 +268,7 @@ def cast_training_params(model: Union[torch.nn.Module, List[torch.nn.Module]], d
             if param.requires_grad:
                 param.data = param.to(dtype)
 
-def log_lora_weights(model, step, accelerator):
+def log_lora_weights(model, step):
        for name, param in model.named_parameters():
            if 'lora' in name:
                print(f"Step {step}: LoRA weight '{name}' mean = {param.data.mean().item():.6f}")
@@ -311,6 +311,10 @@ def train_lora_model(data, video_folder, args):
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
     state_dict = find_model(args.ckpt_path)
     unet.load_state_dict(state_dict)
+
+    # Carica il modello UNet originale
+    original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
+    original_unet.load_state_dict(state_dict)
 
     tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
     text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
@@ -617,7 +621,7 @@ def train_lora_model(data, video_folder, args):
                 train_loss = 0.0
 
                 if global_step % args.logging_steps == 0:
-                    log_lora_weights(unet, global_step, accelerator)
+                    log_lora_weights(unet, global_step)
 
                 if global_step % args.checkpointing_steps == 0:
                     if accelerator.is_main_process:
@@ -684,44 +688,46 @@ def train_lora_model(data, video_folder, args):
         #print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)      
 
-        if (epoch + 1) % 5 == 0:
-
+        if (epoch + 1) % 1 == 0:
             with torch.no_grad():
+                # Funzione per generare video
+                def generate_video(unet, is_original):
+                    pipeline = VideoGenPipeline(
+                        vae=vae, 
+                        text_encoder=text_encoder, 
+                        tokenizer=tokenizer, 
+                        scheduler=noise_scheduler, 
+                        unet=unet,
+                        clip_processor=clip_processor,
+                        clip_model=clip_model
+                    ).to(device)
+                    pipeline.enable_xformers_memory_efficient_attention()
 
-                
-
-                original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
-                state_dict = find_model(args.ckpt_path)
-                original_unet.load_state_dict(state_dict)
-
-                # Pipeline per il modello originale
-                videogen_pipeline_original = VideoGenPipeline(
-                    vae=vae, 
-                    text_encoder=text_encoder, 
-                    tokenizer=tokenizer, 
-                    scheduler=noise_scheduler, 
-                    unet=original_unet,
-                    clip_processor=clip_processor,
-                    clip_model=clip_model
-                ).to(device)
-                videogen_pipeline_original.enable_xformers_memory_efficient_attention()
-
-                for prompt in args.text_prompt:
-                    print('Processing the ({}) prompt'.format(prompt))
-                    # Generazione con il modello originale
-                    videos_original = videogen_pipeline_original(
-                        prompt, 
-                        video_length=args.video_length, 
-                        height=args.image_size[0], 
-                        width=args.image_size[1], 
-                        num_inference_steps=args.num_sampling_steps,
-                        guidance_scale=args.guidance_scale
-                    ).video
+                    for prompt in args.text_prompt:
+                        print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
+                        videos = pipeline(
+                            prompt,
+                            image_tensor=frame if not is_original else None,
+                            video_length=args.video_length, 
+                            height=args.image_size[0], 
+                            width=args.image_size[1], 
+                            num_inference_steps=args.num_sampling_steps,
+                            guidance_scale=args.guidance_scale
+                        ).video
+                        
+                        suffix = "original" if is_original else "fine_tuned"
+                        imageio.mimwrite(f"/content/drive/My Drive/{suffix}_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9)
+                        del videos
                     
-                    imageio.mimwrite("/content/drive/My Drive/" + f"original_sample_epoch_{epoch}.mp4", videos_original[0], fps=8, quality=9) # highest quality is 10, lowest is 0
-                    del videos_original
-                
-                del videogen_pipeline_original, original_unet
+                    del pipeline
+                    torch.cuda.empty_cache()
+
+                # Genera video con il modello fine-tuned
+                generate_video(unet, is_original=False)
+
+                generate_video(original_unet, is_original=True)
+
+                del original_unet
                 torch.cuda.empty_cache()
 
                 print('save path {}'.format("/content/drive/My Drive/"))
