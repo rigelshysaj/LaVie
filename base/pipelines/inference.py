@@ -433,11 +433,14 @@ class VideoGenPipeline(DiffusionPipeline):
             negative_prompt_embeds = negative_prompt_embeds.view(batch_size * num_images_per_prompt, seq_len, -1)
             print(f"negative_prompt_embeds3 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
 
-            padding = torch.zeros(negative_prompt_embeds.shape[0], 
-                              prompt_embeds.shape[1] - negative_prompt_embeds.shape[1], 
-                              negative_prompt_embeds.shape[2], 
-                              device=device, 
-                              dtype=negative_prompt_embeds.dtype)
+
+            if input_image is not None:
+                padding = torch.zeros(negative_prompt_embeds.shape[0], 
+                                prompt_embeds.shape[1] - negative_prompt_embeds.shape[1], 
+                                negative_prompt_embeds.shape[2], 
+                                device=device, 
+                                dtype=negative_prompt_embeds.dtype)
+                
             negative_prompt_embeds = torch.cat([negative_prompt_embeds, padding], dim=1)
             print(f"negative_prompt_embeds4 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
 
