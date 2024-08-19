@@ -684,7 +684,7 @@ def train_lora_model(data, video_folder, args):
         #print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)      
 
-        if (epoch + 1) % 40 == 0:
+        if (epoch + 1) % 5 == 0:
 
             #original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
             #state_dict = find_model(args.ckpt_path)
