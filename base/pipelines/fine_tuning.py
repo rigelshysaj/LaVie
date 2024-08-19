@@ -688,31 +688,7 @@ def train_lora_model(data, video_folder, args):
 
             with torch.no_grad():
 
-                videogen_pipeline = VideoGenPipeline(vae=vae, 
-                            text_encoder=text_encoder, 
-                            tokenizer=tokenizer, 
-                            scheduler=noise_scheduler, 
-                            unet=unet,
-                            clip_processor=clip_processor,
-                            clip_model=clip_model
-                            ).to(device)
-                videogen_pipeline.enable_xformers_memory_efficient_attention()
-
-                for prompt in args.text_prompt:
-                    print('Processing the ({}) prompt'.format(prompt))
-                    videos = videogen_pipeline(prompt,
-                                            image_tensor=frame, 
-                                            video_length=args.video_length, 
-                                            height=args.image_size[0], 
-                                            width=args.image_size[1], 
-                                            num_inference_steps=args.num_sampling_steps,
-                                            guidance_scale=args.guidance_scale).video
-                    imageio.mimwrite("/content/drive/My Drive/" + f"fine_tuned_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
-                    del videos
-
-                    
-                del videogen_pipeline
-                torch.cuda.empty_cache()
+                
 
                 original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
                 state_dict = find_model(args.ckpt_path)
