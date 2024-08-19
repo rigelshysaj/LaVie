@@ -686,9 +686,9 @@ def train_lora_model(data, video_folder, args):
 
         if (epoch + 1) % 40 == 0:
 
-            original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
-            state_dict = find_model(args.ckpt_path)
-            original_unet.load_state_dict(state_dict)
+            #original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
+            #state_dict = find_model(args.ckpt_path)
+            #original_unet.load_state_dict(state_dict)
 
             with torch.no_grad():
 
@@ -702,6 +702,7 @@ def train_lora_model(data, video_folder, args):
                             ).to(device)
                 videogen_pipeline.enable_xformers_memory_efficient_attention()
 
+                '''
                 # Pipeline per il modello originale
                 videogen_pipeline_original = VideoGenPipeline(
                     vae=vae, 
@@ -713,7 +714,7 @@ def train_lora_model(data, video_folder, args):
                     clip_model=clip_model
                 ).to(device)
                 videogen_pipeline_original.enable_xformers_memory_efficient_attention()
-
+                '''
 
                 for prompt in args.text_prompt:
                     print('Processing the ({}) prompt'.format(prompt))
@@ -725,6 +726,7 @@ def train_lora_model(data, video_folder, args):
                                             num_inference_steps=args.num_sampling_steps,
                                             guidance_scale=args.guidance_scale).video
                     
+                    '''
                     # Generazione con il modello originale
                     videos_original = videogen_pipeline_original(
                         prompt, 
@@ -734,16 +736,12 @@ def train_lora_model(data, video_folder, args):
                         num_inference_steps=args.num_sampling_steps,
                         guidance_scale=args.guidance_scale
                     ).video
+                    '''
 
                     imageio.mimwrite("/content/drive/My Drive/" + f"fine_tuned_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
-                    imageio.mimwrite("/content/drive/My Drive/" + f"original_sample_epoch_{epoch}.mp4", videos_original[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+                    #imageio.mimwrite("/content/drive/My Drive/" + f"original_sample_epoch_{epoch}.mp4", videos_original[0], fps=8, quality=9) # highest quality is 10, lowest is 0
 
                 print('save path {}'.format("/content/drive/My Drive/"))
-
-                # Libera la memoria GPU
-                del videogen_pipeline_original
-                del unet_original
-                torch.cuda.empty_cache()
                 
     
     num_epochs = len(epoch_losses)
