@@ -276,10 +276,6 @@ def log_lora_weights(model, step, accelerator):
 
 def train_lora_model(data, video_folder, args, inference):
 
-    #sys.argv = [sys.argv[0], '--pretrained_model_name_or_path', args_base.pretrained_path]
-
-    #args = Details.parse_args()
-
     logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
 
     accelerator_project_config = ProjectConfiguration(project_dir="/content/drive/My Drive/", logging_dir=logging_dir)
@@ -486,52 +482,6 @@ def train_lora_model(data, video_folder, args, inference):
 
     unet.enable_xformers_memory_efficient_attention()
 
-    if(inference):
-
-        image_path = "/content/drive/My Drive/chih.jpeg"
-
-        image = Image.open(image_path)
-
-        # Definisci la trasformazione
-        transform = transforms.Compose([
-            transforms.Resize((512, 320)),
-            transforms.ToTensor()  # Converte l'immagine in un tensore
-        ])
-
-        # Applica la trasformazione all'immagine
-        input_image = transform(image)
-
-        image_tensor = input_image.unsqueeze(0).to(torch.float32)
-
-
-        with torch.no_grad():
-
-                videogen_pipeline = VideoGenPipeline(vae=vae, 
-                            text_encoder=text_encoder, 
-                            tokenizer=tokenizer, 
-                            scheduler=noise_scheduler, 
-                            unet=unet,
-                            clip_processor=clip_processor,
-                            clip_model=clip_model
-                            ).to(device)
-                videogen_pipeline.enable_xformers_memory_efficient_attention()
-
-
-                for prompt in args.text_prompt:
-                    print('Processing the ({}) prompt'.format(prompt))
-                    videos = videogen_pipeline(prompt,
-                                            image_tensor=image_tensor, 
-                                            video_length=args.video_length, 
-                                            height=args.image_size[0], 
-                                            width=args.image_size[1], 
-                                            num_inference_steps=args.num_sampling_steps,
-                                            guidance_scale=args.guidance_scale).video
-                    imageio.mimwrite("/content/drive/My Drive/" + f"chihuu.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
-
-                print('save path {}'.format("/content/drive/My Drive/"))
-
-                return
-
     epoch_losses = []
 
     frame = None
@@ -666,7 +616,7 @@ def train_lora_model(data, video_folder, args, inference):
                 train_loss = 0.0
 
                 if global_step % args.logging_steps == 0:
-                    log_lora_weights(unet, global_step)
+                    log_lora_weights(unet, global_step, accelerator)
 
                 if global_step % args.checkpointing_steps == 0:
                     if accelerator.is_main_process:
