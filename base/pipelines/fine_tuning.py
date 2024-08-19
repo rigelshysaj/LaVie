@@ -271,7 +271,7 @@ def cast_training_params(model: Union[torch.nn.Module, List[torch.nn.Module]], d
 def log_lora_weights(model, step, accelerator):
        for name, param in model.named_parameters():
            if 'lora' in name:
-               accelerator.print({f"lora_weight/{name}": param.data.mean().item()}, step=step)
+               print(f"Step {step}: LoRA weight '{name}' mean = {param.data.mean().item():.6f}")
 
 
 def train_lora_model(data, video_folder, args):
@@ -613,7 +613,7 @@ def train_lora_model(data, video_folder, args):
                 progress_bar.update(1)
                 global_step += 1
                 accelerator.log({"train_loss": train_loss}, step=global_step)
-                accelerator.print({"train_loss": train_loss}, step=global_step)
+                print(f"train_loss: {train_loss}, step={global_step}")
                 train_loss = 0.0
 
                 if global_step % args.logging_steps == 0:
@@ -684,7 +684,7 @@ def train_lora_model(data, video_folder, args):
         #print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)      
 
-        if (epoch + 1) % 40 == 0:
+        if (epoch + 1) % 5 == 0:
 
             #original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
             #state_dict = find_model(args.ckpt_path)
