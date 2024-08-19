@@ -505,8 +505,8 @@ def train_lora_model(data, video_folder, args):
 
                 #print(f"description: {description[0]}")
                 
-                if(description[0] == 'a kid hiding behind a skateboard' and frame is None):
-                    print("yesssssssssss a kid hiding behind a skateboard")
+                if(description[0] == 'a baseball player throwing ball' and frame is None):
+                    print("yesssssssssss a baseball player throwing ball")
                     frame = frame_tensor
 
                 print(f"epoca {epoch}, iterazione {step}")
