@@ -449,6 +449,8 @@ class VideoGenPipeline(DiffusionPipeline):
             # Here we concatenate the unconditional and text embeddings into a single batch
             # to avoid doing two forward passes
             prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds])
+            print(f"prompt_embeds4 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
+
 
         return prompt_embeds
 
