@@ -628,6 +628,11 @@ def train_lora_model(data, video_folder, args):
 
                 # Backpropagate
                 accelerator.backward(loss)
+
+                for name, param in unet.named_parameters():
+                    if "text_encoder" in name:
+                        param.grad *= 1.5 
+
                 if accelerator.sync_gradients:
                     params_to_clip = lora_layers
                     accelerator.clip_grad_norm_(params_to_clip, args.max_grad_norm)
