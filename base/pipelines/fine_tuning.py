@@ -229,31 +229,32 @@ class CrossAttentionTI(nn.Module):
         self.attention = nn.MultiheadAttention(embed_dim, num_heads)
         self.norm1 = nn.LayerNorm(embed_dim)
         self.norm2 = nn.LayerNorm(embed_dim)
-        self.text_weight = nn.Parameter(torch.ones(1) * 2.0)
-        self.image_weight = nn.Parameter(torch.ones(1))
-        self.ff = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim * 4),
-            nn.ReLU(),
-            nn.Linear(embed_dim * 4, embed_dim)
-        )
+        #self.text_weight = nn.Parameter(torch.ones(1) * 2.0)
+        #self.image_weight = nn.Parameter(torch.ones(1))
+        #self.ff = nn.Sequential(
+        #    nn.Linear(embed_dim, embed_dim * 4),
+        #    nn.ReLU(),
+        #    nn.Linear(embed_dim * 4, embed_dim)
+        #)
 
     def forward(self, text, image):
 
-        weighted_text = text * self.text_weight
-        weighted_image = image * self.image_weight
+        text = text * 2.0
+        #weighted_text = text * self.text_weight
+        #weighted_image = image * self.image_weight
 
         # Normalize inputs
-        text = self.norm1(weighted_text)
-        image = self.norm1(weighted_image)
+        text = self.norm1(text)
+        image = self.norm1(image)
         
         # Apply cross-attention
         attention_output, _ = self.attention(text, image, image)
         
         # Add residual connection and apply feed-forward layer
-        text = text + attention_output
-        text = text + self.ff(self.norm2(text))
+        #text = text + attention_output
+        #text = text + self.ff(self.norm2(text))
         
-        return text
+        return attention_output
 
 
 def custom_collate(batch):
@@ -705,7 +706,7 @@ def train_lora_model(data, video_folder, args):
         print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)      
 
-        if (epoch + 1) % 300 == 0:
+        if (epoch + 1) % 100 == 0:
             with torch.no_grad():
 
                 videogen_pipeline = VideoGenPipeline(vae=vae, 
