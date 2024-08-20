@@ -229,8 +229,8 @@ class CrossAttentionTI(nn.Module):
         self.attention = nn.MultiheadAttention(embed_dim, num_heads)
         self.norm1 = nn.LayerNorm(embed_dim)
         self.norm2 = nn.LayerNorm(embed_dim)
-        #self.text_weight = nn.Parameter(torch.ones(1) * 2.0)
-        #self.image_weight = nn.Parameter(torch.ones(1))
+        self.text_weight = nn.Parameter(torch.ones(1) * 10.0)
+        self.image_weight = nn.Parameter(torch.ones(1))
         #self.ff = nn.Sequential(
         #    nn.Linear(embed_dim, embed_dim * 4),
         #    nn.ReLU(),
@@ -239,13 +239,13 @@ class CrossAttentionTI(nn.Module):
 
     def forward(self, text, image):
 
-        text = text * 2.0
-        #weighted_text = text * self.text_weight
-        #weighted_image = image * self.image_weight
+        #text = text * 2.0
+        weighted_text = text * self.text_weight
+        weighted_image = image * self.image_weight
 
         # Normalize inputs
-        text = self.norm1(text)
-        image = self.norm1(image)
+        text = self.norm1(weighted_text)
+        image = self.norm1(weighted_image)
         
         # Apply cross-attention
         attention_output, _ = self.attention(text, image, image)
