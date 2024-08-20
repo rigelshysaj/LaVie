@@ -631,7 +631,8 @@ def train_lora_model(data, video_folder, args):
 
                 for name, param in unet.named_parameters():
                     if "text_encoder" in name:
-                        param.grad *= 1.5 
+                        param.grad *= 1.5
+                        print(f"name: {name}") 
 
                 if accelerator.sync_gradients:
                     params_to_clip = lora_layers
