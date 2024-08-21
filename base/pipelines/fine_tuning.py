@@ -630,11 +630,11 @@ def train_lora_model(data, video_folder, args):
                 accelerator.log({"train_loss": train_loss}, step=global_step)
                 #print(f"Step {global_step}: train_loss = {train_loss:.6f}")
                 train_loss = 0.0
-
+                print(f"checkpoint: {global_step % (args.checkpointing_steps + 1)}")
                 if global_step % args.logging_steps == 0:
                     log_lora_weights(unet, global_step)
 
-                if global_step % args.checkpointing_steps + 1 == 0:
+                if global_step % (args.checkpointing_steps + 1) == 0:
                     if accelerator.is_main_process:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
