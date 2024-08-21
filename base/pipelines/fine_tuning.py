@@ -633,7 +633,7 @@ def train_lora_model(data, video_folder, args):
                 if global_step % args.logging_steps == 0:
                     log_lora_weights(unet, global_step)
 
-                if global_step % args.checkpointing_steps == 0:
+                if global_step % args.checkpointing_steps + 1 == 0:
                     if accelerator.is_main_process:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
@@ -693,21 +693,21 @@ def train_lora_model(data, video_folder, args):
                             ).to(device)
                             pipeline.enable_xformers_memory_efficient_attention()
 
-                            for prompt in args.text_prompt:
-                                print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
-                                videos = pipeline(
-                                    prompt,
-                                    image_tensor=frame if not is_original else None,
-                                    video_length=args.video_length, 
-                                    height=args.image_size[0], 
-                                    width=args.image_size[1], 
-                                    num_inference_steps=args.num_sampling_steps,
-                                    guidance_scale=args.guidance_scale
-                                ).video
-                                
-                                suffix = "original" if is_original else "fine_tuned"
-                                imageio.mimwrite(f"/content/drive/My Drive/{suffix}_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9)
-                                del videos
+
+                            print(f'Processing the ({desc}) prompt for {"original" if is_original else "fine-tuned"} model')
+                            videos = pipeline(
+                                desc,
+                                image_tensor=frame if not is_original else None,
+                                video_length=args.video_length, 
+                                height=args.image_size[0], 
+                                width=args.image_size[1], 
+                                num_inference_steps=args.num_sampling_steps,
+                                guidance_scale=args.guidance_scale
+                            ).video
+                            
+                            suffix = "original" if is_original else "fine_tuned"
+                            imageio.mimwrite(f"/content/drive/My Drive/{suffix}_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9)
+                            del videos
                             
                             del pipeline
                             torch.cuda.empty_cache()
