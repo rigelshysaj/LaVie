@@ -624,6 +624,7 @@ def train_lora_model(data, video_folder, args):
                 optimizer.zero_grad()
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
+                print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
                 progress_bar.update(1)
                 global_step += 1
                 accelerator.log({"train_loss": train_loss}, step=global_step)
