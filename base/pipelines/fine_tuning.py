@@ -489,6 +489,7 @@ def train_lora_model(data, video_folder, args):
     epoch_losses = []
 
     frame = None
+    desc = ""
 
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
@@ -505,15 +506,18 @@ def train_lora_model(data, video_folder, args):
 
                 #print(f"description: {description[0]}")
 
+                
                 try:
-                    if(description[0] == 'a man cutting photo with a sword' and frame is None):
-                        print("yesssssssssss a man cutting photo with a sword")
-                        frame = frame_tensor
+                    #if(description[0] == 'a man cutting photo with a sword' and frame is None):
+                        #print("yesssssssssss a man cutting photo with a sword")
+                    frame = frame_tensor
+                    desc = description[0]
                 except Exception as e:
                     print("------------------START--------------------")
                     print(description)
                     print("------------------END--------------------")
                     continue
+                
 
                 print(f"epoca {epoch}, iterazione {step}")
 
@@ -671,6 +675,11 @@ def train_lora_model(data, video_folder, args):
                 
 
                     with torch.no_grad():
+
+                        print("------------------START DESC--------------------")
+                        print(desc)
+                        print("------------------END DESC--------------------")
+
                         # Funzione per generare video
                         def generate_video(unet, is_original):
                             pipeline = VideoGenPipeline(
