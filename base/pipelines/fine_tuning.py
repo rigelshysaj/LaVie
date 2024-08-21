@@ -129,7 +129,7 @@ def load_model_for_inference(args):
     accelerator.print(f"Inference from checkpoint {path}")
     accelerator.load_state(os.path.join(args.output_dir, path))
 
-    image_path = "/content/drive/My Drive/skate.jpeg"
+    image_path = "/content/drive/My Drive/shoot.jpeg"
 
     image = Image.open(image_path)
 
@@ -223,40 +223,6 @@ def encode_latents_(video, vae):
     return latents
 
 
-class CrossAttentionTI(nn.Module):
-    def __init__(self, embed_dim, num_heads):
-        super().__init__()
-        self.attention = nn.MultiheadAttention(embed_dim, num_heads)
-        self.norm1 = nn.LayerNorm(embed_dim)
-        self.norm2 = nn.LayerNorm(embed_dim)
-        self.text_weight = nn.Parameter(torch.ones(1) * 10.0)
-        self.image_weight = nn.Parameter(torch.ones(1))
-        #self.ff = nn.Sequential(
-        #    nn.Linear(embed_dim, embed_dim * 4),
-        #    nn.ReLU(),
-        #    nn.Linear(embed_dim * 4, embed_dim)
-        #)
-
-    def forward(self, text, image):
-
-        #text = text * 2.0
-        weighted_text = text * self.text_weight
-        weighted_image = image * self.image_weight
-
-        # Normalize inputs
-        text = self.norm1(weighted_text)
-        image = self.norm1(weighted_image)
-        
-        # Apply cross-attention
-        attention_output, _ = self.attention(text, image, image)
-        
-        # Add residual connection and apply feed-forward layer
-        #text = text + attention_output
-        #text = text + self.ff(self.norm2(text))
-        
-        return attention_output
-
-
 def custom_collate(batch):
     batch = list(filter(lambda x: x[0] is not None and x[1] is not None and x[2] is not None, batch))
     if len(batch) == 0:
@@ -302,6 +268,11 @@ def cast_training_params(model: Union[torch.nn.Module, List[torch.nn.Module]], d
             if param.requires_grad:
                 param.data = param.to(dtype)
 
+def log_lora_weights(model, step):
+       for name, param in model.named_parameters():
+           if 'lora' in name:
+               print(f"Step {step}: LoRA weight '{name}' mean = {param.data.mean().item():.6f}")
+
 
 def train_lora_model(data, video_folder, args):
 
@@ -340,6 +311,10 @@ def train_lora_model(data, video_folder, args):
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
     state_dict = find_model(args.ckpt_path)
     unet.load_state_dict(state_dict)
+
+    # Carica il modello UNet originale
+    original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
+    original_unet.load_state_dict(state_dict)
 
     tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
     text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
@@ -512,7 +487,9 @@ def train_lora_model(data, video_folder, args):
     unet.enable_xformers_memory_efficient_attention()
 
     epoch_losses = []
+
     frame = None
+
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
         batch_losses = []
@@ -523,9 +500,14 @@ def train_lora_model(data, video_folder, args):
                 video, description, frame_tensor = batch
 
                 #print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
+                
                 #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
-                frame = frame_tensor
+                #print(f"description: {description[0]}")
+                
+                if(description[0] == 'a man fires a handgun' and frame is None):
+                    print("yesssssssssss a man fires a handgun")
+                    frame = frame_tensor
 
                 print(f"epoca {epoch}, iterazione {step}")
 
@@ -553,8 +535,9 @@ def train_lora_model(data, video_folder, args):
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
                 #print(f"train_lora_model noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
-
+                #print(f"description: {list(description)}")
                 # Get the text embedding for conditioning
+
                 text_inputs = tokenizer(
                     list(description),
                     padding="max_length",
@@ -567,6 +550,8 @@ def train_lora_model(data, video_folder, args):
                     text_inputs.input_ids,
                     return_dict=False
                 )[0]
+
+
                 #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
 
@@ -575,17 +560,10 @@ def train_lora_model(data, video_folder, args):
                 last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
                 #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
                 
-                cross_attention = CrossAttentionTI(embed_dim=768, num_heads=8).to(unet.device).to(torch.float16)
-                
-                # Trasponiamo le dimensioni per adattarsi al MultiheadAttention
-                text_features = text_features.transpose(0, 1)
-                last_hidden_state = last_hidden_state.transpose(0, 1)
+                combination_tensor = torch.cat([text_features, last_hidden_state], dim=1)
+                #print(f"train_lora_model combination_tensor shape: {combination_tensor.shape}, dtype: {combination_tensor.dtype}") #[10, 1, 768] torch.float16
 
-                encoder_hidden_states = cross_attention(text_features, last_hidden_state)
-                encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
-
-                #print(f"train_lora_model encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") #[1, 50, 768] torch.float16
-
+                encoder_hidden_states = combination_tensor
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
@@ -628,12 +606,6 @@ def train_lora_model(data, video_folder, args):
 
                 # Backpropagate
                 accelerator.backward(loss)
-
-                for name, param in unet.named_parameters():
-                    if "text_encoder" in name:
-                        param.grad *= 1.5
-                        print(f"name: {name}") 
-
                 if accelerator.sync_gradients:
                     params_to_clip = lora_layers
                     accelerator.clip_grad_norm_(params_to_clip, args.max_grad_norm)
@@ -645,7 +617,11 @@ def train_lora_model(data, video_folder, args):
                 progress_bar.update(1)
                 global_step += 1
                 accelerator.log({"train_loss": train_loss}, step=global_step)
+                #print(f"Step {global_step}: train_loss = {train_loss:.6f}")
                 train_loss = 0.0
+
+                if global_step % len(train_dataloader) == 0:
+                    log_lora_weights(unet, global_step)
 
                 if global_step % args.checkpointing_steps == 0:
                     if accelerator.is_main_process:
@@ -709,35 +685,52 @@ def train_lora_model(data, video_folder, args):
                 torch.cuda.empty_cache()
 
         avg_epoch_loss = sum(batch_losses) / len(batch_losses)
-        print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
+        #print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)      
 
-        if (epoch + 1) % 100 == 0:
-            with torch.no_grad():
-
-                videogen_pipeline = VideoGenPipeline(vae=vae, 
-                            text_encoder=text_encoder, 
-                            tokenizer=tokenizer, 
-                            scheduler=noise_scheduler, 
-                            unet=unet,
-                            clip_processor=clip_processor,
-                            clip_model=clip_model
-                            ).to(device)
-                videogen_pipeline.enable_xformers_memory_efficient_attention()
-
+        #if (epoch + 1) % 20 == 0:
+        with torch.no_grad():
+            # Funzione per generare video
+            def generate_video(unet, is_original):
+                pipeline = VideoGenPipeline(
+                    vae=vae, 
+                    text_encoder=text_encoder, 
+                    tokenizer=tokenizer, 
+                    scheduler=noise_scheduler, 
+                    unet=unet,
+                    clip_processor=clip_processor,
+                    clip_model=clip_model
+                ).to(device)
+                pipeline.enable_xformers_memory_efficient_attention()
 
                 for prompt in args.text_prompt:
-                    print('Processing the ({}) prompt'.format(prompt))
-                    videos = videogen_pipeline(prompt,
-                                            image_tensor=frame, 
-                                            video_length=args.video_length, 
-                                            height=args.image_size[0], 
-                                            width=args.image_size[1], 
-                                            num_inference_steps=args.num_sampling_steps,
-                                            guidance_scale=args.guidance_scale).video
-                    imageio.mimwrite("/content/drive/My Drive/" + f"sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+                    print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
+                    videos = pipeline(
+                        prompt,
+                        image_tensor=frame if not is_original else None,
+                        video_length=args.video_length, 
+                        height=args.image_size[0], 
+                        width=args.image_size[1], 
+                        num_inference_steps=args.num_sampling_steps,
+                        guidance_scale=args.guidance_scale
+                    ).video
+                    
+                    suffix = "original" if is_original else "fine_tuned"
+                    imageio.mimwrite(f"/content/drive/My Drive/{suffix}_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9)
+                    del videos
+                
+                del pipeline
+                torch.cuda.empty_cache()
 
-                print('save path {}'.format("/content/drive/My Drive/"))
+            # Genera video con il modello fine-tuned
+            generate_video(unet, is_original=False)
+
+            generate_video(original_unet, is_original=True)
+
+            #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
+            torch.cuda.empty_cache()
+
+            print('save path {}'.format("/content/drive/My Drive/"))
                 
     
     num_epochs = len(epoch_losses)
@@ -768,7 +761,7 @@ def training(args):
 
     if on_colab:
         # Percorso del dataset su Google Colab
-        dataset_path = '/content/drive/My Drive/msvd_one'
+        dataset_path = '/content/drive/My Drive/msvd'
     else:
         # Percorso del dataset locale (sincronizzato con Google Drive)
         dataset_path = '/path/to/your/Google_Drive/sync/folder/path/to/your/dataset'

@@ -54,33 +54,6 @@ class StableDiffusionPipelineOutput(BaseOutput):
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
-
-class CrossAttentionTI(nn.Module):
-    def __init__(self, embed_dim, num_heads):
-        super().__init__()
-        self.attention = nn.MultiheadAttention(embed_dim, num_heads)
-        self.norm1 = nn.LayerNorm(embed_dim)
-        self.norm2 = nn.LayerNorm(embed_dim)
-        self.ff = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim * 4),
-            nn.ReLU(),
-            nn.Linear(embed_dim * 4, embed_dim)
-        )
-
-    def forward(self, text, image):
-        # Normalize inputs
-        text = self.norm1(text)
-        image = self.norm1(image)
-        
-        # Apply cross-attention
-        attention_output, _ = self.attention(text, image, image)
-        
-        # Add residual connection and apply feed-forward layer
-        text = text + attention_output
-        text = text + self.ff(self.norm2(text))
-        
-        return text
-
 EXAMPLE_DOC_STRING = """
     Examples:
         ```py
@@ -194,10 +167,11 @@ class VideoGenPipeline(DiffusionPipeline):
             unet=unet,
             scheduler=scheduler,
             clip_processor=clip_processor,
-            clip_model=clip_model,
+            clip_model=clip_model
         )
+
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
-        self.attention_layer = CrossAttentionTI(embed_dim=768, num_heads=8).to(self.device)
+        
         # self.register_to_config(requires_safety_checker=requires_safety_checker)
 
     def enable_vae_slicing(self):
@@ -341,6 +315,8 @@ class VideoGenPipeline(DiffusionPipeline):
         else:
             batch_size = prompt_embeds.shape[0]
 
+        print(f"prompt1: {prompt}")
+
         if prompt_embeds is None:
             text_inputs = self.tokenizer(
                 prompt,
@@ -364,6 +340,7 @@ class VideoGenPipeline(DiffusionPipeline):
                 )
 
             if hasattr(self.text_encoder.config, "use_attention_mask") and self.text_encoder.config.use_attention_mask:
+                print("usa attention mask")
                 attention_mask = text_inputs.attention_mask.to(device)
             else:
                 attention_mask = None
@@ -375,6 +352,7 @@ class VideoGenPipeline(DiffusionPipeline):
             prompt_embeds = prompt_embeds[0]
 
         prompt_embeds = prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
+        print(f"prompt_embeds1 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
         bs_embed, seq_len, _ = prompt_embeds.shape
         # duplicate text embeddings for each generation per prompt, using mps friendly method
@@ -382,33 +360,22 @@ class VideoGenPipeline(DiffusionPipeline):
         prompt_embeds = prompt_embeds.view(bs_embed * num_images_per_prompt, seq_len, -1)
         prompt_embeds = prompt_embeds.to(torch.float32)
 
-        print(f"prompt_embeds1 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
-
         if input_image is not None:
             # Processa l'immagine con CLIP
             image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
             outputs = self.clip_model.vision_model(image_inputs, output_hidden_states=True)
-            #image_features = outputs.hidden_states[-1].to(torch.float16)
-            image_features = outputs.last_hidden_state.to(torch.float32)
+            image_features = outputs.hidden_states[-1].to(torch.float32)
+            prova = outputs.last_hidden_state.to(torch.float32)
             print(f"image_features1 shape: {image_features.shape}, dtype: {image_features.dtype}")
-             # Proietta gli embedding nello stesso spazio
-
-            
-            prompt_embeds = prompt_embeds.transpose(0, 1)
-            image_features = image_features.transpose(0, 1)
+            print(f"prova shape: {prova.shape}, dtype: {prova.dtype}")
 
             assert prompt_embeds.dtype == image_features.dtype, "prompt_embeds and image_features must have the same dtype"
 
-            self.attention_layer = self.attention_layer.to(torch.float32)
-
-            combined_embeds = self.attention_layer(prompt_embeds, image_features)
-
-            combined_embeds = combined_embeds.transpose(0, 1)
-
-            prompt_embeds = combined_embeds
-            
-
             print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
+            
+            prompt_embeds = torch.cat([prompt_embeds, image_features], dim=1)
+
+            print(f"prompt_embeds3 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
@@ -431,7 +398,7 @@ class VideoGenPipeline(DiffusionPipeline):
             else:
                 uncond_tokens = negative_prompt
 
-            max_length = prompt_embeds.shape[1]
+            max_length = min(self.tokenizer.model_max_length, prompt_embeds.shape[1])
             uncond_input = self.tokenizer(
                 uncond_tokens,
                 padding="max_length",
@@ -451,6 +418,9 @@ class VideoGenPipeline(DiffusionPipeline):
             )
             negative_prompt_embeds = negative_prompt_embeds[0]
 
+            print(f"negative_prompt_embeds1 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
+
+
         if do_classifier_free_guidance:
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = negative_prompt_embeds.shape[1]
@@ -458,16 +428,33 @@ class VideoGenPipeline(DiffusionPipeline):
             negative_prompt_embeds = negative_prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
 
             negative_prompt_embeds = negative_prompt_embeds.repeat(1, num_images_per_prompt, 1)
+            print(f"negative_prompt_embeds2 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
+
             negative_prompt_embeds = negative_prompt_embeds.view(batch_size * num_images_per_prompt, seq_len, -1)
+            print(f"negative_prompt_embeds3 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
+
+
+            if input_image is not None:
+                padding = torch.zeros(negative_prompt_embeds.shape[0], 
+                                prompt_embeds.shape[1] - negative_prompt_embeds.shape[1], 
+                                negative_prompt_embeds.shape[2], 
+                                device=device, 
+                                dtype=negative_prompt_embeds.dtype)
+                
+                negative_prompt_embeds = torch.cat([negative_prompt_embeds, padding], dim=1)
+                print(f"negative_prompt_embeds4 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
+
 
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and text embeddings into a single batch
             # to avoid doing two forward passes
             prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds])
+            print(f"prompt_embeds4 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
+
 
         return prompt_embeds
 
-    def decode_latents(self, latents):
+    def decode_latents_(self, latents):
         self.vae = self.vae.to(torch.float32)
         video_length = latents.shape[2]
         latents = 1 / 0.18215 * latents
@@ -477,8 +464,8 @@ class VideoGenPipeline(DiffusionPipeline):
         video = ((video / 2 + 0.5) * 255).add_(0.5).clamp_(0, 255).to(dtype=torch.uint8).cpu().contiguous()
         return video
     
-    def decode_latents_(self, latents):
-        #latents = latents.to(torch.float16)
+    def decode_latents(self, latents):
+        self.vae = self.vae.to(torch.float32)
         video_length = latents.shape[2]
         latents = 1 / 0.18215 * latents
         latents = einops.rearrange(latents, "b c f h w -> (b f) c h w")
@@ -691,6 +678,8 @@ class VideoGenPipeline(DiffusionPipeline):
         # 0. Default height and width to unet
         height = height or self.unet.config.sample_size * self.vae_scale_factor
         width = width or self.unet.config.sample_size * self.vae_scale_factor
+
+        print(f"prompt2: {prompt}")
 
         # 1. Check inputs. Raise error if not correct
         self.check_inputs(
