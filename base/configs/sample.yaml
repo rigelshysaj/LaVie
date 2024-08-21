@@ -76,7 +76,7 @@ prediction_type: null
 hub_model_id: null
 report_to: "tensorboard"
 local_rank: -1
-checkpointing_steps: 100
+checkpointing_steps: 500
 checkpoints_total_limit: 3
 resume_from_checkpoint: "latest"
 noise_offset: 0

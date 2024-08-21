@@ -663,7 +663,7 @@ def train_lora_model(data, video_folder, args):
 
                         logger.info(f"Saved state to {save_path}")
                 
-                if (epoch + 1) % 20 == 0:
+
                     with torch.no_grad():
                         # Funzione per generare video
                         def generate_video(unet, is_original):
