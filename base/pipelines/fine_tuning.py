@@ -504,10 +504,16 @@ def train_lora_model(data, video_folder, args):
                 #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
                 #print(f"description: {description[0]}")
-                
-                if(description[0] == 'a man fires a handgun' and frame is None):
-                    print("yesssssssssss a man fires a handgun")
-                    frame = frame_tensor
+
+                try:
+                    if(description[0] == 'a man cutting photo with a sword' and frame is None):
+                        print("yesssssssssss a man cutting photo with a sword")
+                        frame = frame_tensor
+                except Exception as e:
+                    print("------------------START--------------------")
+                    print(description)
+                    print("------------------END--------------------")
+                    continue
 
                 print(f"epoca {epoch}, iterazione {step}")
 
@@ -623,7 +629,7 @@ def train_lora_model(data, video_folder, args):
                 if global_step % args.logging_steps == 0:
                     log_lora_weights(unet, global_step)
 
-                if global_step % args.checkpointing_steps == 0:
+                if global_step % len(train_dataloader) == 0:
                     if accelerator.is_main_process:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
