@@ -620,7 +620,7 @@ def train_lora_model(data, video_folder, args):
                 #print(f"Step {global_step}: train_loss = {train_loss:.6f}")
                 train_loss = 0.0
 
-                if global_step % len(train_dataloader) == 0:
+                if global_step % args.logging_steps == 0:
                     log_lora_weights(unet, global_step)
 
                 if global_step % args.checkpointing_steps == 0:
@@ -662,6 +662,50 @@ def train_lora_model(data, video_folder, args):
                         print("modello salvatooooooooooo")
 
                         logger.info(f"Saved state to {save_path}")
+                
+                if (epoch + 1) % 20 == 0:
+                    with torch.no_grad():
+                        # Funzione per generare video
+                        def generate_video(unet, is_original):
+                            pipeline = VideoGenPipeline(
+                                vae=vae, 
+                                text_encoder=text_encoder, 
+                                tokenizer=tokenizer, 
+                                scheduler=noise_scheduler, 
+                                unet=unet,
+                                clip_processor=clip_processor,
+                                clip_model=clip_model
+                            ).to(device)
+                            pipeline.enable_xformers_memory_efficient_attention()
+
+                            for prompt in args.text_prompt:
+                                print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
+                                videos = pipeline(
+                                    prompt,
+                                    image_tensor=frame if not is_original else None,
+                                    video_length=args.video_length, 
+                                    height=args.image_size[0], 
+                                    width=args.image_size[1], 
+                                    num_inference_steps=args.num_sampling_steps,
+                                    guidance_scale=args.guidance_scale
+                                ).video
+                                
+                                suffix = "original" if is_original else "fine_tuned"
+                                imageio.mimwrite(f"/content/drive/My Drive/{suffix}_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9)
+                                del videos
+                            
+                            del pipeline
+                            torch.cuda.empty_cache()
+
+                        # Genera video con il modello fine-tuned
+                        generate_video(unet, is_original=False)
+
+                        generate_video(original_unet, is_original=True)
+
+                        #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
+                        torch.cuda.empty_cache()
+
+                        print('save path {}'.format("/content/drive/My Drive/"))
 
             logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
             progress_bar.set_postfix(**logs)
@@ -669,68 +713,11 @@ def train_lora_model(data, video_folder, args):
             if global_step >= args.max_train_steps:
                 break
 
-        if accelerator.is_main_process:
-            if args.validation_prompt is not None and epoch % args.validation_epochs == 0:
-                # create pipeline
-                pipeline = DiffusionPipeline.from_pretrained(
-                    args.pretrained_model_name_or_path,
-                    unet=unwrap_model(unet),
-                    revision=args.revision,
-                    variant=args.variant,
-                    torch_dtype=weight_dtype,
-                )
-                #images = log_validation(pipeline, args, accelerator, epoch)
-
-                del pipeline
-                torch.cuda.empty_cache()
 
         avg_epoch_loss = sum(batch_losses) / len(batch_losses)
         #print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
         epoch_losses.append(avg_epoch_loss)      
 
-        #if (epoch + 1) % 20 == 0:
-        with torch.no_grad():
-            # Funzione per generare video
-            def generate_video(unet, is_original):
-                pipeline = VideoGenPipeline(
-                    vae=vae, 
-                    text_encoder=text_encoder, 
-                    tokenizer=tokenizer, 
-                    scheduler=noise_scheduler, 
-                    unet=unet,
-                    clip_processor=clip_processor,
-                    clip_model=clip_model
-                ).to(device)
-                pipeline.enable_xformers_memory_efficient_attention()
-
-                for prompt in args.text_prompt:
-                    print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
-                    videos = pipeline(
-                        prompt,
-                        image_tensor=frame if not is_original else None,
-                        video_length=args.video_length, 
-                        height=args.image_size[0], 
-                        width=args.image_size[1], 
-                        num_inference_steps=args.num_sampling_steps,
-                        guidance_scale=args.guidance_scale
-                    ).video
-                    
-                    suffix = "original" if is_original else "fine_tuned"
-                    imageio.mimwrite(f"/content/drive/My Drive/{suffix}_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9)
-                    del videos
-                
-                del pipeline
-                torch.cuda.empty_cache()
-
-            # Genera video con il modello fine-tuned
-            generate_video(unet, is_original=False)
-
-            generate_video(original_unet, is_original=True)
-
-            #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
-            torch.cuda.empty_cache()
-
-            print('save path {}'.format("/content/drive/My Drive/"))
                 
     
     num_epochs = len(epoch_losses)
