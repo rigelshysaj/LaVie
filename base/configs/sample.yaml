@@ -53,8 +53,8 @@ validation_epochs: 1
 max_train_samples: null
 center_crop: false
 random_flip: false
-train_batch_size: 1
-num_train_epochs: 300
+train_batch_size: 4
+num_train_epochs: 10
 max_train_steps: null
 gradient_accumulation_steps: 1
 gradient_checkpointing: true
