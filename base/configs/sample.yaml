@@ -62,7 +62,7 @@ learning_rate: 1e-4
 scale_lr: false
 lr_scheduler: "cosine"
 lr_warmup_steps: 500
-snr_gamma: null
+snr_gamma: 5
 use_8bit_adam: false
 dataloader_num_workers: 0
 adam_beta1: 0.9
