@@ -357,7 +357,7 @@ def train_lora_model(data, video_folder, args):
 
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
-    train_dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=custom_collate)
+    train_dataloader = DataLoader(dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=custom_collate)
     print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
 
     lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
