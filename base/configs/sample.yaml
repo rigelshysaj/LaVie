@@ -53,7 +53,7 @@ validation_epochs: 1
 max_train_samples: null
 center_crop: false
 random_flip: false
-train_batch_size: 1
+train_batch_size: 16
 num_train_epochs: 10
 max_train_steps: null
 gradient_accumulation_steps: 4
@@ -76,7 +76,7 @@ prediction_type: null
 hub_model_id: null
 report_to: "tensorboard"
 local_rank: -1
-checkpointing_steps: 125
+checkpointing_steps: 32
 checkpoints_total_limit: 3
 resume_from_checkpoint: "latest"
 noise_offset: 0
