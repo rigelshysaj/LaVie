@@ -725,9 +725,9 @@ def train_lora_model(data, video_folder, args):
                                 torch.cuda.empty_cache()
 
                         # Genera video con il modello fine-tuned
-                        generate_video(unet, is_original=False)
+                        generate_video(unet, is_original=True)
 
-                        generate_video(original_unet, is_original=True)
+                        generate_video(original_unet, is_original=False)
 
                         #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
                         torch.cuda.empty_cache()
