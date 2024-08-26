@@ -497,7 +497,7 @@ def train_lora_model(data, video_folder, args):
     #desc = ""
 
     print(f"first_epoch: {first_epoch}")
-    print(f"num_train_epochs: {first_epoch}")
+    print(f"num_train_epochs: {args.num_train_epochs}")
 
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
