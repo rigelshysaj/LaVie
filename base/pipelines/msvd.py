@@ -83,17 +83,6 @@ class VideoDatasetMsvd(Dataset):
             descriptions = self.video_descriptions.get(video_id, [])
 
             #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
-
-            output_video_path = os.path.join("/content/drive/My Drive/", f"{video_id}_cropped.mp4")
-            imageio.mimwrite(output_video_path, frames, fps=30)
-            print(f"Saved cropped video to {output_video_path}")
-
-            output_image_path = os.path.join("/content/drive/My Drive/", f"{video_id}_mid_frame.png")
-            # Converti il tensore PyTorch in un array NumPy
-            frame_test = mid_frame.permute(1, 2, 0).numpy()  # (C, H, W) -> (H, W, C)
-            # Salva l'immagine usando imageio
-            imageio.imwrite(output_image_path, frame_test)
-            print(f"Saved mid-frame image to {output_image_path}")
             
             # Applica trasformazioni, se presenti
             if self.transform:
