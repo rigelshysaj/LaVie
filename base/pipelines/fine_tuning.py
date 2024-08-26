@@ -454,16 +454,22 @@ def train_lora_model(data, video_folder, args):
     global_step = 0
     first_epoch = 0
 
+    print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+
     # Potentially load in the weights and states from a previous save
     if args.resume_from_checkpoint:
         if args.resume_from_checkpoint != "latest":
             path = os.path.basename(args.resume_from_checkpoint)
         else:
             # Get the most recent checkpoint
+            print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa111111111111")
+
             dirs = os.listdir(args.output_dir)
             dirs = [d for d in dirs if d.startswith("checkpoint")]
             dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
             path = dirs[-1] if len(dirs) > 0 else None
+            print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2222222222222")
+
 
         if path is None:
             accelerator.print(
@@ -472,12 +478,15 @@ def train_lora_model(data, video_folder, args):
             args.resume_from_checkpoint = None
             initial_global_step = 0
         else:
+            print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa3333333333333")
+
             accelerator.print(f"Resuming from checkpoint {path}")
             accelerator.load_state(os.path.join(args.output_dir, path))
             global_step = int(path.split("-")[1])
 
             initial_global_step = global_step
             first_epoch = global_step // num_update_steps_per_epoch
+            print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4444444444")
     else:
         initial_global_step = 0
 
