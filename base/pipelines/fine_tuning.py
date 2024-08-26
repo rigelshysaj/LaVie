@@ -631,7 +631,7 @@ def train_lora_model(data, video_folder, args):
                 if global_step % args.logging_steps == 0:
                     log_lora_weights(unet, global_step)
 
-                if global_step % 501 == 0:
+                if global_step % args.checkpointing_steps == 0:
                     if accelerator.is_main_process:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
@@ -725,9 +725,9 @@ def train_lora_model(data, video_folder, args):
                                 torch.cuda.empty_cache()
 
                         # Genera video con il modello fine-tuned
-                        generate_video(unet, is_original=True)
+                        generate_video(unet, is_original=False)
 
-                        generate_video(original_unet, is_original=False)
+                        generate_video(original_unet, is_original=True)
 
                         #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
                         torch.cuda.empty_cache()
