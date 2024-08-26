@@ -65,7 +65,7 @@ class VideoDatasetMsvd(Dataset):
 
             video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
 
-            print(f"video shape: {video.shape}, dtype: {video.dtype}")
+            #print(f"video shape: {video.shape}, dtype: {video.dtype}") #video shape: torch.Size([3, 16, 320, 512]), dtype: torch.float32
             
             # Estrarre un frame centrale
             mid_frame = frames[len(frames) // 2]
@@ -76,7 +76,7 @@ class VideoDatasetMsvd(Dataset):
 
             mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
 
-            print(f"mid_frame shape: {mid_frame.shape}, dtype: {mid_frame.dtype}")
+            #print(f"mid_frame shape: {mid_frame.shape}, dtype: {mid_frame.dtype}") #mid_frame shape: torch.Size([3, 320, 512]), dtype: torch.float32
             
             # Ottieni le descrizioni del video
             video_id = os.path.splitext(video_file)[0]
