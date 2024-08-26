@@ -3,9 +3,10 @@ import torch
 import cv2
 import os
 import numpy as np
+import imageio
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None, target_size=(320, 512), fixed_frame_count=16):
+    def __init__(self, annotations_file, video_dir, transform=None, target_size=(512, 320), fixed_frame_count=16):
         self.video_dir = video_dir
         self.transform = transform
         self.target_size = target_size
@@ -83,18 +84,13 @@ class VideoDatasetMsvd(Dataset):
 
             #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
 
-            # Save the cropped video
             output_video_path = os.path.join("/content/drive/My Drive/", f"{video_id}_cropped.mp4")
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            out = cv2.VideoWriter(output_video_path, fourcc, 30.0, self.target_size)
-            for frame in frames:
-                out.write(frame)
-            out.release()
+            imageio.mimwrite(output_video_path, frames, fps=30)
             print(f"Saved cropped video to {output_video_path}")
 
             # Save the mid-frame as an image
             output_image_path = os.path.join("/content/drive/My Drive/", f"{video_id}_mid_frame.png")
-            cv2.imwrite(output_image_path, cv2.cvtColor(mid_frame_np, cv2.COLOR_RGB2BGR))
+            imageio.imwrite(output_image_path, cv2.cvtColor(mid_frame_np, cv2.COLOR_RGB2BGR))
             print(f"Saved mid-frame image to {output_image_path}")
             
             # Applica trasformazioni, se presenti

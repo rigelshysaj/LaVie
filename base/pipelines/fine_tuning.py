@@ -67,7 +67,7 @@ def load_and_transform_image(path):
 
     # Definisci la trasformazione
     transform = transforms.Compose([
-        transforms.Resize((512, 320)),
+        transforms.Resize((320, 512)),
         transforms.ToTensor()  # Converte l'immagine in un tensore
     ])
 
