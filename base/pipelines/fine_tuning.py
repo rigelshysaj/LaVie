@@ -129,7 +129,7 @@ def load_model_for_inference(args):
     accelerator.print(f"Inference from checkpoint {path}")
     accelerator.load_state(os.path.join(args.output_dir, path))
 
-    image_path = "/content/drive/My Drive/shoot.jpeg"
+    image_path = "/content/drive/My Drive/rabbit.webp"
 
     image = Image.open(image_path)
 
