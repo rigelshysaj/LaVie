@@ -129,9 +129,7 @@ def load_model_for_inference(args):
     accelerator.print(f"Inference from checkpoint {path}")
     accelerator.load_state(os.path.join(args.output_dir, path))
 
-    image_path = "/content/drive/My Drive/rabbit2.jpeg"
-
-    image = Image.open(image_path)
+    image = Image.open(args.image_path)
 
     # Definisci la trasformazione
     transform = transforms.Compose([
