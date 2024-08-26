@@ -781,5 +781,5 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
-    training(OmegaConf.load(args.config))
-    #load_model_for_inference(OmegaConf.load(args.config))
+    #training(OmegaConf.load(args.config))
+    load_model_for_inference(OmegaConf.load(args.config))
