@@ -49,7 +49,7 @@ class VideoDatasetMsvd(Dataset):
                 frames.append(frame)
             cap.release()
 
-            print(f"len frames: {len(frames)}")
+            #print(f"len frames: {len(frames)}")
 
             
             # Se il numero di frame è inferiore a fixed_frame_count, ripeti l'ultimo frame
