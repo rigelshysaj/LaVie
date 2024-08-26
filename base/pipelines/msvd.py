@@ -48,6 +48,8 @@ class VideoDatasetMsvd(Dataset):
                 frames.append(frame)
             cap.release()
 
+            print(f"len frames: {len(frames)}")
+
             
             # Se il numero di frame è inferiore a fixed_frame_count, ripeti l'ultimo frame
             if len(frames) < self.fixed_frame_count:
@@ -61,6 +63,8 @@ class VideoDatasetMsvd(Dataset):
             frames_np = (frames_np - 0.5) / 0.5
 
             video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
+
+            print(f"video shape: {video.shape}, dtype: {video.dtype}")
             
             # Estrarre un frame centrale
             mid_frame = frames[len(frames) // 2]
@@ -70,6 +74,8 @@ class VideoDatasetMsvd(Dataset):
             #mid_frame_np = (mid_frame_np - 0.5) / 0.5
 
             mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
+
+            print(f"mid_frame shape: {mid_frame.shape}, dtype: {mid_frame.dtype}")
             
             # Ottieni le descrizioni del video
             video_id = os.path.splitext(video_file)[0]

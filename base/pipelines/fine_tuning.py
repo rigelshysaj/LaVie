@@ -486,8 +486,8 @@ def train_lora_model(data, video_folder, args):
 
     epoch_losses = []
 
-    frame = None
-    desc = ""
+    #frame = None
+    #desc = ""
 
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
@@ -508,7 +508,7 @@ def train_lora_model(data, video_folder, args):
                 try:
                     #if(description[0] == 'a man cutting photo with a sword' and frame is None):
                         #print("yesssssssssss a man cutting photo with a sword")
-                    frame = frame_tensor
+                    #frame = frame_tensor
                     desc = description[0]
                 except Exception as e:
                     print("------------------START--------------------")
@@ -631,7 +631,7 @@ def train_lora_model(data, video_folder, args):
                 if global_step % args.logging_steps == 0:
                     log_lora_weights(unet, global_step)
 
-                if global_step % args.checkpointing_steps == 0:
+                if global_step % 2501 == 0:
                     if accelerator.is_main_process:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
@@ -674,10 +674,6 @@ def train_lora_model(data, video_folder, args):
 
                     with torch.no_grad():
 
-                        print("------------------START DESC--------------------")
-                        print(desc)
-                        print("------------------END DESC--------------------")
-
                         # Funzione per generare video
                         def generate_video(unet, is_original):
                             pipeline = VideoGenPipeline(
@@ -692,23 +688,41 @@ def train_lora_model(data, video_folder, args):
                             pipeline.enable_xformers_memory_efficient_attention()
 
 
-                            print(f'Processing the ({desc}) prompt for {"original" if is_original else "fine-tuned"} model')
-                            videos = pipeline(
-                                desc,
-                                image_tensor=frame if not is_original else None,
-                                video_length=args.video_length, 
-                                height=args.image_size[0], 
-                                width=args.image_size[1], 
-                                num_inference_steps=args.num_sampling_steps,
-                                guidance_scale=args.guidance_scale
-                            ).video
+                            if(not is_original):
+                                image = Image.open(args.image_path)
+
+                                # Definisci la trasformazione
+                                transform = transforms.Compose([
+                                    transforms.Resize((512, 320)),
+                                    transforms.ToTensor()  # Converte l'immagine in un tensore
+                                ])
+
+                                # Applica la trasformazione all'immagine
+                                input_image = transform(image)
+
+                                image_tensor = input_image.unsqueeze(0).to(torch.float32)  # Aggiunge una dimensione per il batch
+
+                                print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
+
                             
-                            suffix = "original" if is_original else "fine_tuned"
-                            imageio.mimwrite(f"/content/drive/My Drive/{suffix}_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9)
-                            del videos
+                            for prompt in args.text_prompt:
+                                print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
+                                videos = pipeline(
+                                    prompt,
+                                    image_tensor=image if not is_original else None,
+                                    video_length=args.video_length, 
+                                    height=args.image_size[0], 
+                                    width=args.image_size[1], 
+                                    num_inference_steps=args.num_sampling_steps,
+                                    guidance_scale=args.guidance_scale
+                                ).video
                             
-                            del pipeline
-                            torch.cuda.empty_cache()
+                                suffix = "original" if is_original else "fine_tuned"
+                                imageio.mimwrite(f"/content/drive/My Drive/{suffix}_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9)
+                                del videos
+                                
+                                del pipeline
+                                torch.cuda.empty_cache()
 
                         # Genera video con il modello fine-tuned
                         generate_video(unet, is_original=False)
