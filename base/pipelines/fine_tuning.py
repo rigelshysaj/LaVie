@@ -478,15 +478,22 @@ def train_lora_model(data, video_folder, args):
             args.resume_from_checkpoint = None
             initial_global_step = 0
         else:
-            print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa3333333333333")
+            try:
+                print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa3333333333333")
 
-            accelerator.print(f"Resuming from checkpoint {path}")
-            accelerator.load_state(os.path.join(args.output_dir, path))
-            global_step = int(path.split("-")[1])
+                accelerator.print(f"Resuming from checkpoint {path}")
+                print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa555555555")
+                accelerator.load_state(os.path.join(args.output_dir, path))
+                print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa66666666")
+                global_step = int(path.split("-")[1])
+                print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa777777777")
 
-            initial_global_step = global_step
-            first_epoch = global_step // num_update_steps_per_epoch
-            print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4444444444")
+                initial_global_step = global_step
+                print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa88888888888")
+                first_epoch = global_step // num_update_steps_per_epoch
+                print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa999999999")
+            except Exception as e:
+                print(f"Skipping due to error: {e}")
     else:
         initial_global_step = 0
 
