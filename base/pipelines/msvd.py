@@ -90,7 +90,7 @@ class VideoDatasetMsvd(Dataset):
 
             # Save the mid-frame as an image
             output_image_path = os.path.join("/content/drive/My Drive/", f"{video_id}_mid_frame.png")
-            imageio.imwrite(output_image_path, cv2.cvtColor(mid_frame_np, cv2.COLOR_RGB2BGR))
+            cv2.imwrite(output_image_path, cv2.cvtColor(mid_frame_np, cv2.COLOR_RGB2BGR))
             print(f"Saved mid-frame image to {output_image_path}")
             
             # Applica trasformazioni, se presenti
