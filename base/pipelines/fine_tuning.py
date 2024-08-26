@@ -61,6 +61,26 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
+
+def load_and_transform_image(path):
+    image = Image.open(path)
+
+    # Definisci la trasformazione
+    transform = transforms.Compose([
+        transforms.Resize((512, 320)),
+        transforms.ToTensor()  # Converte l'immagine in un tensore
+    ])
+
+    # Applica la trasformazione all'immagine
+    input_image = transform(image)
+
+    image_tensor = input_image.unsqueeze(0).to(torch.float32)  # Aggiunge una dimensione per il batch
+
+    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
+
+    return image_tensor
+
+
 def load_model_for_inference(args):
     if args.seed is not None:
         torch.manual_seed(args.seed)
@@ -129,20 +149,7 @@ def load_model_for_inference(args):
     accelerator.print(f"Inference from checkpoint {path}")
     accelerator.load_state(os.path.join(args.output_dir, path))
 
-    image = Image.open(args.image_path)
-
-    # Definisci la trasformazione
-    transform = transforms.Compose([
-        transforms.Resize((512, 320)),
-        transforms.ToTensor()  # Converte l'immagine in un tensore
-    ])
-
-    # Applica la trasformazione all'immagine
-    input_image = transform(image)
-
-    image_tensor = input_image.unsqueeze(0).to(torch.float32)  # Aggiunge una dimensione per il batch
-
-    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
+    image_tensor = load_and_transform_image(args.image_path)
 
     videogen_pipeline = VideoGenPipeline(vae=vae, 
                                 text_encoder=text_encoder_one, 
@@ -500,7 +507,7 @@ def train_lora_model(data, video_folder, args):
 
                 #print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
                 
-                #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
+                print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
                 #print(f"description: {description[0]}")
 
@@ -689,27 +696,13 @@ def train_lora_model(data, video_folder, args):
 
 
                             if(not is_original):
-                                image = Image.open(args.image_path)
-
-                                # Definisci la trasformazione
-                                transform = transforms.Compose([
-                                    transforms.Resize((512, 320)),
-                                    transforms.ToTensor()  # Converte l'immagine in un tensore
-                                ])
-
-                                # Applica la trasformazione all'immagine
-                                input_image = transform(image)
-
-                                image_tensor = input_image.unsqueeze(0).to(torch.float32)  # Aggiunge una dimensione per il batch
-
-                                print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
-
+                                image_tensor = load_and_transform_image(args.image_path)
                             
                             for prompt in args.text_prompt:
                                 print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
                                 videos = pipeline(
                                     prompt,
-                                    image_tensor=image if not is_original else None,
+                                    image_tensor=image_tensor if not is_original else None,
                                     video_length=args.video_length, 
                                     height=args.image_size[0], 
                                     width=args.image_size[1], 
