@@ -76,7 +76,7 @@ def load_and_transform_image(path):
 
     image_tensor = input_image.unsqueeze(0).to(torch.float32)  # Aggiunge una dimensione per il batch
 
-    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
+    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}") #shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
     return image_tensor
 
