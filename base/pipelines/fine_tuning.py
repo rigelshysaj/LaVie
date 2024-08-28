@@ -68,7 +68,7 @@ class GradientAnalysisVideoGenPipeline(VideoGenPipeline):
             image_tensor.requires_grad_(True)
         
         # Chiamata al metodo originale
-        output = super().__call__(prompt, image_tensor=image_tensor, *args, **kwargs)
+        output = super().__call__(prompt, image_tensor=image_tensor, *args, **kwargs).video
         
         # Calcoliamo la somma dei pixel del primo frame del video generato
         first_frame = output.videos[0][0]
@@ -740,7 +740,7 @@ def train_lora_model(data, video_folder, args):
                                     width=args.image_size[1], 
                                     num_inference_steps=args.num_sampling_steps,
                                     guidance_scale=args.guidance_scale
-                                ).video
+                                )
 
                                 if(not is_original):
                                     zero_tensor = torch.zeros_like(image_tensor)
@@ -752,7 +752,7 @@ def train_lora_model(data, video_folder, args):
                                         width=args.image_size[1], 
                                         num_inference_steps=args.num_sampling_steps,
                                         guidance_scale=args.guidance_scale
-                                    ).video
+                                    )
 
                                     imageio.mimwrite(f"/content/drive/My Drive/test_fine_tuned_sample_epoch_{epoch}.mp4", test[0], fps=8, quality=9)
                                     del test
