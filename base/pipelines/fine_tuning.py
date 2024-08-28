@@ -580,10 +580,10 @@ def train_lora_model(data, video_folder, args):
 
                 #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
                 
-                combination_tensor = torch.cat([last_hidden_state, text_features], dim=1)
+                #combination_tensor = torch.cat([last_hidden_state, text_features], dim=1)
                 #print(f"train_lora_model combination_tensor shape: {combination_tensor.shape}, dtype: {combination_tensor.dtype}") #[10, 1, 768] torch.float16
 
-                encoder_hidden_states = combination_tensor
+                encoder_hidden_states = last_hidden_state
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
