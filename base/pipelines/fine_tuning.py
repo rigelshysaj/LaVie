@@ -577,9 +577,6 @@ def train_lora_model(data, video_folder, args):
                 outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
                 last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
 
-                outputs_test = clip_model.vision_model(image_inputs)
-                print(f"outputs_test shape: {outputs_test.shape}, dtype: {outputs_test.dtype}") #[1, 50, 768] torch.float16
-
 
                 print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
                 
