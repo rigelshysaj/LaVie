@@ -71,7 +71,7 @@ class GradientAnalysisVideoGenPipeline(VideoGenPipeline):
         output = super().__call__(prompt, image_tensor=image_tensor, *args, **kwargs).video
         
         # Calcoliamo la somma dei pixel del primo frame del video generato
-        first_frame = output.videos[0][0]
+        first_frame = output[0][0]
         output_sum = first_frame.sum()
         
         # Calcoliamo i gradienti
