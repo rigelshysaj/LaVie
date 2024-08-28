@@ -73,6 +73,7 @@ class GradientAnalysisVideoGenPipeline(VideoGenPipeline):
         
         # Calcoliamo la somma dei pixel del primo frame del video generato
         first_frame = output[0][0]
+        first_frame = first_frame.float()
         output_metric = first_frame.mean()
         
         # Creiamo un nuovo tensore che richiede gradiente
