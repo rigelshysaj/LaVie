@@ -71,7 +71,7 @@ class VideoDatasetMsvd(Dataset):
             mid_frame = frames[len(frames) // 2]
             mid_frame_np = np.array(mid_frame)
 
-            mid_frame_np = mid_frame_np.astype(np.float32) / 255.0  # Normalizza in [0, 1]
+            #mid_frame_np = mid_frame_np.astype(np.float32) / 255.0  # Normalizza in [0, 1]
             #mid_frame_np = (mid_frame_np - 0.5) / 0.5
 
             mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
