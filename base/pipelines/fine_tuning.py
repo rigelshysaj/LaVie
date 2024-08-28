@@ -767,24 +767,24 @@ def train_lora_model(data, video_folder, args):
                             return videos, grad_magnitude
 
 
-                        # Genera video con il modello fine-tuned
-                        _, grad_magnitude_finetuned = generate_video(unet, is_original=False)
-                        print(f"Gradient magnitude for fine-tuned model: {grad_magnitude_finetuned}")
+                    # Genera video con il modello fine-tuned
+                    _, grad_magnitude_finetuned = generate_video(unet, is_original=False)
+                    print(f"Gradient magnitude for fine-tuned model: {grad_magnitude_finetuned}")
 
 
-                        _, grad_magnitude_original = generate_video(original_unet, is_original=True)
-                        print(f"Gradient magnitude for original model: {grad_magnitude_original}")
-        
-                        # Confronta i risultati
-                        if grad_magnitude_finetuned > grad_magnitude_original:
-                            print("The fine-tuned model seems more sensitive to the image input.")
-                        else:
-                            print("The fine-tuned model doesn't show increased sensitivity to the image input.")
+                    _, grad_magnitude_original = generate_video(original_unet, is_original=True)
+                    print(f"Gradient magnitude for original model: {grad_magnitude_original}")
+    
+                    # Confronta i risultati
+                    if grad_magnitude_finetuned > grad_magnitude_original:
+                        print("The fine-tuned model seems more sensitive to the image input.")
+                    else:
+                        print("The fine-tuned model doesn't show increased sensitivity to the image input.")
 
-                        #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
-                        torch.cuda.empty_cache()
+                    #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
+                    torch.cuda.empty_cache()
 
-                        print('save path {}'.format("/content/drive/My Drive/"))
+                    print('save path {}'.format("/content/drive/My Drive/"))
 
             logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
             progress_bar.set_postfix(**logs)
