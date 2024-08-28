@@ -714,6 +714,22 @@ def train_lora_model(data, video_folder, args):
                                     num_inference_steps=args.num_sampling_steps,
                                     guidance_scale=args.guidance_scale
                                 ).video
+
+                                if(not is_original):
+                                    zero_tensor = torch.zeros_like(image_tensor)
+                                    test = pipeline(
+                                        prompt,
+                                        image_tensor=zero_tensor,
+                                        video_length=args.video_length, 
+                                        height=args.image_size[0], 
+                                        width=args.image_size[1], 
+                                        num_inference_steps=args.num_sampling_steps,
+                                        guidance_scale=args.guidance_scale
+                                    ).video
+
+                                    imageio.mimwrite(f"/content/drive/My Drive/test_fine_tuned_sample_epoch_{epoch}.mp4", test[0], fps=8, quality=9)
+                                    del videos
+
                             
                                 suffix = "original" if is_original else "fine_tuned"
                                 imageio.mimwrite(f"/content/drive/My Drive/{suffix}_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9)
