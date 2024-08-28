@@ -81,6 +81,8 @@ def load_and_transform_image(path):
     return image_tensor
 
 def compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model, clip_processor, image_tensor, text_prompt, noisy_latents, timesteps):
+    image_tensor = image_tensor.float()
+    
     image_tensor.requires_grad_(True)
 
     text_inputs = tokenizer(
