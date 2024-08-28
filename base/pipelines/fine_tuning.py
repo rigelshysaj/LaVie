@@ -80,6 +80,41 @@ def load_and_transform_image(path):
 
     return image_tensor
 
+def compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model, clip_processor, image_tensor, text_prompt, noisy_latents, timesteps):
+    image_tensor.requires_grad_(True)
+
+    text_inputs = tokenizer(
+                    list(text_prompt),
+                    padding="max_length",
+                    max_length=tokenizer.model_max_length,
+                    truncation=True,
+                    return_tensors="pt"
+                ).to(unet.device)
+
+    text_features = text_encoder(
+        text_inputs.input_ids,
+        return_dict=False
+    )[0]
+
+
+    image_inputs = clip_processor(images=image_tensor, return_tensors="pt").pixel_values.to(unet.device)
+    outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
+    last_hidden_state = outputs.last_hidden_state.to(torch.float16)
+    
+    encoder_hidden_states = torch.cat([text_features, last_hidden_state], dim=1)
+    
+    noise_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
+    loss = noise_pred.sum()
+    loss.backward()
+    
+    gradient = image_tensor.grad
+    
+    print(f"Gradient analysis:")
+    print(f"  Shape: {gradient.shape}")
+    print(f"  Mean: {gradient.mean().item():.4f}")
+    print(f"  Std: {gradient.std().item():.4f}")
+    print(f"  L2 norm: {gradient.norm().item():.4f}")
+
 
 def load_model_for_inference(args):
     if args.seed is not None:
@@ -596,6 +631,10 @@ def train_lora_model(data, video_folder, args):
                     target = noise_scheduler.get_velocity(latents, noise, timesteps)
                 else:
                     raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+                
+                if global_step % args.gradient_analysis_steps == 0:
+                    compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model, clip_processor, frame_tensor, description[0], noisy_latents, timesteps)
+
 
                 # Predict the noise residual and compute loss
                 model_pred = unet(noisy_latents, timesteps, encoder_hidden_states, return_dict=False)[0]
