@@ -310,7 +310,7 @@ class VideoGenPipeline(DiffusionPipeline):
 
             print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
             
-            prompt_embeds = torch.cat([image_features, prompt_embeds], dim=1)
+            prompt_embeds = torch.cat([prompt_embeds, image_features], dim=1)
 
             print(f"prompt_embeds3 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
