@@ -302,10 +302,9 @@ class VideoGenPipeline(DiffusionPipeline):
             # Processa l'immagine con CLIP
             image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
             outputs = self.clip_model.vision_model(image_inputs, output_hidden_states=True)
-            image_features = outputs.hidden_states[-1].to(torch.float32)
-            prova = outputs.last_hidden_state.to(torch.float32)
+            image_features = outputs.last_hidden_state.to(torch.float32)
             print(f"image_features1 shape: {image_features.shape}, dtype: {image_features.dtype}")
-            print(f"prova shape: {prova.shape}, dtype: {prova.dtype}")
+
 
             assert prompt_embeds.dtype == image_features.dtype, "prompt_embeds and image_features must have the same dtype"
 
