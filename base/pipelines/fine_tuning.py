@@ -61,37 +61,6 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
-class GradientAnalysisVideoGenPipeline(VideoGenPipeline):
-    def __call__(self, prompt, image_tensor=None, *args, **kwargs):
-        # Assicuriamoci che l'image_tensor richieda gradienti
-        if image_tensor is not None:
-            image_tensor.requires_grad_(True)
-        
-        # Chiamata al metodo originale
-        with torch.no_grad():
-            output = super().__call__(prompt, image_tensor=image_tensor, *args, **kwargs).video
-        
-        # Calcoliamo la somma dei pixel del primo frame del video generato
-        first_frame = output[0][0]
-        first_frame = first_frame.float()
-        output_metric = first_frame.mean()
-        
-        # Creiamo un nuovo tensore che richiede gradiente
-        output_metric_with_grad = output_metric.clone().detach().requires_grad_(True)
-        
-        # Calcoliamo i gradienti
-        output_metric_with_grad.backward()
-        
-        # Calcoliamo la magnitudine media dei gradienti
-        if image_tensor is not None and image_tensor.grad is not None:
-            grad_magnitude = image_tensor.grad.abs().mean().item()
-            print(f"Average gradient magnitude: {grad_magnitude}")
-        else:
-            grad_magnitude = 0
-            print("No gradients computed for the image tensor.")
-        
-        return output, grad_magnitude
-
 
 def load_and_transform_image(path):
     image = Image.open(path)
@@ -674,7 +643,7 @@ def train_lora_model(data, video_folder, args):
                 if global_step % args.logging_steps == 0:
                     log_lora_weights(unet, global_step)
 
-                if global_step % 316 == 0:
+                if global_step % args.checkpointing_steps == 0:
                     if accelerator.is_main_process:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
@@ -713,79 +682,71 @@ def train_lora_model(data, video_folder, args):
                         print("modello salvatooooooooooo")
 
                         logger.info(f"Saved state to {save_path}")
+                
 
-                    # Funzione per generare video
-                    def generate_video(unet, is_original):
-                        pipeline = GradientAnalysisVideoGenPipeline(
-                            vae=vae, 
-                            text_encoder=text_encoder, 
-                            tokenizer=tokenizer, 
-                            scheduler=noise_scheduler, 
-                            unet=unet,
-                            clip_processor=clip_processor,
-                            clip_model=clip_model
-                        ).to(device)
-                        
-                        pipeline.enable_xformers_memory_efficient_attention()
+                    with torch.no_grad():
 
+                        # Funzione per generare video
+                        def generate_video(unet, is_original):
+                            pipeline = VideoGenPipeline(
+                                vae=vae, 
+                                text_encoder=text_encoder, 
+                                tokenizer=tokenizer, 
+                                scheduler=noise_scheduler, 
+                                unet=unet,
+                                clip_processor=clip_processor,
+                                clip_model=clip_model
+                            ).to(device)
+                            pipeline.enable_xformers_memory_efficient_attention()
 
-                        if(not is_original):
-                            image_tensor = load_and_transform_image(args.image_path)
-                        
-                        for prompt in args.text_prompt:
-                            print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
-                            videos, grad_magnitude = pipeline(
-                                prompt,
-                                image_tensor=image_tensor if not is_original else None,
-                                video_length=args.video_length, 
-                                height=args.image_size[0], 
-                                width=args.image_size[1], 
-                                num_inference_steps=args.num_sampling_steps,
-                                guidance_scale=args.guidance_scale
-                            )
 
                             if(not is_original):
-                                zero_tensor = torch.zeros_like(image_tensor)
-                                test, _ = pipeline(
+                                image_tensor = load_and_transform_image(args.image_path)
+                            
+                            for prompt in args.text_prompt:
+                                print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
+                                videos = pipeline(
                                     prompt,
-                                    image_tensor=zero_tensor,
+                                    image_tensor=image_tensor if not is_original else None,
                                     video_length=args.video_length, 
                                     height=args.image_size[0], 
                                     width=args.image_size[1], 
                                     num_inference_steps=args.num_sampling_steps,
                                     guidance_scale=args.guidance_scale
-                                )
+                                ).video
 
-                                imageio.mimwrite(f"/content/drive/My Drive/test_fine_tuned_sample_epoch_{epoch}.mp4", test[0], fps=8, quality=9)
-                                del test
+                                if(not is_original):
+                                    zero_tensor = torch.zeros_like(image_tensor)
+                                    test = pipeline(
+                                        prompt,
+                                        image_tensor=zero_tensor,
+                                        video_length=args.video_length, 
+                                        height=args.image_size[0], 
+                                        width=args.image_size[1], 
+                                        num_inference_steps=args.num_sampling_steps,
+                                        guidance_scale=args.guidance_scale
+                                    ).video
 
-                        
-                            suffix = "original" if is_original else "fine_tuned"
-                            imageio.mimwrite(f"/content/drive/My Drive/{suffix}_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9)
+                                    imageio.mimwrite(f"/content/drive/My Drive/test_fine_tuned_sample_epoch_{epoch}.mp4", test[0], fps=8, quality=9)
+                                    del test
 
-                            torch.cuda.empty_cache()
                             
-                            return videos, grad_magnitude
+                                suffix = "original" if is_original else "fine_tuned"
+                                imageio.mimwrite(f"/content/drive/My Drive/{suffix}_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9)
+                                del videos
+                                
+                                del pipeline
+                                torch.cuda.empty_cache()
 
+                        # Genera video con il modello fine-tuned
+                        generate_video(unet, is_original=False)
 
-                    # Genera video con il modello fine-tuned
-                    _, grad_magnitude_finetuned = generate_video(unet, is_original=False)
-                    print(f"Gradient magnitude for fine-tuned model: {grad_magnitude_finetuned}")
+                        generate_video(original_unet, is_original=True)
 
+                        #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
+                        torch.cuda.empty_cache()
 
-                    _, grad_magnitude_original = generate_video(original_unet, is_original=True)
-                    print(f"Gradient magnitude for original model: {grad_magnitude_original}")
-    
-                    # Confronta i risultati
-                    if grad_magnitude_finetuned > grad_magnitude_original:
-                        print("The fine-tuned model seems more sensitive to the image input.")
-                    else:
-                        print("The fine-tuned model doesn't show increased sensitivity to the image input.")
-
-                    #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
-                    torch.cuda.empty_cache()
-
-                    print('save path {}'.format("/content/drive/My Drive/"))
+                        print('save path {}'.format("/content/drive/My Drive/"))
 
             logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
             progress_bar.set_postfix(**logs)
