@@ -581,7 +581,7 @@ def train_lora_model(data, video_folder, args):
                 print(f"outputs_test shape: {outputs_test.shape}, dtype: {outputs_test.dtype}") #[1, 50, 768] torch.float16
 
 
-                #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
+                print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
                 
                 combination_tensor = torch.cat([last_hidden_state, text_features], dim=1)
                 #print(f"train_lora_model combination_tensor shape: {combination_tensor.shape}, dtype: {combination_tensor.dtype}") #[10, 1, 768] torch.float16
