@@ -737,6 +737,7 @@ def train_lora_model(data, video_folder, args):
                                 clip_processor=clip_processor,
                                 clip_model=clip_model
                             ).to(device)
+                            
                             pipeline.enable_xformers_memory_efficient_attention()
 
 
@@ -767,14 +768,29 @@ def train_lora_model(data, video_folder, args):
                                         guidance_scale=args.guidance_scale
                                     ).video
 
-                                    imageio.mimwrite(f"/content/drive/My Drive/test_fine_tuned_sample_epoch_{epoch}.mp4", test[0], fps=8, quality=9)
-                                    del test
+                                    imageio.mimwrite(f"/content/drive/My Drive/test1_fine_tuned_sample_epoch_{epoch}.mp4", test[0], fps=8, quality=9)
+                                    
+                                    image_2 = load_and_transform_image("/content/drive/My Drive/horse.jped")
 
+                                    test_2 = pipeline(
+                                        prompt,
+                                        image_tensor=image_2,
+                                        video_length=args.video_length, 
+                                        height=args.image_size[0], 
+                                        width=args.image_size[1], 
+                                        num_inference_steps=args.num_sampling_steps,
+                                        guidance_scale=args.guidance_scale
+                                    ).video
+                                    
+                                    imageio.mimwrite(f"/content/drive/My Drive/test2_fine_tuned_sample_epoch_{epoch}.mp4", test_2[0], fps=8, quality=9)
+
+                                    del test
+                                    del test_2
                             
                                 suffix = "original" if is_original else "fine_tuned"
                                 imageio.mimwrite(f"/content/drive/My Drive/{suffix}_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9)
-                                del videos
                                 
+                                del videos
                                 del pipeline
                                 torch.cuda.empty_cache()
 
