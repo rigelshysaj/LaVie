@@ -770,7 +770,7 @@ def train_lora_model(data, video_folder, args):
 
                                     imageio.mimwrite(f"/content/drive/My Drive/test1_fine_tuned_sample_epoch_{epoch}.mp4", test[0], fps=8, quality=9)
                                     
-                                    image_2 = load_and_transform_image("/content/drive/My Drive/horse.jped")
+                                    image_2 = load_and_transform_image("/content/drive/My Drive/horse.jpeg")
 
                                     test_2 = pipeline(
                                         prompt,
