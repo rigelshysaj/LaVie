@@ -683,7 +683,7 @@ def train_lora_model(data, video_folder, args):
                 if global_step % args.logging_steps == 0:
                     log_lora_weights(unet, global_step)
 
-                if global_step % args.checkpointing_steps == 0:
+                if global_step % 568 == 0:
                     if accelerator.is_main_process:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                         if args.checkpoints_total_limit is not None:
@@ -737,7 +737,7 @@ def train_lora_model(data, video_folder, args):
                                 clip_processor=clip_processor,
                                 clip_model=clip_model
                             ).to(device)
-                            
+
                             pipeline.enable_xformers_memory_efficient_attention()
 
 
