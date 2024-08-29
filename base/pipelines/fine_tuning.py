@@ -82,11 +82,14 @@ def load_and_transform_image(path):
 
 def compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model, clip_processor, image_tensor, text_prompt, noisy_latents, timesteps):
     image_tensor = image_tensor.float()
+
+    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
+
     
     image_tensor.requires_grad_(True)
 
     text_inputs = tokenizer(
-                    list(text_prompt),
+                    text_prompt,
                     padding="max_length",
                     max_length=tokenizer.model_max_length,
                     truncation=True,
@@ -98,10 +101,15 @@ def compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model,
         return_dict=False
     )[0]
 
+    print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
+
 
     image_inputs = clip_processor(images=image_tensor, return_tensors="pt").pixel_values.to(unet.device)
     outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
     last_hidden_state = outputs.last_hidden_state.to(torch.float16)
+
+    print(f"last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}")
+
     
     encoder_hidden_states = torch.cat([text_features, last_hidden_state], dim=1)
     
@@ -625,8 +633,8 @@ def train_lora_model(data, video_folder, args):
                 else:
                     raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
                 
-                #if global_step % 442 == 0:
-                #    compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model, clip_processor, frame_tensor, description[0], noisy_latents, timesteps)
+                if global_step % (args.checkpointing_steps + 2) == 0:
+                    compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model, clip_processor, frame_tensor, list(description), noisy_latents, timesteps)
 
 
                 # Predict the noise residual and compute loss
