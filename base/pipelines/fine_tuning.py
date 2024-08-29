@@ -530,9 +530,6 @@ def train_lora_model(data, video_folder, args):
 
     epoch_losses = []
 
-    #frame = None
-    #desc = ""
-
     print(f"first_epoch: {first_epoch}")
     print(f"num_train_epochs: {args.num_train_epochs}")
 
@@ -548,15 +545,9 @@ def train_lora_model(data, video_folder, args):
                 #print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
                 
                 #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
-
-                #print(f"description: {description[0]}")
-
                 
                 try:
-                    #if(description[0] == 'a man cutting photo with a sword' and frame is None):
-                        #print("yesssssssssss a man cutting photo with a sword")
-                    #frame = frame_tensor
-                    desc = description[0]
+                    description[0]
                 except Exception as e:
                     print("------------------START--------------------")
                     print(description)
@@ -634,7 +625,7 @@ def train_lora_model(data, video_folder, args):
                 else:
                     raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
                 
-                if global_step % args.gradient_analysis_steps == 0:
+                if global_step % args.checkpointing_steps + 1 == 0:
                     compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model, clip_processor, frame_tensor, description[0], noisy_latents, timesteps)
 
 
