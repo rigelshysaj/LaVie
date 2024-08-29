@@ -625,8 +625,8 @@ def train_lora_model(data, video_folder, args):
                 else:
                     raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
                 
-                if global_step % 442 == 0:
-                    compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model, clip_processor, frame_tensor, description[0], noisy_latents, timesteps)
+                #if global_step % 442 == 0:
+                #    compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model, clip_processor, frame_tensor, description[0], noisy_latents, timesteps)
 
 
                 # Predict the noise residual and compute loss
