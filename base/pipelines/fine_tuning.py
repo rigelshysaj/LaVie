@@ -196,6 +196,10 @@ def load_model_for_inference(args):
 
     image_tensor = load_and_transform_image(args.image_path)
 
+    #image_tensor = load_and_transform_image("/content/drive/My Drive/horse.jpeg")
+
+    #zero_tensor = torch.zeros_like(image_tensor)
+
     videogen_pipeline = VideoGenPipeline(vae=vae, 
                                 text_encoder=text_encoder_one, 
                                 tokenizer=tokenizer_one, 
@@ -863,5 +867,5 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
-    training(OmegaConf.load(args.config))
-    #load_model_for_inference(OmegaConf.load(args.config))
+    #training(OmegaConf.load(args.config))
+    load_model_for_inference(OmegaConf.load(args.config))
