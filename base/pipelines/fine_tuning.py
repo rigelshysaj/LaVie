@@ -126,102 +126,85 @@ def compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model,
     print(f"  L2 norm: {gradient.norm().item():.4f}")
 
 
-def load_model_for_inference(args):
-    if args.seed is not None:
-        torch.manual_seed(args.seed)
-    torch.set_grad_enabled(False)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device):
+    with torch.no_grad():
+        # Funzione per generare video
+        def generate_video(unet, is_original):
+            pipeline = VideoGenPipeline(
+                vae=vae, 
+                text_encoder=text_encoder, 
+                tokenizer=tokenizer, 
+                scheduler=noise_scheduler, 
+                unet=unet,
+                clip_processor=clip_processor,
+                clip_model=clip_model
+            ).to(device)
 
-    logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
+            pipeline.enable_xformers_memory_efficient_attention()
 
-    accelerator_project_config = ProjectConfiguration(project_dir="/content/drive/My Drive/", logging_dir=logging_dir)
 
-    accelerator = Accelerator(
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
-        mixed_precision=args.mixed_precision,
-        log_with=args.report_to,
-        project_config=accelerator_project_config,
-    )
+            if(not is_original):
+                image_tensor = load_and_transform_image(args.image_path)
+            
+            for prompt in args.text_prompt:
+                print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
+                videos = pipeline(
+                    prompt,
+                    image_tensor=image_tensor if not is_original else None,
+                    video_length=args.video_length, 
+                    height=args.image_size[0], 
+                    width=args.image_size[1], 
+                    num_inference_steps=args.num_sampling_steps,
+                    guidance_scale=args.guidance_scale
+                ).video
 
-    # Disable AMP for MPS.
-    if torch.backends.mps.is_available():
-        accelerator.native_amp = False
+                suffix = "original" if is_original else "fine_tuned"
+                imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
+                del videos
 
-    weight_dtype = torch.float32
+                if(not is_original):
+                    zero_tensor = torch.zeros_like(image_tensor)
+                    test = pipeline(
+                        prompt,
+                        image_tensor=zero_tensor,
+                        video_length=args.video_length, 
+                        height=args.image_size[0], 
+                        width=args.image_size[1], 
+                        num_inference_steps=args.num_sampling_steps,
+                        guidance_scale=args.guidance_scale
+                    ).video
 
-    sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
-    unet = get_models(args, sd_path).to(device)
-    state_dict = find_model(args.ckpt_path)
-    unet.load_state_dict(state_dict)
+                    imageio.mimwrite(f"/content/drive/My Drive/test111111_fine_tuned.mp4", test[0], fps=8, quality=9)
+                    del test
 
-    vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
-    tokenizer_one = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
-    text_encoder_one = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device) # huge
-    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
-    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+                    image_2 = load_and_transform_image("/content/drive/My Drive/horse.jpeg")
 
-    scheduler = DDPMScheduler.from_pretrained(sd_path,
-                                            subfolder="scheduler",
-                                            beta_start=args.beta_start,
-                                            beta_end=args.beta_end,
-                                            beta_schedule=args.beta_schedule)
+                    test_2 = pipeline(
+                        prompt,
+                        image_tensor=image_2,
+                        video_length=args.video_length, 
+                        height=args.image_size[0], 
+                        width=args.image_size[1], 
+                        num_inference_steps=args.num_sampling_steps,
+                        guidance_scale=args.guidance_scale
+                    ).video
+                    
+                    imageio.mimwrite(f"/content/drive/My Drive/test2222222_fine_tuned.mp4", test_2[0], fps=8, quality=9)
+                    del test_2
+            
+                
+                del pipeline
+                torch.cuda.empty_cache()
 
-    lora_config = LoraConfig(
-        r=4,
-        lora_alpha=4,
-        init_lora_weights="gaussian",
-        target_modules=["to_k", "to_q", "to_v", "to_out.0"],
-    )
+        # Genera video con il modello fine-tuned
+        generate_video(unet, is_original=False)
 
-    unet.to(accelerator.device, dtype=weight_dtype)
-    vae.to(accelerator.device, dtype=weight_dtype)
-    text_encoder_one.to(accelerator.device, dtype=weight_dtype)
+        generate_video(original_unet, is_original=True)
 
-    # Applica LoRA al modello
-    unet = get_peft_model(unet, lora_config)
+        #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
+        torch.cuda.empty_cache()
 
-    unet = accelerator.prepare(unet)
-    
-    if args.resume_from_checkpoint != "latest":
-        path = os.path.basename(args.resume_from_checkpoint)
-    else:
-        # Get the most recent checkpoint
-        dirs = os.listdir(args.output_dir)
-        dirs = [d for d in dirs if d.startswith("checkpoint")]
-        dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
-        path = dirs[-1] if len(dirs) > 0 else None
-
-    accelerator.print(f"Inference from checkpoint {path}")
-    accelerator.load_state(os.path.join(args.output_dir, path))
-
-    image_tensor = load_and_transform_image(args.image_path)
-
-    videogen_pipeline = VideoGenPipeline(vae=vae, 
-                                text_encoder=text_encoder_one, 
-                                tokenizer=tokenizer_one, 
-                                scheduler=scheduler, 
-                                unet=unet,
-                                clip_processor=clip_processor,
-                                clip_model=clip_model
-                                ).to(device)
-    videogen_pipeline.enable_xformers_memory_efficient_attention()
-
-    if not os.path.exists(args.output_folder):
-        os.makedirs(args.output_folder)
-
-    video_grids = []
-    for prompt in args.text_prompt:
-        print('Processing the ({}) prompt'.format(prompt))
-        videos = videogen_pipeline(prompt,
-                                image_tensor=image_tensor, 
-                                video_length=args.video_length, 
-                                height=args.image_size[0], 
-                                width=args.image_size[1], 
-                                num_inference_steps=args.num_sampling_steps,
-                                guidance_scale=args.guidance_scale).video
-        imageio.mimwrite("/content/drive/My Drive/" + prompt.replace(' ', '_') + '.mp4', videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
-    
-    print('save path {}'.format("/content/drive/My Drive/" + prompt.replace(' ', '_') + '.mp4'))
+        print('save path {}'.format("/content/drive/My Drive/"))
     
 
 
@@ -324,7 +307,7 @@ def log_lora_weights(model, step):
                print(f"Step {step}: LoRA weight '{name}' mean = {param.data.mean().item():.6f}")
 
 
-def train_lora_model(data, video_folder, args):
+def lora_model(data, video_folder, args, training=True):
 
     logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
 
@@ -541,304 +524,231 @@ def train_lora_model(data, video_folder, args):
     print(f"first_epoch: {first_epoch}")
     print(f"num_train_epochs: {args.num_train_epochs}")
 
-    for epoch in range(first_epoch, args.num_train_epochs):
-        unet.train()
-        batch_losses = []
-        train_loss = 0.0
-        for step, batch in enumerate(train_dataloader):
-            with accelerator.accumulate(unet):
+    if(training):
 
-                video, description, frame_tensor = batch
+        for epoch in range(first_epoch, args.num_train_epochs):
+            unet.train()
+            batch_losses = []
+            train_loss = 0.0
+            for step, batch in enumerate(train_dataloader):
+                with accelerator.accumulate(unet):
 
-                #print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
-                
-                #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
-                
-                try:
-                    description[0]
-                except Exception as e:
-                    print("------------------START--------------------")
-                    print(description)
-                    print("------------------END--------------------")
-                    continue
-                
+                    video, description, frame_tensor = batch
 
-                print(f"epoca {epoch}, iterazione {step}, global_step {global_step}")
+                    #print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
+                    
+                    #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
+                    
+                    try:
+                        description[0]
+                    except Exception as e:
+                        print("------------------START--------------------")
+                        print(description)
+                        print("------------------END--------------------")
+                        continue
+                    
 
-                latents = encode_latents(video, vae)
-                #print(f"train_lora_model latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
+                    print(f"epoca {epoch}, iterazione {step}, global_step {global_step}")
 
-
-                latents = latents * vae.config.scaling_factor
-
-                # Sample noise that we'll add to the latents
-                noise = torch.randn_like(latents)
-                if args.noise_offset:
-                    # https://www.crosslabs.org//blog/diffusion-with-offset-noise
-                    noise += args.noise_offset * torch.randn(
-                        (latents.shape[0], latents.shape[1], latents.shape[2], 1, 1), device=latents.device
-                    )
-
-                bsz = latents.shape[0]
-                # Sample a random timestep for each image
-                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
-                timesteps = timesteps.long()
-
-                # Add noise to the latents according to the noise magnitude at each timestep
-                # (this is the forward diffusion process)
-                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
-                #print(f"train_lora_model noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
-
-                #print(f"description: {list(description)}")
-                # Get the text embedding for conditioning
-
-                text_inputs = tokenizer(
-                    list(description),
-                    padding="max_length",
-                    max_length=tokenizer.model_max_length,
-                    truncation=True,
-                    return_tensors="pt"
-                ).to(unet.device)
-
-                text_features = text_encoder(
-                    text_inputs.input_ids,
-                    return_dict=False
-                )[0]
+                    latents = encode_latents(video, vae)
+                    #print(f"train_lora_model latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
 
-                #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                    latents = latents * vae.config.scaling_factor
 
+                    # Sample noise that we'll add to the latents
+                    noise = torch.randn_like(latents)
+                    if args.noise_offset:
+                        # https://www.crosslabs.org//blog/diffusion-with-offset-noise
+                        noise += args.noise_offset * torch.randn(
+                            (latents.shape[0], latents.shape[1], latents.shape[2], 1, 1), device=latents.device
+                        )
 
-                image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
-                outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
-                #last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
-                last_hidden_state = outputs.last_hidden_state.to(torch.float16)
+                    bsz = latents.shape[0]
+                    # Sample a random timestep for each image
+                    timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
+                    timesteps = timesteps.long()
 
-                #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
-                
-                combination_tensor = torch.cat([text_features, last_hidden_state], dim=1)
-                #print(f"train_lora_model combination_tensor shape: {combination_tensor.shape}, dtype: {combination_tensor.dtype}") #[10, 1, 768] torch.float16
+                    # Add noise to the latents according to the noise magnitude at each timestep
+                    # (this is the forward diffusion process)
+                    noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
+                    #print(f"train_lora_model noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
-                encoder_hidden_states = combination_tensor
+                    #print(f"description: {list(description)}")
+                    # Get the text embedding for conditioning
 
-                # Get the target for loss depending on the prediction type
-                if args.prediction_type is not None:
-                    # set prediction_type of scheduler if defined
-                    noise_scheduler.register_to_config(prediction_type=args.prediction_type)
+                    text_inputs = tokenizer(
+                        list(description),
+                        padding="max_length",
+                        max_length=tokenizer.model_max_length,
+                        truncation=True,
+                        return_tensors="pt"
+                    ).to(unet.device)
 
-                if noise_scheduler.config.prediction_type == "epsilon":
-                    target = noise
-                elif noise_scheduler.config.prediction_type == "v_prediction":
-                    target = noise_scheduler.get_velocity(latents, noise, timesteps)
-                else:
-                    raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
-                
-                #if global_step % args.checkpointing_steps == 0:
-                #    compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model, clip_processor, frame_tensor, list(description), noisy_latents, timesteps)
-
-
-                # Predict the noise residual and compute loss
-                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states, return_dict=False)[0]
-
-                if args.snr_gamma is None:
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
-                else:
-                    # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
-                    # Since we predict the noise instead of x_0, the original formulation is slightly changed.
-                    # This is discussed in Section 4.2 of the same paper.
-                    snr = compute_snr(noise_scheduler, timesteps)
-                    mse_loss_weights = torch.stack([snr, args.snr_gamma * torch.ones_like(timesteps)], dim=1).min(
-                        dim=1
+                    text_features = text_encoder(
+                        text_inputs.input_ids,
+                        return_dict=False
                     )[0]
+
+
+                    #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+
+
+                    image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
+                    outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
+                    #last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
+                    last_hidden_state = outputs.last_hidden_state.to(torch.float16)
+
+                    #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
+                    
+                    combination_tensor = torch.cat([text_features, last_hidden_state], dim=1)
+                    #print(f"train_lora_model combination_tensor shape: {combination_tensor.shape}, dtype: {combination_tensor.dtype}") #[10, 1, 768] torch.float16
+
+                    encoder_hidden_states = combination_tensor
+
+                    # Get the target for loss depending on the prediction type
+                    if args.prediction_type is not None:
+                        # set prediction_type of scheduler if defined
+                        noise_scheduler.register_to_config(prediction_type=args.prediction_type)
+
                     if noise_scheduler.config.prediction_type == "epsilon":
-                        mse_loss_weights = mse_loss_weights / snr
+                        target = noise
                     elif noise_scheduler.config.prediction_type == "v_prediction":
-                        mse_loss_weights = mse_loss_weights / (snr + 1)
+                        target = noise_scheduler.get_velocity(latents, noise, timesteps)
+                    else:
+                        raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+                    
+                    #if global_step % args.checkpointing_steps == 0:
+                    #    compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model, clip_processor, frame_tensor, list(description), noisy_latents, timesteps)
 
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
-                    loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
-                    loss = loss.mean()
 
-                # Gather the losses across all processes for logging (if we use distributed training).
-                avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
-                train_loss += avg_loss.item() / args.gradient_accumulation_steps
-                batch_losses.append(train_loss)
+                    # Predict the noise residual and compute loss
+                    model_pred = unet(noisy_latents, timesteps, encoder_hidden_states, return_dict=False)[0]
 
-                # Backpropagate
-                accelerator.backward(loss)
+                    if args.snr_gamma is None:
+                        loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+                    else:
+                        # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
+                        # Since we predict the noise instead of x_0, the original formulation is slightly changed.
+                        # This is discussed in Section 4.2 of the same paper.
+                        snr = compute_snr(noise_scheduler, timesteps)
+                        mse_loss_weights = torch.stack([snr, args.snr_gamma * torch.ones_like(timesteps)], dim=1).min(
+                            dim=1
+                        )[0]
+                        if noise_scheduler.config.prediction_type == "epsilon":
+                            mse_loss_weights = mse_loss_weights / snr
+                        elif noise_scheduler.config.prediction_type == "v_prediction":
+                            mse_loss_weights = mse_loss_weights / (snr + 1)
+
+                        loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
+                        loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
+                        loss = loss.mean()
+
+                    # Gather the losses across all processes for logging (if we use distributed training).
+                    avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
+                    train_loss += avg_loss.item() / args.gradient_accumulation_steps
+                    batch_losses.append(train_loss)
+
+                    # Backpropagate
+                    accelerator.backward(loss)
+                    if accelerator.sync_gradients:
+                        params_to_clip = lora_layers
+                        accelerator.clip_grad_norm_(params_to_clip, args.max_grad_norm)
+                    optimizer.step()
+                    lr_scheduler.step()
+                    optimizer.zero_grad()
+                # Checks if the accelerator has performed an optimization step behind the scenes
                 if accelerator.sync_gradients:
-                    params_to_clip = lora_layers
-                    accelerator.clip_grad_norm_(params_to_clip, args.max_grad_norm)
-                optimizer.step()
-                lr_scheduler.step()
-                optimizer.zero_grad()
-            # Checks if the accelerator has performed an optimization step behind the scenes
-            if accelerator.sync_gradients:
-                progress_bar.update(1)
-                global_step += 1
-                accelerator.log({"train_loss": train_loss}, step=global_step)
-                #print(f"Step {global_step}: train_loss = {train_loss:.6f}")
-                train_loss = 0.0
+                    progress_bar.update(1)
+                    global_step += 1
+                    accelerator.log({"train_loss": train_loss}, step=global_step)
+                    #print(f"Step {global_step}: train_loss = {train_loss:.6f}")
+                    train_loss = 0.0
 
-                if global_step % args.logging_steps == 0:
-                    log_lora_weights(unet, global_step)
+                    if global_step % args.logging_steps == 0:
+                        log_lora_weights(unet, global_step)
 
-                if global_step % args.checkpointing_steps == 0:
-                    if accelerator.is_main_process:
-                        # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
-                        if args.checkpoints_total_limit is not None:
-                            checkpoints = os.listdir(args.output_dir)
-                            checkpoints = [d for d in checkpoints if d.startswith("checkpoint")]
-                            checkpoints = sorted(checkpoints, key=lambda x: int(x.split("-")[1]))
+                    if global_step % args.checkpointing_steps == 0:
+                        if accelerator.is_main_process:
+                            # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
+                            if args.checkpoints_total_limit is not None:
+                                checkpoints = os.listdir(args.output_dir)
+                                checkpoints = [d for d in checkpoints if d.startswith("checkpoint")]
+                                checkpoints = sorted(checkpoints, key=lambda x: int(x.split("-")[1]))
 
-                            # before we save the new checkpoint, we need to have at _most_ `checkpoints_total_limit - 1` checkpoints
-                            if len(checkpoints) >= args.checkpoints_total_limit:
-                                num_to_remove = len(checkpoints) - args.checkpoints_total_limit + 1
-                                removing_checkpoints = checkpoints[0:num_to_remove]
+                                # before we save the new checkpoint, we need to have at _most_ `checkpoints_total_limit - 1` checkpoints
+                                if len(checkpoints) >= args.checkpoints_total_limit:
+                                    num_to_remove = len(checkpoints) - args.checkpoints_total_limit + 1
+                                    removing_checkpoints = checkpoints[0:num_to_remove]
 
-                                logger.info(
-                                    f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints"
-                                )
-                                logger.info(f"removing checkpoints: {', '.join(removing_checkpoints)}")
+                                    logger.info(
+                                        f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints"
+                                    )
+                                    logger.info(f"removing checkpoints: {', '.join(removing_checkpoints)}")
 
-                                for removing_checkpoint in removing_checkpoints:
-                                    removing_checkpoint = os.path.join(args.output_dir, removing_checkpoint)
-                                    shutil.rmtree(removing_checkpoint)
+                                    for removing_checkpoint in removing_checkpoints:
+                                        removing_checkpoint = os.path.join(args.output_dir, removing_checkpoint)
+                                        shutil.rmtree(removing_checkpoint)
 
-                        save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
-                        accelerator.save_state(save_path)
+                            save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
+                            accelerator.save_state(save_path)
 
-                        unwrapped_unet = unwrap_model(unet, accelerator=accelerator)
-                        unet_lora_state_dict = convert_state_dict_to_diffusers(
-                            get_peft_model_state_dict(unwrapped_unet)
-                        )
+                            unwrapped_unet = unwrap_model(unet, accelerator=accelerator)
+                            unet_lora_state_dict = convert_state_dict_to_diffusers(
+                                get_peft_model_state_dict(unwrapped_unet)
+                            )
 
-                        StableDiffusionPipeline.save_lora_weights(
-                            save_directory=save_path,
-                            unet_lora_layers=unet_lora_state_dict,
-                            safe_serialization=True,
-                        )
+                            StableDiffusionPipeline.save_lora_weights(
+                                save_directory=save_path,
+                                unet_lora_layers=unet_lora_state_dict,
+                                safe_serialization=True,
+                            )
 
-                        print("modello salvatooooooooooo")
+                            print("modello salvatooooooooooo")
 
-                        logger.info(f"Saved state to {save_path}")
-                
+                            logger.info(f"Saved state to {save_path}")
+                    
 
-                    with torch.no_grad():
+                        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device)
 
-                        # Funzione per generare video
-                        def generate_video(unet, is_original):
-                            pipeline = VideoGenPipeline(
-                                vae=vae, 
-                                text_encoder=text_encoder, 
-                                tokenizer=tokenizer, 
-                                scheduler=noise_scheduler, 
-                                unet=unet,
-                                clip_processor=clip_processor,
-                                clip_model=clip_model
-                            ).to(device)
+                logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
+                progress_bar.set_postfix(**logs)
 
-                            pipeline.enable_xformers_memory_efficient_attention()
+                if global_step >= args.max_train_steps:
+                    break
 
 
-                            if(not is_original):
-                                image_tensor = load_and_transform_image(args.image_path)
-                            
-                            for prompt in args.text_prompt:
-                                print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
-                                videos = pipeline(
-                                    prompt,
-                                    image_tensor=image_tensor if not is_original else None,
-                                    video_length=args.video_length, 
-                                    height=args.image_size[0], 
-                                    width=args.image_size[1], 
-                                    num_inference_steps=args.num_sampling_steps,
-                                    guidance_scale=args.guidance_scale
-                                ).video
+            avg_epoch_loss = sum(batch_losses) / len(batch_losses)
+            #print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
+            epoch_losses.append(avg_epoch_loss)      
 
-                                if(not is_original):
-                                    zero_tensor = torch.zeros_like(image_tensor)
-                                    test = pipeline(
-                                        prompt,
-                                        image_tensor=zero_tensor,
-                                        video_length=args.video_length, 
-                                        height=args.image_size[0], 
-                                        width=args.image_size[1], 
-                                        num_inference_steps=args.num_sampling_steps,
-                                        guidance_scale=args.guidance_scale
-                                    ).video
+                    
+        
+        num_epochs = len(epoch_losses)
+        epochs = list(range(1, num_epochs + 1))  # Crea una lista [1, 2, 3, ..., num_epochs]
+        print(f"num_epochs: {num_epochs}")
 
-                                    imageio.mimwrite(f"/content/drive/My Drive/test1_fine_tuned_sample_epoch_{epoch}.mp4", test[0], fps=8, quality=9)
-                                    
-                                    image_2 = load_and_transform_image("/content/drive/My Drive/horse.jpeg")
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=epochs, y=epoch_losses, mode='lines'))
 
-                                    test_2 = pipeline(
-                                        prompt,
-                                        image_tensor=image_2,
-                                        video_length=args.video_length, 
-                                        height=args.image_size[0], 
-                                        width=args.image_size[1], 
-                                        num_inference_steps=args.num_sampling_steps,
-                                        guidance_scale=args.guidance_scale
-                                    ).video
-                                    
-                                    imageio.mimwrite(f"/content/drive/My Drive/test2_fine_tuned_sample_epoch_{epoch}.mp4", test_2[0], fps=8, quality=9)
+        # Personalizza il layout
+        fig.update_layout(
+            title='Training Loss',
+            xaxis_title='Epoch',
+            yaxis_title='Loss'
+        )
 
-                                    del test
-                                    del test_2
-                            
-                                suffix = "original" if is_original else "fine_tuned"
-                                imageio.mimwrite(f"/content/drive/My Drive/{suffix}_sample_epoch_{epoch}.mp4", videos[0], fps=8, quality=9)
-                                
-                                del videos
-                                del pipeline
-                                torch.cuda.empty_cache()
+        # Salva il grafico come immagine
+        fig.write_image("/content/drive/My Drive/training_loss.png")
 
-                        # Genera video con il modello fine-tuned
-                        generate_video(unet, is_original=False)
-
-                        generate_video(original_unet, is_original=True)
-
-                        #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
-                        torch.cuda.empty_cache()
-
-                        print('save path {}'.format("/content/drive/My Drive/"))
-
-            logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
-            progress_bar.set_postfix(**logs)
-
-            if global_step >= args.max_train_steps:
-                break
+        # Opzionale: visualizza il grafico interattivo in Colab
+        fig.show()
+    else:
+        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device)
 
 
-        avg_epoch_loss = sum(batch_losses) / len(batch_losses)
-        #print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
-        epoch_losses.append(avg_epoch_loss)      
 
-                
-    
-    num_epochs = len(epoch_losses)
-    epochs = list(range(1, num_epochs + 1))  # Crea una lista [1, 2, 3, ..., num_epochs]
-    print(f"num_epochs: {num_epochs}")
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=epochs, y=epoch_losses, mode='lines'))
-
-    # Personalizza il layout
-    fig.update_layout(
-        title='Training Loss',
-        xaxis_title='Epoch',
-        yaxis_title='Loss'
-    )
-
-    # Salva il grafico come immagine
-    fig.write_image("/content/drive/My Drive/training_loss.png")
-
-    # Opzionale: visualizza il grafico interattivo in Colab
-    fig.show()
-
-
-def training(args):
+def model(args):
     
     # Determina se sei su Google Colab
     on_colab = 'COLAB_GPU' in os.environ
@@ -854,7 +764,7 @@ def training(args):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    train_lora_model(data, video_folder, args)
+    lora_model(data, video_folder, args, training=False)
 
 
 
@@ -863,5 +773,4 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
-    training(OmegaConf.load(args.config))
-    #load_model_for_inference(OmegaConf.load(args.config))
+    model(OmegaConf.load(args.config))
