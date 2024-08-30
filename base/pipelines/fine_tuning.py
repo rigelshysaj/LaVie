@@ -194,11 +194,11 @@ def load_model_for_inference(args):
     accelerator.print(f"Inference from checkpoint {path}")
     accelerator.load_state(os.path.join(args.output_dir, path))
 
-    #image_tensor = load_and_transform_image(args.image_path)
+    image_tensor = load_and_transform_image(args.image_path)
 
-    image_tensor = load_and_transform_image("/content/drive/My Drive/horse.jpeg")
+    #image_tensor = load_and_transform_image("/content/drive/My Drive/horse.jpeg")
 
-    #zero_tensor = torch.zeros_like(image_tensor)
+    zero_tensor = torch.zeros_like(image_tensor)
 
     videogen_pipeline = VideoGenPipeline(vae=vae, 
                                 text_encoder=text_encoder_one, 
@@ -217,13 +217,13 @@ def load_model_for_inference(args):
     for prompt in args.text_prompt:
         print('Processing the ({}) prompt'.format(prompt))
         videos = videogen_pipeline(prompt,
-                                image_tensor=image_tensor, 
+                                image_tensor=zero_tensor, 
                                 video_length=args.video_length, 
                                 height=args.image_size[0], 
                                 width=args.image_size[1], 
                                 num_inference_steps=args.num_sampling_steps,
                                 guidance_scale=args.guidance_scale).video
-        imageio.mimwrite("/content/drive/My Drive/" + prompt.replace(' ', '_') + '1111.mp4', videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
+        imageio.mimwrite("/content/drive/My Drive/" + prompt.replace(' ', '_') + '2222.mp4', videos[0], fps=8, quality=9) # highest quality is 10, lowest is 0
     
     print('save path {}'.format("/content/drive/My Drive/" + prompt.replace(' ', '_') + '.mp4'))
     
