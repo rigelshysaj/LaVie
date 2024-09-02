@@ -71,14 +71,16 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     # Convert frame to numpy array
     frame_np = frame.detach().cpu().numpy().transpose(1, 2, 0)
 
-    # Calculate mean attention across all heads
-    attn_weights = attention_weights.mean(dim=0).detach().cpu().numpy()
+    # Calculate mean attention across all heads (if applicable)
+    if attention_weights.dim() > 2:
+        attn_weights = attention_weights.mean(dim=0).detach().cpu().numpy()
+    else:
+        attn_weights = attention_weights.detach().cpu().numpy()
 
-    # Reshape attention weights to match the spatial dimensions of the input
-    attn_size = int(np.sqrt(attn_weights.shape[0]))
-    attn_weights = attn_weights.reshape(attn_size, -1)  # Reshape to 2D, allowing for rectangular shape
+    # Reshape attention weights to 2D
+    attn_weights = attn_weights.reshape(-1, attn_weights.shape[-1])
 
-    # Resize attention weights to match frame dimensions
+    # Interpolate attention weights to match frame dimensions
     attn_weights = F.interpolate(torch.from_numpy(attn_weights).unsqueeze(0).unsqueeze(0), 
                                  size=(frame_np.shape[0], frame_np.shape[1]), 
                                  mode='bicubic', align_corners=False).squeeze().numpy()
@@ -90,7 +92,8 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     fig = make_subplots(rows=1, cols=2, subplot_titles=("Original Frame", "Attention Heatmap"))
 
     # Add original frame
-    fig.add_trace(go.Image(z=frame_np), row=1, col=1)
+    frame_np_normalized = (frame_np - frame_np.min()) / (frame_np.max() - frame_np.min())
+    fig.add_trace(go.Image(z=frame_np_normalized), row=1, col=1)
 
     # Add attention heatmap
     fig.add_trace(go.Heatmap(z=attn_weights, colorscale='Hot', zmin=0, zmax=1), row=1, col=2)
@@ -113,7 +116,7 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     print(f"Attention heatmap image saved to {save_path}")
 
     # Print debug information
-    print(f"Attention weights shape: {attn_weights.shape}")
+    print(f"Attention weights shape after processing: {attn_weights.shape}")
     print(f"Attention weights min: {attn_weights.min()}, max: {attn_weights.max()}")
 
 class AttentionWithVisualization(nn.Module):
