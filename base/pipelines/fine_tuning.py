@@ -5,6 +5,8 @@ import cv2
 import os
 import json
 from tqdm import tqdm
+from plotly.subplots import make_subplots
+import plotly.graph_objs as go
 import shutil
 from transformers import CLIPProcessor, CLIPModel
 from peft import LoraConfig, get_peft_model
@@ -60,6 +62,36 @@ logger = logging.get_logger(__name__)
 @dataclass
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
+
+def visualize_attention_maps(attn_weights, save_path):
+    # attn_weights shape: (num_heads, target_seq_len, source_seq_len)
+    num_heads = attn_weights.shape[0]
+    
+    fig = make_subplots(rows=1, cols=num_heads, 
+                        subplot_titles=[f'Head {i+1}' for i in range(num_heads)])
+    
+    for i in range(num_heads):
+        heatmap = go.Heatmap(z=attn_weights[i].cpu().detach().numpy(),
+                             colorscale='Viridis')
+        fig.add_trace(heatmap, row=1, col=i+1)
+    
+    fig.update_layout(height=400, width=300*num_heads, title_text="Attention Maps")
+    
+    for i in range(num_heads):
+        fig.update_xaxes(title_text="Source Sequence", row=1, col=i+1)
+        fig.update_yaxes(title_text="Target Sequence", row=1, col=i+1)
+    
+    # Salva solo come immagine statica
+    fig.write_image(save_path)
+
+class AttentionMapModule(nn.Module):
+    def __init__(self, embed_dim, num_heads):
+        super().__init__()
+        self.attention = nn.MultiheadAttention(embed_dim, num_heads)
+    
+    def forward(self, query, key, value):
+        attn_output, attn_weights = self.attention(query, key, value)
+        return attn_output, attn_weights
 
 
 def load_and_transform_image(path):
@@ -526,6 +558,8 @@ def lora_model(data, video_folder, args, training=True):
 
     if(training):
 
+        attention_map_module = AttentionMapModule(embed_dim=768, num_heads=8).to(unet.device).to(torch.float16)
+
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
             batch_losses = []
@@ -605,10 +639,21 @@ def lora_model(data, video_folder, args, training=True):
 
                     #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
                     
-                    combination_tensor = torch.cat([text_features, last_hidden_state], dim=1)
-                    #print(f"train_lora_model combination_tensor shape: {combination_tensor.shape}, dtype: {combination_tensor.dtype}") #[10, 1, 768] torch.float16
+                    
+                    encoder_hidden_states, attn_weights = attention_map_module(
+                    text_features.transpose(0, 1),
+                    last_hidden_state.transpose(0, 1),
+                    last_hidden_state.transpose(0, 1)
+                    )
+                    
+                    encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
-                    encoder_hidden_states = combination_tensor
+                    if step % 1 == 0:
+                        os.makedirs(os.path.join(args.output_dir, "attention_maps"), exist_ok=True)
+                        visualize_attention_maps(
+                            attn_weights,
+                            save_path=os.path.join(args.output_dir, "attention_maps", f"attention_map_epoch{epoch}_step{step}.png")
+                        )
 
                     # Get the target for loss depending on the prediction type
                     if args.prediction_type is not None:
