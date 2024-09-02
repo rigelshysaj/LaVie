@@ -64,13 +64,11 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 def visualize_attention_heatmap(frame, attention_weights, save_path):
-    print(f"attn_weights shape: {attention_weights.shape}")
-    print(f"frame_tensor shape: {frame.shape}")
     # Converti il frame in un'immagine numpy
-    frame_np = frame.permute(1, 2, 0).cpu().numpy()
+    frame_np = frame.detach().cpu().numpy()
 
     # Ridimensiona le attention weights alla dimensione del frame
-    attn_weights = attention_weights.mean(dim=0)  # Media su tutte le teste di attenzione
+    attn_weights = attention_weights.mean(dim=0).detach()  # Media su tutte le teste di attenzione
     
     # Gestisci il caso specifico di 50 elementi
     attn_size = attn_weights.shape[0]
