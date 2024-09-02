@@ -7,6 +7,7 @@ import json
 from tqdm import tqdm
 from plotly.subplots import make_subplots
 import plotly.io as pio
+from scipy.ndimage import gaussian_filter
 import plotly.graph_objs as go
 import shutil
 from transformers import CLIPProcessor, CLIPModel
@@ -65,11 +66,15 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 def visualize_attention_heatmap(frame, attention_weights, save_path):
-    #print(f"frame shape: {frame.shape}, dtype: {frame.dtype}") #torch.Size([3, 320, 512]), dtype: torch.uint8
-    #print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") #shape: torch.Size([77, 50]), dtype: torch.float16
+    print(f"frame shape: {frame.shape}, dtype: {frame.dtype}")
+    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
     
     # Convert frame to numpy array
     frame_np = frame.detach().cpu().numpy().transpose(1, 2, 0)
+
+    # Ensure frame is in 0-255 range
+    if frame_np.max() <= 1.0:
+        frame_np = (frame_np * 255).astype(np.uint8)
 
     # Calculate mean attention across all heads (if applicable)
     if attention_weights.dim() > 2:
@@ -77,25 +82,23 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     else:
         attn_weights = attention_weights.detach().cpu().numpy()
 
-    #print(f"attn_weights1 shape: {attn_weights.shape}, dtype: {attn_weights.dtype}") #shape: (77, 50), dtype: float16
-    
-    # Reshape attention weights to 2D
-    attn_weights = attn_weights.reshape(-1, attn_weights.shape[-1])
+    # Reshape attention weights to match image dimensions
+    h, w = frame_np.shape[:2]
+    attn_weights = attn_weights.reshape(h, w)
 
-    #print(f"attn_weights2 shape: {attn_weights.shape}, dtype: {attn_weights.dtype}") #shape: (77, 50), dtype: float16
-
-    # Interpolate attention weights to match frame dimensions
-    attn_weights = F.interpolate(torch.from_numpy(attn_weights).unsqueeze(0).unsqueeze(0), 
-                                 size=(frame_np.shape[0], frame_np.shape[1]), 
-                                 mode='bicubic', align_corners=False).squeeze().numpy()
-    
-    #print(f"attn_weights3 shape: {attn_weights.shape}, dtype: {attn_weights.dtype}") #shape: (320, 512), dtype: float16
+    # Apply Gaussian smoothing
+    attn_weights = gaussian_filter(attn_weights, sigma=3)
 
     # Normalize attention weights
     attn_weights = (attn_weights - attn_weights.min()) / (attn_weights.max() - attn_weights.min())
 
+    # Create color overlay
+    heatmap = np.zeros((h, w, 4), dtype=np.uint8)
+    heatmap[..., 0] = np.interp(attn_weights, [0, 1], [0, 255])  # Red channel
+    heatmap[..., 3] = np.interp(attn_weights, [0, 1], [0, 180])  # Alpha channel
+
     # Create Plotly figure
-    fig = make_subplots(rows=1, cols=2, subplot_titles=("Original Frame", "Attention Heatmap"))
+    fig = make_subplots(rows=1, cols=3, subplot_titles=("Original Frame", "Attention Heatmap", "Overlay"))
 
     # Add original frame
     fig.add_trace(go.Image(z=frame_np), row=1, col=1)
@@ -103,11 +106,18 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     # Add attention heatmap
     fig.add_trace(go.Heatmap(z=attn_weights, colorscale='Hot', zmin=0, zmax=1), row=1, col=2)
 
+    # Add overlay
+    overlay = frame_np.copy()
+    overlay = overlay.astype(np.float32) / 255.0
+    overlay = overlay * (1 - heatmap[..., 3:4] / 255.0) + heatmap[..., :3] * (heatmap[..., 3:4] / 255.0)
+    overlay = (overlay * 255).astype(np.uint8)
+    fig.add_trace(go.Image(z=overlay), row=1, col=3)
+
     # Configure layout
     fig.update_layout(
         title='Attention Visualization',
-        width=1200,
-        height=500
+        width=1800,
+        height=600
     )
 
     # Disable axes
