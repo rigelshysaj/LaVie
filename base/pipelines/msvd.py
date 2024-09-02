@@ -78,8 +78,8 @@ class VideoDatasetMsvd(Dataset):
 
             #print(f"mid_frame1 shape: {mid_frame_np.shape}, dtype: {mid_frame_np.dtype}") #shape: (320, 512, 3), dtype: uint8
             mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
-
             #print(f"mid_frame2 shape: {mid_frame.shape}, dtype: {mid_frame.dtype}") #shape: torch.Size([3, 320, 512]), dtype: torch.uint8
+            
             # Ottieni le descrizioni del video
             video_id = os.path.splitext(video_file)[0]
             descriptions = self.video_descriptions.get(video_id, [])
