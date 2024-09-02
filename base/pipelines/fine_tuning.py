@@ -66,7 +66,7 @@ class StableDiffusionPipelineOutput(BaseOutput):
 
 def visualize_attention_heatmap(frame, attention_weights, save_path):
     # Converti il frame in un'immagine numpy
-    frame_np = frame.detach().cpu().numpy()
+    frame_np = frame.detach().cpu().numpy().transpose(1, 2, 0)
 
     # Calcola la media dell'attenzione su tutte le teste
     attn_weights = attention_weights.mean(dim=0).detach().cpu().numpy()
