@@ -595,7 +595,7 @@ def lora_model(data, video_folder, args, training=True):
 
 
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
-                    #print(f"Processed image shape: {image_inputs.shape}, dtype: {image_inputs.dtype}")
+                    #print(f"Processed image shape: {image_inputs.shape}, dtype: {image_inputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
                     #print(f"Min value: {image_inputs.min()}, Max value: {image_inputs.max()}")
                     #print(f"Mean: {image_inputs.mean()}, Std: {image_inputs.std()}")
 
