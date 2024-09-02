@@ -67,13 +67,21 @@ class StableDiffusionPipelineOutput(BaseOutput):
 def visualize_attention_heatmap(frame, attention_weights, save_path):
     # Converti il frame in un'immagine numpy
     frame_np = frame.detach().cpu().numpy().transpose(1, 2, 0)
-    
-    # Non è necessario normalizzare frame_np perché è già in formato uint8 (0-255)
 
-    # Ridimensiona le attention weights alla dimensione del frame
+    # Calcola la media dell'attenzione su tutte le teste
     attn_weights = attention_weights.mean(dim=0).detach().cpu().numpy()
+
+    # Reshape dell'attenzione in una matrice 2D
+    attn_size = int(np.sqrt(attn_weights.shape[0]))
+    attn_weights = attn_weights.reshape(attn_size, attn_size)
+
+    # Ridimensiona l'attenzione alle dimensioni del frame usando interpolazione bicubica
+    attn_weights = F.interpolate(torch.from_numpy(attn_weights).unsqueeze(0).unsqueeze(0), 
+                                 size=(frame_np.shape[0], frame_np.shape[1]), 
+                                 mode='bicubic', align_corners=False).squeeze().numpy()
+
+    # Normalizza l'attenzione
     attn_weights = (attn_weights - attn_weights.min()) / (attn_weights.max() - attn_weights.min())
-    attn_weights = np.resize(attn_weights, (320, 512))
 
     # Crea la figura Plotly
     fig = make_subplots(rows=1, cols=2, subplot_titles=("Original Frame", "Attention Heatmap"))
@@ -82,7 +90,7 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     fig.add_trace(go.Image(z=frame_np), row=1, col=1)
 
     # Aggiungi la heatmap dell'attenzione
-    fig.add_trace(go.Heatmap(z=attn_weights, colorscale='Hot'), row=1, col=2)
+    fig.add_trace(go.Heatmap(z=attn_weights, colorscale='Hot', zmin=0, zmax=1), row=1, col=2)
 
     # Configura il layout
     fig.update_layout(
@@ -102,6 +110,10 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     with open(save_path, "wb") as f:
         f.write(img_bytes)
     print(f"Attention heatmap image saved to {save_path}")
+
+    # Stampa alcune informazioni di debug
+    print(f"Attention weights shape: {attn_weights.shape}")
+    print(f"Attention weights min: {attn_weights.min()}, max: {attn_weights.max()}")
 
 class AttentionWithVisualization(nn.Module):
     def __init__(self, embed_dim, num_heads):
