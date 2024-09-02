@@ -648,12 +648,11 @@ def lora_model(data, video_folder, args, training=True):
                     
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
-                    if step % 1 == 0:
-                        os.makedirs(os.path.join(args.output_dir, "attention_maps"), exist_ok=True)
-                        visualize_attention_maps(
-                            attn_weights,
-                            save_path=os.path.join(args.output_dir, "attention_maps", f"attention_map_epoch{epoch}_step{step}.png")
-                        )
+                    os.makedirs(os.path.join(args.output_dir, "attention_maps"), exist_ok=True)
+                    visualize_attention_maps(
+                        attn_weights,
+                        save_path=os.path.join(args.output_dir, "attention_maps", f"attention_map_epoch{epoch}_step{step}.png")
+                    )
 
                     # Get the target for loss depending on the prediction type
                     if args.prediction_type is not None:
