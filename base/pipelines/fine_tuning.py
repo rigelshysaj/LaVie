@@ -65,13 +65,10 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 def visualize_attention_heatmap(frame, attention_weights, save_path):
-    print(f"frame2222 shape: {frame.shape}, dtype: {frame.dtype}")
-    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
     # Converti il frame in un'immagine numpy
     frame_np = frame.detach().cpu().numpy().transpose(1, 2, 0)
     
-    # Normalizza il frame per la visualizzazione
-    frame_np = (frame_np - frame_np.min()) / (frame_np.max() - frame_np.min())
+    # Non è necessario normalizzare frame_np perché è già in formato uint8 (0-255)
 
     # Ridimensiona le attention weights alla dimensione del frame
     attn_weights = attention_weights.mean(dim=0).detach().cpu().numpy()
