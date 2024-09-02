@@ -69,8 +69,13 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
 
     # Ridimensiona le attention weights alla dimensione del frame
     attn_weights = attention_weights.mean(dim=0)  # Media su tutte le teste di attenzione
-    attn_size = int(np.sqrt(attn_weights.shape[0]))
-    attn_weights = attn_weights.reshape(attn_size, attn_size)
+    
+    # Determina la forma corretta delle attention weights
+    attn_size = attn_weights.shape[0]
+    height = int(np.sqrt(attn_size))
+    width = attn_size // height
+    
+    attn_weights = attn_weights.reshape(height, width)
     attn_weights = F.interpolate(attn_weights.unsqueeze(0).unsqueeze(0), size=(320, 512), mode='bilinear').squeeze()
 
     # Normalizza le attention weights
