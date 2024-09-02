@@ -76,7 +76,7 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
         frame_np = frame
     
     # Ensure frame is in the range [0, 1]
-    frame_np = frame_np.astype(np.float32)
+    frame_np = frame_np.astype(np.float32) / 255.0
 
     # Handle attention weights
     if isinstance(attention_weights, torch.Tensor):
