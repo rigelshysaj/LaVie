@@ -98,8 +98,7 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     fig = make_subplots(rows=1, cols=2, subplot_titles=("Original Frame", "Attention Heatmap"))
 
     # Add original frame
-    frame_np_normalized = (frame_np - frame_np.min()) / (frame_np.max() - frame_np.min())
-    fig.add_trace(go.Image(z=frame_np_normalized), row=1, col=1)
+    fig.add_trace(go.Image(z=frame_np), row=1, col=1)
 
     # Add attention heatmap
     fig.add_trace(go.Heatmap(z=attn_weights, colorscale='Hot', zmin=0, zmax=1), row=1, col=2)
