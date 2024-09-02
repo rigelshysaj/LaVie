@@ -65,8 +65,8 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 def visualize_attention_heatmap(frame, attention_weights, save_path):
-    print(f"frame shape: {frame.shape}, dtype: {frame.dtype}")
-    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
+    #print(f"frame shape: {frame.shape}, dtype: {frame.dtype}") #torch.Size([3, 320, 512]), dtype: torch.uint8
+    #print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") #shape: torch.Size([77, 50]), dtype: torch.float16
     
     # Convert frame to numpy array
     frame_np = frame.detach().cpu().numpy().transpose(1, 2, 0)
@@ -77,19 +77,19 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     else:
         attn_weights = attention_weights.detach().cpu().numpy()
 
-    print(f"attn_weights1 shape: {attn_weights.shape}, dtype: {attn_weights.dtype}")
+    #print(f"attn_weights1 shape: {attn_weights.shape}, dtype: {attn_weights.dtype}") #shape: (77, 50), dtype: float16
     
     # Reshape attention weights to 2D
     attn_weights = attn_weights.reshape(-1, attn_weights.shape[-1])
 
-    print(f"attn_weights2 shape: {attn_weights.shape}, dtype: {attn_weights.dtype}")
+    #print(f"attn_weights2 shape: {attn_weights.shape}, dtype: {attn_weights.dtype}") #shape: (77, 50), dtype: float16
 
     # Interpolate attention weights to match frame dimensions
     attn_weights = F.interpolate(torch.from_numpy(attn_weights).unsqueeze(0).unsqueeze(0), 
                                  size=(frame_np.shape[0], frame_np.shape[1]), 
                                  mode='bicubic', align_corners=False).squeeze().numpy()
     
-    print(f"attn_weights3 shape: {attn_weights.shape}, dtype: {attn_weights.dtype}")
+    #print(f"attn_weights3 shape: {attn_weights.shape}, dtype: {attn_weights.dtype}") #shape: (320, 512), dtype: float16
 
     # Normalize attention weights
     attn_weights = (attn_weights - attn_weights.min()) / (attn_weights.max() - attn_weights.min())
