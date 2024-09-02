@@ -67,53 +67,52 @@ class StableDiffusionPipelineOutput(BaseOutput):
 def visualize_attention_heatmap(frame, attention_weights, save_path):
     print(f"frame shape: {frame.shape}, dtype: {frame.dtype}")
     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
-    # Converti il frame in un'immagine numpy
+    
+    # Convert frame to numpy array
     frame_np = frame.detach().cpu().numpy().transpose(1, 2, 0)
 
-    # Calcola la media dell'attenzione su tutte le teste
+    # Calculate mean attention across all heads
     attn_weights = attention_weights.mean(dim=0).detach().cpu().numpy()
 
-    # Reshape dell'attenzione in una matrice 2D
+    # Reshape attention weights to match the spatial dimensions of the input
     attn_size = int(np.sqrt(attn_weights.shape[0]))
-    attn_weights = attn_weights.reshape(attn_size, attn_size)
+    attn_weights = attn_weights.reshape(attn_size, -1)  # Reshape to 2D, allowing for rectangular shape
 
-    # Ridimensiona l'attenzione alle dimensioni del frame usando interpolazione bicubica
+    # Resize attention weights to match frame dimensions
     attn_weights = F.interpolate(torch.from_numpy(attn_weights).unsqueeze(0).unsqueeze(0), 
                                  size=(frame_np.shape[0], frame_np.shape[1]), 
                                  mode='bicubic', align_corners=False).squeeze().numpy()
 
-    # Normalizza l'attenzione
+    # Normalize attention weights
     attn_weights = (attn_weights - attn_weights.min()) / (attn_weights.max() - attn_weights.min())
 
-    # Crea la figura Plotly
+    # Create Plotly figure
     fig = make_subplots(rows=1, cols=2, subplot_titles=("Original Frame", "Attention Heatmap"))
 
-    # Aggiungi il frame originale
+    # Add original frame
     fig.add_trace(go.Image(z=frame_np), row=1, col=1)
 
-    # Aggiungi la heatmap dell'attenzione
+    # Add attention heatmap
     fig.add_trace(go.Heatmap(z=attn_weights, colorscale='Hot', zmin=0, zmax=1), row=1, col=2)
 
-    # Configura il layout
+    # Configure layout
     fig.update_layout(
         title='Attention Visualization',
         width=1200,
         height=500
     )
 
-    # Disabilita gli assi
+    # Disable axes
     fig.update_xaxes(visible=False, showticklabels=False)
     fig.update_yaxes(visible=False, showticklabels=False)
 
-    # Genera l'immagine direttamente
+    # Generate and save image
     img_bytes = pio.to_image(fig, format="png")
-    
-    # Salva l'immagine
     with open(save_path, "wb") as f:
         f.write(img_bytes)
     print(f"Attention heatmap image saved to {save_path}")
 
-    # Stampa alcune informazioni di debug
+    # Print debug information
     print(f"Attention weights shape: {attn_weights.shape}")
     print(f"Attention weights min: {attn_weights.min()}, max: {attn_weights.max()}")
 
