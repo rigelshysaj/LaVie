@@ -77,13 +77,19 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     else:
         attn_weights = attention_weights.detach().cpu().numpy()
 
+    print(f"attn_weights1 shape: {attn_weights.shape}, dtype: {attn_weights.dtype}")
+    
     # Reshape attention weights to 2D
     attn_weights = attn_weights.reshape(-1, attn_weights.shape[-1])
+
+    print(f"attn_weights2 shape: {attn_weights.shape}, dtype: {attn_weights.dtype}")
 
     # Interpolate attention weights to match frame dimensions
     attn_weights = F.interpolate(torch.from_numpy(attn_weights).unsqueeze(0).unsqueeze(0), 
                                  size=(frame_np.shape[0], frame_np.shape[1]), 
                                  mode='bicubic', align_corners=False).squeeze().numpy()
+    
+    print(f"attn_weights3 shape: {attn_weights.shape}, dtype: {attn_weights.dtype}")
 
     # Normalize attention weights
     attn_weights = (attn_weights - attn_weights.min()) / (attn_weights.max() - attn_weights.min())
