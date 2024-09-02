@@ -63,67 +63,73 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
-def visualize_attention_maps(attn_weights, frame_tensor, save_path):
-    print(f"attn_weights shape: {attn_weights.shape}")
-    print(f"frame_tensor shape: {frame_tensor.shape}")
+def visualize_attention_heatmap(frame, attention_weights, save_path):
+    # Converti il frame in un'immagine numpy
+    frame_np = frame.permute(1, 2, 0).cpu().numpy()
 
-    # Gestisci il caso in cui attn_weights ha forma (1, target_seq_len, source_seq_len)
-    if attn_weights.dim() == 3 and attn_weights.shape[0] == 1:
-        attn_weights = attn_weights.squeeze(0)
-    
-    # Gestisci il caso in cui frame_tensor ha 4 dimensioni
-    if frame_tensor.dim() == 4:
-        frame_tensor = frame_tensor.squeeze(0)  # Rimuovi la dimensione del batch se presente
-    
-    # Converti il frame_tensor in numpy array e normalizza
-    frame_np = frame_tensor.permute(1, 2, 0).cpu().numpy()
-    frame_np = cv2.cvtColor(frame_np, cv2.COLOR_RGB2BGR)
-    frame_np = frame_np.astype(np.float32) / 255.0
+    # Ridimensiona le attention weights alla dimensione del frame
+    attn_weights = attention_weights.mean(dim=0)  # Media su tutte le teste di attenzione
+    attn_size = int(np.sqrt(attn_weights.shape[0]))
+    attn_weights = attn_weights.reshape(attn_size, attn_size)
+    attn_weights = F.interpolate(attn_weights.unsqueeze(0).unsqueeze(0), size=(320, 512), mode='bilinear').squeeze()
 
-    # Usa solo la prima riga di attn_weights come mappa di attenzione
-    attn_map = attn_weights[0].cpu().detach().numpy()
-    print(f"attn_map shape: {attn_map.shape}")
+    # Normalizza le attention weights
+    attn_weights = (attn_weights - attn_weights.min()) / (attn_weights.max() - attn_weights.min())
+    attn_weights_np = attn_weights.cpu().numpy()
 
-    # Trasforma l'array 1D in una mappa 2D
-    attn_map_2d = attn_map.reshape(1, -1)
-    print(f"attn_map_2d shape: {attn_map_2d.shape}")
+    # Crea la figura Plotly
+    fig = go.Figure()
 
-    # Ridimensiona la mappa di attenzione alle dimensioni del frame
-    try:
-        attn_map_resized = cv2.resize(attn_map_2d, (frame_np.shape[1], frame_np.shape[0]))
-    except cv2.error as e:
-        print(f"Error resizing attn_map: {e}")
-        print(f"attn_map_2d shape: {attn_map_2d.shape}, frame_np shape: {frame_np.shape}")
-        return  # Esci dalla funzione se c'è un errore
-    
-    # Normalizza la mappa di attenzione
-    attn_map_resized = (attn_map_resized - attn_map_resized.min()) / (attn_map_resized.max() - attn_map_resized.min() + 1e-8)
-    
-    # Crea una heatmap colorata
-    heatmap = cv2.applyColorMap(np.uint8(255 * attn_map_resized), cv2.COLORMAP_JET)
-    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB) / 255.0
-    
-    # Sovrapponi la heatmap al frame originale
-    overlayed_img = 0.7 * frame_np + 0.3 * heatmap
-    
-    # Converti l'immagine sovrapposta in RGB per Plotly
-    overlayed_img_rgb = cv2.cvtColor(overlayed_img, cv2.COLOR_BGR2RGB)
-    
-    # Crea la figura con Plotly
-    fig = go.Figure(data=go.Image(z=overlayed_img_rgb))
-    fig.update_layout(title_text="Attention Map")
-    
-    # Salva come immagine statica
-    fig.write_image(save_path)
+    # Aggiungi il frame originale
+    fig.add_trace(go.Image(z=frame_np))
 
-class AttentionMapModule(nn.Module):
+    # Aggiungi la heatmap dell'attenzione
+    fig.add_trace(go.Heatmap(z=attn_weights_np, colorscale='Hot', opacity=0.7))
+
+    # Configura il layout
+    fig.update_layout(
+        title='Attention Heatmap',
+        width=800,
+        height=500,
+        updatemenus=[dict(
+            type="buttons",
+            direction="left",
+            buttons=list([
+                dict(args=[{"visible": [True, False]}],
+                     label="Original Frame",
+                     method="update"),
+                dict(args=[{"visible": [True, True]}],
+                     label="Frame + Heatmap",
+                     method="update"),
+                dict(args=[{"visible": [False, True]}],
+                     label="Heatmap Only",
+                     method="update")
+            ]),
+            pad={"r": 10, "t": 10},
+            showactive=True,
+            x=0.11,
+            xanchor="left",
+            y=1.1,
+            yanchor="top"
+        )],
+    )
+
+    # Disabilita gli assi
+    fig.update_xaxes(visible=False, showticklabels=False)
+    fig.update_yaxes(visible=False, showticklabels=False)
+
+    # Salva la figura
+    fig.write_html(save_path)
+    print(f"Interactive attention heatmap saved to {save_path}")
+
+class AttentionWithVisualization(nn.Module):
     def __init__(self, embed_dim, num_heads):
         super().__init__()
-        self.attention = nn.MultiheadAttention(embed_dim, num_heads)
-    
+        self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads)
+        
     def forward(self, query, key, value):
-        attn_output, attn_weights = self.attention(query, key, value)
-        return attn_output, attn_weights
+        attn_output, attn_output_weights = self.attention(query, key, value)
+        return attn_output, attn_output_weights
 
 
 def load_and_transform_image(path):
@@ -590,7 +596,7 @@ def lora_model(data, video_folder, args, training=True):
 
     if(training):
 
-        attention_map_module = AttentionMapModule(embed_dim=768, num_heads=8).to(unet.device).to(torch.float16)
+        attention_layer = AttentionWithVisualization(embed_dim=768, num_heads=8).to(unet.device).to(torch.float16)
 
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
@@ -672,20 +678,18 @@ def lora_model(data, video_folder, args, training=True):
                     #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
                     
                     
-                    encoder_hidden_states, attn_weights = attention_map_module(
-                    text_features.transpose(0, 1),
-                    last_hidden_state.transpose(0, 1),
-                    last_hidden_state.transpose(0, 1)
-                    )
-                    
+                    text_features = text_features.transpose(0, 1)
+                    last_hidden_state = last_hidden_state.transpose(0, 1)
+
+                    encoder_hidden_states, attention_weights = attention_layer(text_features, last_hidden_state, last_hidden_state)
+
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
-                    os.makedirs(os.path.join(args.output_dir, "attention_maps"), exist_ok=True)
-                    visualize_attention_maps(
-                        attn_weights,
-                        frame_tensor,  # Passa il frame_tensor
-                        save_path=os.path.join(args.output_dir, "attention_maps", f"attention_map_epoch{epoch}_step{step}.png")
-                    )
+                    # Visualizza e salva le attention maps
+                    if step % args.save_attention_map_steps == 0:  # Aggiungi questo parametro agli argomenti
+                        attention_map_path = f"{args.output_dir}/attention_heatmap_step_{global_step}.png"
+                        visualize_attention_heatmap(frame_tensor[0], attention_weights[0], attention_map_path)
+                        print(f"Attention heatmap saved to {attention_map_path}")
 
                     # Get the target for loss depending on the prediction type
                     if args.prediction_type is not None:
