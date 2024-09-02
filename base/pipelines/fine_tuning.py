@@ -595,10 +595,10 @@ def lora_model(data, video_folder, args, training=True):
 
 
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
-                    print(f"Processed image shape: {image_inputs.shape}, dtype: {image_inputs.dtype}")
-                    print(f"Min value: {image_inputs.min()}, Max value: {image_inputs.max()}")
-                    print(f"Mean: {image_inputs.mean()}, Std: {image_inputs.std()}")
-                    
+                    #print(f"Processed image shape: {image_inputs.shape}, dtype: {image_inputs.dtype}")
+                    #print(f"Min value: {image_inputs.min()}, Max value: {image_inputs.max()}")
+                    #print(f"Mean: {image_inputs.mean()}, Std: {image_inputs.std()}")
+
                     outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
                     #last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
                     last_hidden_state = outputs.last_hidden_state.to(torch.float16)
