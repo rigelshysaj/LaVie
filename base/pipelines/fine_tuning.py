@@ -76,18 +76,29 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     # Ensure frame is in the range [0, 1]
     frame_np = frame_np.astype(np.float32) / 255.0
 
-    # Calculate mean attention across all heads (if applicable)
-    if attention_weights.dim() > 2:
-        attn_weights = attention_weights.mean(dim=0).detach().cpu().numpy()
-    else:
+    # Handle attention weights
+    if isinstance(attention_weights, torch.Tensor):
         attn_weights = attention_weights.detach().cpu().numpy()
+    else:
+        attn_weights = attention_weights
 
-    # Reshape attention weights to match the spatial dimensions of the frame
+    # Reshape attention weights
+    if attn_weights.ndim == 2:
+        # If 2D, assume it's already in the correct shape
+        pass
+    elif attn_weights.ndim == 3:
+        # If 3D, take the mean across the first dimension
+        attn_weights = attn_weights.mean(axis=0)
+    else:
+        raise ValueError(f"Unexpected attention weights shape: {attn_weights.shape}")
+
+    # Get frame dimensions
     h, w = frame_np.shape[:2]
-    attn_weights = attn_weights.reshape(-1, int(np.sqrt(attn_weights.shape[1])), int(np.sqrt(attn_weights.shape[1])))
-    attn_weights = F.interpolate(torch.from_numpy(attn_weights).unsqueeze(0),
-                                 size=(h, w),
-                                 mode='bicubic', align_corners=False).squeeze().numpy()
+
+    # Interpolate attention weights to match frame dimensions
+    attn_weights = torch.from_numpy(attn_weights).float().unsqueeze(0).unsqueeze(0)
+    attn_weights = F.interpolate(attn_weights, size=(h, w), mode='bicubic', align_corners=False)
+    attn_weights = attn_weights.squeeze().numpy()
 
     # Normalize attention weights
     attn_weights = (attn_weights - attn_weights.min()) / (attn_weights.max() - attn_weights.min())
