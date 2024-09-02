@@ -65,6 +65,8 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 def visualize_attention_heatmap(frame, attention_weights, save_path):
+    print(f"frame2222 shape: {frame.shape}, dtype: {frame.dtype}")
+    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
     # Converti il frame in un'immagine numpy
     frame_np = frame.detach().cpu().numpy().transpose(1, 2, 0)
     
@@ -591,7 +593,7 @@ def lora_model(data, video_folder, args, training=True):
 
                     #print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
                     
-                    #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
+                    print(f"frame_tensor111111 shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
                     
                     try:
                         description[0]
