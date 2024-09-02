@@ -64,6 +64,9 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 def visualize_attention_maps(attn_weights, frame_tensor, save_path):
+    print(f"attn_weights shape: {attn_weights.shape}")
+    print(f"frame_tensor shape: {frame_tensor.shape}")
+
     # attn_weights shape: (num_heads, target_seq_len, source_seq_len)
     num_heads = attn_weights.shape[0]
     
@@ -82,12 +85,22 @@ def visualize_attention_maps(attn_weights, frame_tensor, save_path):
     for i in range(num_heads):
         # Prendi la media dell'attenzione per ogni pixel dell'immagine
         attn_map = attn_weights[i].mean(dim=0).cpu().detach().numpy()
+        print(f"attn_map shape for head {i}: {attn_map.shape}")
+        
+        # Assicurati che attn_map sia 2D
+        if attn_map.ndim == 1:
+            attn_map = attn_map.reshape(-1, 1)
         
         # Ridimensiona la mappa di attenzione alle dimensioni del frame
-        attn_map_resized = cv2.resize(attn_map, (frame_np.shape[1], frame_np.shape[0]))
+        try:
+            attn_map_resized = cv2.resize(attn_map, (frame_np.shape[1], frame_np.shape[0]))
+        except cv2.error as e:
+            print(f"Error resizing attn_map for head {i}: {e}")
+            print(f"attn_map shape: {attn_map.shape}, frame_np shape: {frame_np.shape}")
+            continue  # Salta questa testa se c'è un errore
         
         # Normalizza la mappa di attenzione
-        attn_map_resized = (attn_map_resized - attn_map_resized.min()) / (attn_map_resized.max() - attn_map_resized.min())
+        attn_map_resized = (attn_map_resized - attn_map_resized.min()) / (attn_map_resized.max() - attn_map_resized.min() + 1e-8)
         
         # Crea una heatmap colorata
         heatmap = cv2.applyColorMap(np.uint8(255 * attn_map_resized), cv2.COLORMAP_JET)
