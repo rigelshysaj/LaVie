@@ -686,10 +686,10 @@ def lora_model(data, video_folder, args, training=True):
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
                     # Visualizza e salva le attention maps
-                    if step % args.save_attention_map_steps == 0:  # Aggiungi questo parametro agli argomenti
-                        attention_map_path = f"{args.output_dir}/attention_heatmap_step_{global_step}.png"
-                        visualize_attention_heatmap(frame_tensor[0], attention_weights[0], attention_map_path)
-                        print(f"Attention heatmap saved to {attention_map_path}")
+                    #if step % args.save_attention_map_steps == 0:  # Aggiungi questo parametro agli argomenti
+                    attention_map_path = f"{args.output_dir}/attention_heatmap_step_{global_step}.png"
+                    visualize_attention_heatmap(frame_tensor[0], attention_weights[0], attention_map_path)
+                    print(f"Attention heatmap saved to {attention_map_path}")
 
                     # Get the target for loss depending on the prediction type
                     if args.prediction_type is not None:
