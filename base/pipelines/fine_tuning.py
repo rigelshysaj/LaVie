@@ -67,8 +67,9 @@ def visualize_attention_maps(attn_weights, frame_tensor, save_path):
     print(f"attn_weights shape: {attn_weights.shape}")
     print(f"frame_tensor shape: {frame_tensor.shape}")
 
-    # attn_weights shape: (num_heads, target_seq_len, source_seq_len)
-    num_heads = attn_weights.shape[0]
+    # Gestisci il caso in cui attn_weights ha forma (1, target_seq_len, source_seq_len)
+    if attn_weights.dim() == 3 and attn_weights.shape[0] == 1:
+        attn_weights = attn_weights.squeeze(0)
     
     # Gestisci il caso in cui frame_tensor ha 4 dimensioni
     if frame_tensor.dim() == 4:
@@ -79,42 +80,34 @@ def visualize_attention_maps(attn_weights, frame_tensor, save_path):
     frame_np = cv2.cvtColor(frame_np, cv2.COLOR_RGB2BGR)
     frame_np = frame_np.astype(np.float32) / 255.0
 
-    fig = make_subplots(rows=1, cols=num_heads, 
-                        subplot_titles=[f'Head {i+1}' for i in range(num_heads)])
+    # Usa solo la prima riga di attn_weights come mappa di attenzione
+    attn_map = attn_weights[0].cpu().detach().numpy()
+    print(f"attn_map shape: {attn_map.shape}")
+
+    # Ridimensiona la mappa di attenzione alle dimensioni del frame
+    try:
+        attn_map_resized = cv2.resize(attn_map, (frame_np.shape[1], frame_np.shape[0]))
+    except cv2.error as e:
+        print(f"Error resizing attn_map: {e}")
+        print(f"attn_map shape: {attn_map.shape}, frame_np shape: {frame_np.shape}")
+        return  # Esci dalla funzione se c'è un errore
     
-    for i in range(num_heads):
-        # Prendi la media dell'attenzione per ogni pixel dell'immagine
-        attn_map = attn_weights[i].mean(dim=0).cpu().detach().numpy()
-        print(f"attn_map shape for head {i}: {attn_map.shape}")
-        
-        # Assicurati che attn_map sia 2D
-        if attn_map.ndim == 1:
-            attn_map = attn_map.reshape(-1, 1)
-        
-        # Ridimensiona la mappa di attenzione alle dimensioni del frame
-        try:
-            attn_map_resized = cv2.resize(attn_map, (frame_np.shape[1], frame_np.shape[0]))
-        except cv2.error as e:
-            print(f"Error resizing attn_map for head {i}: {e}")
-            print(f"attn_map shape: {attn_map.shape}, frame_np shape: {frame_np.shape}")
-            continue  # Salta questa testa se c'è un errore
-        
-        # Normalizza la mappa di attenzione
-        attn_map_resized = (attn_map_resized - attn_map_resized.min()) / (attn_map_resized.max() - attn_map_resized.min() + 1e-8)
-        
-        # Crea una heatmap colorata
-        heatmap = cv2.applyColorMap(np.uint8(255 * attn_map_resized), cv2.COLORMAP_JET)
-        heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB) / 255.0
-        
-        # Sovrapponi la heatmap al frame originale
-        overlayed_img = 0.7 * frame_np + 0.3 * heatmap
-        
-        # Converti l'immagine sovrapposta in RGB per Plotly
-        overlayed_img_rgb = cv2.cvtColor(overlayed_img, cv2.COLOR_BGR2RGB)
-        
-        fig.add_trace(go.Image(z=overlayed_img_rgb), row=1, col=i+1)
+    # Normalizza la mappa di attenzione
+    attn_map_resized = (attn_map_resized - attn_map_resized.min()) / (attn_map_resized.max() - attn_map_resized.min() + 1e-8)
     
-    fig.update_layout(height=400, width=300*num_heads, title_text="Attention Maps")
+    # Crea una heatmap colorata
+    heatmap = cv2.applyColorMap(np.uint8(255 * attn_map_resized), cv2.COLORMAP_JET)
+    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB) / 255.0
+    
+    # Sovrapponi la heatmap al frame originale
+    overlayed_img = 0.7 * frame_np + 0.3 * heatmap
+    
+    # Converti l'immagine sovrapposta in RGB per Plotly
+    overlayed_img_rgb = cv2.cvtColor(overlayed_img, cv2.COLOR_BGR2RGB)
+    
+    # Crea la figura con Plotly
+    fig = go.Figure(data=go.Image(z=overlayed_img_rgb))
+    fig.update_layout(title_text="Attention Map")
     
     # Salva come immagine statica
     fig.write_image(save_path)
