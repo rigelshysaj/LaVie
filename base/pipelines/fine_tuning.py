@@ -65,7 +65,10 @@ class StableDiffusionPipelineOutput(BaseOutput):
 
 def visualize_attention_heatmap(frame, attention_weights, save_path):
     # Converti il frame in un'immagine numpy
-    frame_np = frame.detach().cpu().numpy()
+    frame_np = frame.detach().cpu().numpy().transpose(1, 2, 0)
+    
+    # Normalizza il frame per la visualizzazione
+    frame_np = (frame_np - frame_np.min()) / (frame_np.max() - frame_np.min())
 
     # Ridimensiona le attention weights alla dimensione del frame
     attn_weights = attention_weights.mean(dim=0).detach()  # Media su tutte le teste di attenzione
@@ -85,53 +88,32 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     attn_weights = F.interpolate(attn_weights.unsqueeze(0).unsqueeze(0), size=(320, 512), mode='bilinear').squeeze()
 
     # Normalizza le attention weights
-    attn_weights = (attn_weights - attn_weights.min()) / (attn_weights.max() - attn_weights.min())
     attn_weights_np = attn_weights.cpu().numpy()
+    attn_weights_np = (attn_weights_np - attn_weights_np.min()) / (attn_weights_np.max() - attn_weights_np.min())
 
     # Crea la figura Plotly
-    fig = go.Figure()
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("Original Frame", "Attention Heatmap"))
 
     # Aggiungi il frame originale
-    fig.add_trace(go.Image(z=frame_np))
+    fig.add_trace(go.Image(z=frame_np), row=1, col=1)
 
     # Aggiungi la heatmap dell'attenzione
-    fig.add_trace(go.Heatmap(z=attn_weights_np, colorscale='Hot', opacity=0.7))
+    fig.add_trace(go.Heatmap(z=attn_weights_np, colorscale='Hot'), row=1, col=2)
 
     # Configura il layout
     fig.update_layout(
-        title='Attention Heatmap',
-        width=800,
-        height=500,
-        updatemenus=[dict(
-            type="buttons",
-            direction="left",
-            buttons=list([
-                dict(args=[{"visible": [True, False]}],
-                     label="Original Frame",
-                     method="update"),
-                dict(args=[{"visible": [True, True]}],
-                     label="Frame + Heatmap",
-                     method="update"),
-                dict(args=[{"visible": [False, True]}],
-                     label="Heatmap Only",
-                     method="update")
-            ]),
-            pad={"r": 10, "t": 10},
-            showactive=True,
-            x=0.11,
-            xanchor="left",
-            y=1.1,
-            yanchor="top"
-        )],
+        title='Attention Visualization',
+        width=1200,
+        height=500
     )
 
     # Disabilita gli assi
     fig.update_xaxes(visible=False, showticklabels=False)
     fig.update_yaxes(visible=False, showticklabels=False)
 
-    # Salva la figura
-    fig.write_html(save_path)
-    print(f"Interactive attention heatmap saved to {save_path}")
+    # Salva la figura come immagine
+    fig.write_image(save_path)
+    print(f"Attention heatmap image saved to {save_path}")
 
 class AttentionWithVisualization(nn.Module):
     def __init__(self, embed_dim, num_heads):
