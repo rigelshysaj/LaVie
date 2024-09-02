@@ -31,6 +31,8 @@ from download import find_model
 from transformers import CLIPTokenizer, CLIPTextModel
 import torch.nn as nn
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 import torchvision.models as models
 import torch.nn.functional as F
 from diffusers.utils import check_min_version, convert_state_dict_to_diffusers, is_wandb_available
@@ -65,11 +67,14 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 def visualize_attention_heatmap(frame, attention_weights, save_path):
-    #print(f"frame shape: {frame.shape}, dtype: {frame.dtype}") #torch.Size([3, 320, 512]), dtype: torch.uint8
-    #print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") #shape: torch.Size([77, 50]), dtype: torch.float16
+    # Convert frame to numpy array and ensure it's in the correct format
+    if isinstance(frame, torch.Tensor):
+        frame_np = frame.detach().cpu().numpy().transpose(1, 2, 0)
+    else:
+        frame_np = frame
     
-    # Convert frame to numpy array
-    frame_np = frame.detach().cpu().numpy().transpose(1, 2, 0)
+    # Ensure frame is in the range [0, 1]
+    frame_np = frame_np.astype(np.float32) / 255.0
 
     # Calculate mean attention across all heads (if applicable)
     if attention_weights.dim() > 2:
@@ -77,47 +82,44 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     else:
         attn_weights = attention_weights.detach().cpu().numpy()
 
-    #print(f"attn_weights1 shape: {attn_weights.shape}, dtype: {attn_weights.dtype}") #shape: (77, 50), dtype: float16
-    
-    # Interpolate attention weights to match frame dimensions
-    attn_weights = F.interpolate(torch.from_numpy(attn_weights).unsqueeze(0).unsqueeze(0), 
-                                 size=(frame_np.shape[0], frame_np.shape[1]), 
+    # Reshape attention weights to match the spatial dimensions of the frame
+    h, w = frame_np.shape[:2]
+    attn_weights = attn_weights.reshape(-1, int(np.sqrt(attn_weights.shape[1])), int(np.sqrt(attn_weights.shape[1])))
+    attn_weights = F.interpolate(torch.from_numpy(attn_weights).unsqueeze(0),
+                                 size=(h, w),
                                  mode='bicubic', align_corners=False).squeeze().numpy()
-    
-    #print(f"attn_weights2 shape: {attn_weights.shape}, dtype: {attn_weights.dtype}") #shape: (320, 512), dtype: float16
 
     # Normalize attention weights
     attn_weights = (attn_weights - attn_weights.min()) / (attn_weights.max() - attn_weights.min())
 
-    # Create Plotly figure
-    fig = make_subplots(rows=1, cols=2, subplot_titles=("Original Frame", "Attention Heatmap"))
+    # Create a custom colormap for the heatmap
+    colors = ['blue', 'cyan', 'yellow', 'red']
+    n_bins = 100
+    cmap = LinearSegmentedColormap.from_list('custom', colors, N=n_bins)
 
-    # Add original frame
-    fig.add_trace(go.Image(z=frame_np), row=1, col=1)
+    # Create the figure and axes
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+    fig.suptitle('Attention Visualization', fontsize=16)
 
-    # Add attention heatmap
-    fig.add_trace(go.Heatmap(z=attn_weights, colorscale='Hot', zmin=0, zmax=1), row=1, col=2)
+    # Plot original frame
+    ax1.imshow(frame_np)
+    ax1.set_title('Original Frame')
+    ax1.axis('off')
 
-    # Configure layout
-    fig.update_layout(
-        title='Attention Visualization',
-        width=1200,
-        height=500
-    )
+    # Plot attention heatmap overlaid on original frame
+    ax2.imshow(frame_np)
+    heatmap = ax2.imshow(attn_weights, cmap=cmap, alpha=0.7)
+    ax2.set_title('Attention Heatmap')
+    ax2.axis('off')
 
-    # Disable axes
-    fig.update_xaxes(visible=False, showticklabels=False)
-    fig.update_yaxes(visible=False, showticklabels=False)
+    # Add colorbar
+    plt.colorbar(heatmap, ax=ax2, label='Attention Intensity', fraction=0.046, pad=0.04)
 
-    # Generate and save image
-    img_bytes = pio.to_image(fig, format="png")
-    with open(save_path, "wb") as f:
-        f.write(img_bytes)
+    # Save the figure
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
     print(f"Attention heatmap image saved to {save_path}")
-
-    # Print debug information
-    print(f"Attention weights shape after processing: {attn_weights.shape}")
-    print(f"Attention weights min: {attn_weights.min()}, max: {attn_weights.max()}")
 
 class AttentionWithVisualization(nn.Module):
     def __init__(self, embed_dim, num_heads):
