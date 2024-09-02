@@ -6,6 +6,7 @@ import os
 import json
 from tqdm import tqdm
 from plotly.subplots import make_subplots
+import plotly.io as pio
 import plotly.graph_objs as go
 import shutil
 from transformers import CLIPProcessor, CLIPModel
@@ -71,25 +72,9 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     frame_np = (frame_np - frame_np.min()) / (frame_np.max() - frame_np.min())
 
     # Ridimensiona le attention weights alla dimensione del frame
-    attn_weights = attention_weights.mean(dim=0).detach()  # Media su tutte le teste di attenzione
-    
-    # Gestisci il caso specifico di 50 elementi
-    attn_size = attn_weights.shape[0]
-    if attn_size == 50:
-        # Ridimensiona a 7x7 e poi aggiungi un elemento per arrivare a 50
-        attn_weights = attn_weights[:49].reshape(7, 7)
-        attn_weights = F.pad(attn_weights, (0, 1, 0, 1), "constant", 0)
-    else:
-        # Se non è 50, usa la logica precedente
-        height = int(np.sqrt(attn_size))
-        width = attn_size // height
-        attn_weights = attn_weights.reshape(height, width)
-    
-    attn_weights = F.interpolate(attn_weights.unsqueeze(0).unsqueeze(0), size=(320, 512), mode='bilinear').squeeze()
-
-    # Normalizza le attention weights
-    attn_weights_np = attn_weights.cpu().numpy()
-    attn_weights_np = (attn_weights_np - attn_weights_np.min()) / (attn_weights_np.max() - attn_weights_np.min())
+    attn_weights = attention_weights.mean(dim=0).detach().cpu().numpy()
+    attn_weights = (attn_weights - attn_weights.min()) / (attn_weights.max() - attn_weights.min())
+    attn_weights = np.resize(attn_weights, (320, 512))
 
     # Crea la figura Plotly
     fig = make_subplots(rows=1, cols=2, subplot_titles=("Original Frame", "Attention Heatmap"))
@@ -98,7 +83,7 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     fig.add_trace(go.Image(z=frame_np), row=1, col=1)
 
     # Aggiungi la heatmap dell'attenzione
-    fig.add_trace(go.Heatmap(z=attn_weights_np, colorscale='Hot'), row=1, col=2)
+    fig.add_trace(go.Heatmap(z=attn_weights, colorscale='Hot'), row=1, col=2)
 
     # Configura il layout
     fig.update_layout(
@@ -111,8 +96,12 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     fig.update_xaxes(visible=False, showticklabels=False)
     fig.update_yaxes(visible=False, showticklabels=False)
 
-    # Salva la figura come immagine
-    fig.write_image(save_path)
+    # Genera l'immagine direttamente
+    img_bytes = pio.to_image(fig, format="png")
+    
+    # Salva l'immagine
+    with open(save_path, "wb") as f:
+        f.write(img_bytes)
     print(f"Attention heatmap image saved to {save_path}")
 
 class AttentionWithVisualization(nn.Module):
