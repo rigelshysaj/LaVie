@@ -723,6 +723,7 @@ def lora_model(data, video_folder, args, training=True):
             epoch_losses.append(avg_epoch_loss)      
 
                     
+        accelerator.end_training()
         
         num_epochs = len(epoch_losses)
         epochs = list(range(1, num_epochs + 1))  # Crea una lista [1, 2, 3, ..., num_epochs]

@@ -63,9 +63,11 @@ class VideoDatasetMsvd(Dataset):
             frames_np = frames_np.astype(np.float32) / 255.0  # Normalizza in [0, 1]
             frames_np = (frames_np - 0.5) / 0.5
 
+            print(f"video1 shape: {frames_np.shape}, dtype: {frames_np.dtype}") 
+
             video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
 
-            #print(f"video shape: {video.shape}, dtype: {video.dtype}") #video shape: torch.Size([3, 16, 320, 512]), dtype: torch.float32
+            print(f"video2 shape: {video.shape}, dtype: {video.dtype}") 
             
             # Estrarre un frame centrale
             mid_frame = frames[len(frames) // 2]
@@ -74,10 +76,10 @@ class VideoDatasetMsvd(Dataset):
             #mid_frame_np = mid_frame_np.astype(np.float32) / 255.0  # Normalizza in [0, 1]
             #mid_frame_np = (mid_frame_np - 0.5) / 0.5
 
+            print(f"mid_frame1 shape: {mid_frame_np.shape}, dtype: {mid_frame_np.dtype}")
             mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
 
-            #print(f"mid_frame shape: {mid_frame.shape}, dtype: {mid_frame.dtype}") #mid_frame shape: torch.Size([3, 320, 512]), dtype: torch.float32
-            
+            print(f"mid_frame2 shape: {mid_frame.shape}, dtype: {mid_frame.dtype}")
             # Ottieni le descrizioni del video
             video_id = os.path.splitext(video_file)[0]
             descriptions = self.video_descriptions.get(video_id, [])
