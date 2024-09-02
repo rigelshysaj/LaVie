@@ -49,6 +49,8 @@ import plotly.graph_objects as go
 from inference import VideoGenPipeline
 from arguments import Details
 from msvd import VideoDatasetMsvd
+import matplotlib
+matplotlib.use('Agg')
 
 from diffusers.utils import (
     deprecate,
