@@ -84,12 +84,16 @@ def visualize_attention_maps(attn_weights, frame_tensor, save_path):
     attn_map = attn_weights[0].cpu().detach().numpy()
     print(f"attn_map shape: {attn_map.shape}")
 
+    # Trasforma l'array 1D in una mappa 2D
+    attn_map_2d = attn_map.reshape(1, -1)
+    print(f"attn_map_2d shape: {attn_map_2d.shape}")
+
     # Ridimensiona la mappa di attenzione alle dimensioni del frame
     try:
-        attn_map_resized = cv2.resize(attn_map, (frame_np.shape[1], frame_np.shape[0]))
+        attn_map_resized = cv2.resize(attn_map_2d, (frame_np.shape[1], frame_np.shape[0]))
     except cv2.error as e:
         print(f"Error resizing attn_map: {e}")
-        print(f"attn_map shape: {attn_map.shape}, frame_np shape: {frame_np.shape}")
+        print(f"attn_map_2d shape: {attn_map_2d.shape}, frame_np shape: {frame_np.shape}")
         return  # Esci dalla funzione se c'è un errore
     
     # Normalizza la mappa di attenzione
