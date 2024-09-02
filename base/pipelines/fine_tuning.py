@@ -67,6 +67,10 @@ def visualize_attention_maps(attn_weights, frame_tensor, save_path):
     # attn_weights shape: (num_heads, target_seq_len, source_seq_len)
     num_heads = attn_weights.shape[0]
     
+    # Gestisci il caso in cui frame_tensor ha 4 dimensioni
+    if frame_tensor.dim() == 4:
+        frame_tensor = frame_tensor.squeeze(0)  # Rimuovi la dimensione del batch se presente
+    
     # Converti il frame_tensor in numpy array e normalizza
     frame_np = frame_tensor.permute(1, 2, 0).cpu().numpy()
     frame_np = cv2.cvtColor(frame_np, cv2.COLOR_RGB2BGR)
