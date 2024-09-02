@@ -68,7 +68,7 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
-def visualize_attention_heatmap(frame, attention_weights, save_path):
+def visualize_attention_heatmap(frame, attention_map, save_path):
     # Convert frame to numpy array and ensure it's in the correct format
     if isinstance(frame, torch.Tensor):
         frame_np = frame.detach().cpu().numpy().transpose(1, 2, 0)
@@ -78,32 +78,9 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     # Ensure frame is in the range [0, 1]
     frame_np = frame_np.astype(np.float32) / 255.0
 
-    # Handle attention weights
-    if isinstance(attention_weights, torch.Tensor):
-        attn_weights = attention_weights.detach().cpu().numpy()
-    else:
-        attn_weights = attention_weights
-
-    # Reshape attention weights
-    if attn_weights.ndim == 2:
-        # If 2D, assume it's already in the correct shape
-        pass
-    elif attn_weights.ndim == 3:
-        # If 3D, take the mean across the first dimension
-        attn_weights = attn_weights.mean(axis=0)
-    else:
-        raise ValueError(f"Unexpected attention weights shape: {attn_weights.shape}")
-
-    # Get frame dimensions
-    h, w = frame_np.shape[:2]
-
-    # Interpolate attention weights to match frame dimensions
-    attn_weights = torch.from_numpy(attn_weights).float().unsqueeze(0).unsqueeze(0)
-    attn_weights = F.interpolate(attn_weights, size=(h, w), mode='bicubic', align_corners=False)
-    attn_weights = attn_weights.squeeze().numpy()
-
-    # Normalize attention weights
-    attn_weights = (attn_weights - attn_weights.min()) / (attn_weights.max() - attn_weights.min())
+    # Ensure attention_map is a numpy array
+    if isinstance(attention_map, torch.Tensor):
+        attention_map = attention_map.detach().cpu().numpy()
 
     # Create a custom colormap for the heatmap
     colors = ['blue', 'cyan', 'yellow', 'red']
@@ -121,7 +98,7 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
 
     # Plot attention heatmap overlaid on original frame
     ax2.imshow(frame_np)
-    heatmap = ax2.imshow(attn_weights, cmap=cmap, alpha=0.7)
+    heatmap = ax2.imshow(attention_map, cmap=cmap, alpha=0.7)
     ax2.set_title('Attention Heatmap')
     ax2.axis('off')
 
@@ -134,15 +111,37 @@ def visualize_attention_heatmap(frame, attention_weights, save_path):
     plt.close(fig)
     print(f"Attention heatmap image saved to {save_path}")
 
+
 class AttentionWithVisualization(nn.Module):
     def __init__(self, embed_dim, num_heads):
         super().__init__()
         self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads)
-        
+        self.num_heads = num_heads
+
     def forward(self, query, key, value):
         attn_output, attn_output_weights = self.attention(query, key, value)
-        return attn_output, attn_output_weights
+        
+        # Reshape attn_output_weights to separate the heads
+        # Shape: (batch_size, num_heads, seq_len, seq_len)
+        attn_output_weights = attn_output_weights.view(-1, self.num_heads, query.size(0), key.size(0))
+        
+        # Average attention weights across heads
+        avg_attn_weights = attn_output_weights.mean(dim=1)
+        
+        # Optionally, apply softmax to enhance contrast
+        avg_attn_weights = F.softmax(avg_attn_weights, dim=-1)
+        
+        return attn_output, avg_attn_weights
 
+    def get_attention_map(self, attn_weights, height, width):
+        # Reshape attention weights to match image dimensions
+        attention_map = F.interpolate(attn_weights.unsqueeze(1), size=(height, width), mode='bilinear', align_corners=False)
+        attention_map = attention_map.squeeze(1)
+        
+        # Normalize the attention map
+        attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())
+        
+        return attention_map
 
 def load_and_transform_image(path):
     image = Image.open(path)
@@ -697,10 +696,13 @@ def lora_model(data, video_folder, args, training=True):
 
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
+                    height, width = frame_tensor.shape[2:]  # Assumendo che frame_tensor sia (batch, channels, height, width)
+                    attention_map = attention_layer.get_attention_map(attention_weights[0], height, width)
+
                     # Visualizza e salva le attention maps
                     #if step % args.save_attention_map_steps == 0:  # Aggiungi questo parametro agli argomenti
                     attention_map_path = f"{args.output_dir}/attention_heatmap_step_{global_step}.png"
-                    visualize_attention_heatmap(frame_tensor[0], attention_weights[0], attention_map_path)
+                    visualize_attention_heatmap(frame_tensor[0], attention_map, attention_map_path)
                     print(f"Attention heatmap saved to {attention_map_path}")
 
                     # Get the target for loss depending on the prediction type
