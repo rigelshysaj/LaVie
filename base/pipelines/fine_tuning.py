@@ -63,25 +63,43 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
-def visualize_attention_maps(attn_weights, save_path):
+def visualize_attention_maps(attn_weights, frame_tensor, save_path):
     # attn_weights shape: (num_heads, target_seq_len, source_seq_len)
     num_heads = attn_weights.shape[0]
     
+    # Converti il frame_tensor in numpy array e normalizza
+    frame_np = frame_tensor.permute(1, 2, 0).cpu().numpy()
+    frame_np = cv2.cvtColor(frame_np, cv2.COLOR_RGB2BGR)
+    frame_np = frame_np.astype(np.float32) / 255.0
+
     fig = make_subplots(rows=1, cols=num_heads, 
                         subplot_titles=[f'Head {i+1}' for i in range(num_heads)])
     
     for i in range(num_heads):
-        heatmap = go.Heatmap(z=attn_weights[i].cpu().detach().numpy(),
-                             colorscale='Viridis')
-        fig.add_trace(heatmap, row=1, col=i+1)
+        # Prendi la media dell'attenzione per ogni pixel dell'immagine
+        attn_map = attn_weights[i].mean(dim=0).cpu().detach().numpy()
+        
+        # Ridimensiona la mappa di attenzione alle dimensioni del frame
+        attn_map_resized = cv2.resize(attn_map, (frame_np.shape[1], frame_np.shape[0]))
+        
+        # Normalizza la mappa di attenzione
+        attn_map_resized = (attn_map_resized - attn_map_resized.min()) / (attn_map_resized.max() - attn_map_resized.min())
+        
+        # Crea una heatmap colorata
+        heatmap = cv2.applyColorMap(np.uint8(255 * attn_map_resized), cv2.COLORMAP_JET)
+        heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB) / 255.0
+        
+        # Sovrapponi la heatmap al frame originale
+        overlayed_img = 0.7 * frame_np + 0.3 * heatmap
+        
+        # Converti l'immagine sovrapposta in RGB per Plotly
+        overlayed_img_rgb = cv2.cvtColor(overlayed_img, cv2.COLOR_BGR2RGB)
+        
+        fig.add_trace(go.Image(z=overlayed_img_rgb), row=1, col=i+1)
     
     fig.update_layout(height=400, width=300*num_heads, title_text="Attention Maps")
     
-    for i in range(num_heads):
-        fig.update_xaxes(title_text="Source Sequence", row=1, col=i+1)
-        fig.update_yaxes(title_text="Target Sequence", row=1, col=i+1)
-    
-    # Salva solo come immagine statica
+    # Salva come immagine statica
     fig.write_image(save_path)
 
 class AttentionMapModule(nn.Module):
@@ -651,6 +669,7 @@ def lora_model(data, video_folder, args, training=True):
                     os.makedirs(os.path.join(args.output_dir, "attention_maps"), exist_ok=True)
                     visualize_attention_maps(
                         attn_weights,
+                        frame_tensor,  # Passa il frame_tensor
                         save_path=os.path.join(args.output_dir, "attention_maps", f"attention_map_epoch{epoch}_step{step}.png")
                     )
 
