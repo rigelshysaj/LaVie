@@ -71,73 +71,53 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 
-def visualize_attention(image, attention_weights, save_path=None):
+def visualize_attention(frame_tensor, attention_weights):
+    # Ensure we're working with CPU tensors
+    frame_tensor = frame_tensor.cpu()
+    attention_weights = attention_weights.cpu()
 
-    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") #shape: torch.Size([77, 50]), dtype: torch.float16
-    print(f"image shape: {image.shape}, dtype: {image.dtype}") #shape: torch.Size([3, 320, 512]), dtype: torch.uint8
+    # Reshape attention weights
+    # attention_weights shape: [1, 77, 50]
+    # We'll use the mean attention across all text tokens
+    attention_map = attention_weights.mean(1).squeeze()  # Shape: [50]
 
+    # Reshape attention map to match the spatial dimensions of the CLIP vision model output
+    attention_map = attention_map.view(7, 7)  # 7x7 is the spatial dimension of CLIP's last hidden state
 
-    # Ensure image is detached, on CPU and convert to numpy
-    image = image.detach().permute(1, 2, 0).cpu().numpy()
+    # Upsample the attention map to match the image size
+    attention_map = F.interpolate(attention_map.unsqueeze(0).unsqueeze(0), 
+                                  size=(320, 512), 
+                                  mode='bilinear', 
+                                  align_corners=False).squeeze()
+
+    # Normalize the attention map
+    attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())
+
+    # Convert frame tensor to numpy array and transpose to (H, W, C)
+    frame_np = frame_tensor.squeeze().permute(1, 2, 0).numpy()
     
-    # Normalize image to 0-1 range
-    image = image.astype(np.float32) 
+    # Normalize frame to 0-1 range
+    frame_np = (frame_np - frame_np.min()) / (frame_np.max() - frame_np.min())
 
-    # Get attention weights, ensure they are detached and convert to float32
-    attention = attention_weights.detach().cpu().numpy().astype(np.float32)
-    
-    print(f"attention1 shape: {attention.shape}, dtype: {attention.dtype}") #shape: (77, 50), dtype: float32
-    print(f"image2 shape: {image.shape}, dtype: {image.dtype}") #shape: (320, 512, 3), dtype: float32
-
-    # Reshape attention if it's 1D
-    if attention.ndim == 1:
-        attention = attention.reshape(7, -1)  # Assuming 7x7 grid, adjust if needed
-    elif attention.ndim == 2:
-        pass  # It's already 2D, no need to reshape
-    else:
-        raise ValueError(f"Unexpected attention shape: {attention.shape}")
-    
-    print(f"attention2 shape: {attention.shape}, dtype: {attention.dtype}") #shape: (77, 50), dtype: float32
-
-
-    # Resize attention to match image size
-    zoom_factors = (image.shape[0] / attention.shape[0], image.shape[1] / attention.shape[1])
-    attention = zoom(attention, zoom_factors)
-    print(f"attention3 shape: {attention.shape}, dtype: {attention.dtype}") #shape: (320, 512), dtype: float32
-
-    
-    # Normalize attention weights
-    attention = (attention - attention.min()) / (attention.max() - attention.min())
-    print(f"attention4 shape: {attention.shape}, dtype: {attention.dtype}") #shape: (320, 512), dtype: float32
-
-    
     # Create a color map
     cmap = plt.get_cmap('jet')
-    attention_heatmap = cmap(attention)
-    
-    # Combine original image and attention heatmap
-    alpha = 0.5
-    overlayed_image = (1 - alpha) * image + alpha * attention_heatmap[:, :, :3]
-    
+    attention_map_color = cmap(attention_map.numpy())
+
+    # Combine the original image and the attention map
+    alpha = 0.5  # Transparency of the attention map
+    combined_img = (1-alpha) * frame_np + alpha * attention_map_color[:,:,:3]
+
+    # Clip values to 0-1 range
+    combined_img = np.clip(combined_img, 0, 1)
+
     # Plot
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
-    
-    # Original image
-    ax1.imshow(image)
-    ax1.set_title("Original Frame", fontsize=16)
-    ax1.axis('off')
-    
-    # Heatmap overlay
-    ax2.imshow(overlayed_image)
-    ax2.set_title("Attention Heatmap", fontsize=16)
-    ax2.axis('off')
-    
-    plt.tight_layout()
-    
-    if save_path:
-        plt.savefig(save_path, bbox_inches='tight', pad_inches=0.1, dpi=300)
-    
+    plt.figure(figsize=(12, 8))
+    plt.imshow(combined_img)
+    plt.axis('off')
+    plt.title("Attention Visualization")
     plt.show()
+
+    
 
 class AttentionWithVisualization(nn.Module):
     def __init__(self, embed_dim, num_heads):
