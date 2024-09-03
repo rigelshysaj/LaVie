@@ -4,7 +4,6 @@ import torch
 import cv2
 import os
 import json
-from scipy.ndimage import zoom
 from tqdm import tqdm
 from plotly.subplots import make_subplots
 import plotly.io as pio
