@@ -117,7 +117,7 @@ def visualize_attention(frame_tensor, attention_weights):
     plt.title("Attention Visualization")
     plt.show()
 
-    
+
 
 class AttentionWithVisualization(nn.Module):
     def __init__(self, embed_dim, num_heads):
@@ -683,7 +683,7 @@ def lora_model(data, video_folder, args, training=True):
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
-                    visualize_attention(frame_tensor[0], attention_weights[0], save_path='/content/drive/My Drive/attention_visualization.png')
+                    visualize_attention(frame_tensor[0], attention_weights[0])
 
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
