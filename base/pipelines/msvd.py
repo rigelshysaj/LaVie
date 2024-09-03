@@ -63,11 +63,11 @@ class VideoDatasetMsvd(Dataset):
             frames_np = frames_np.astype(np.float32) / 255.0  # Normalizza in [0, 1]
             frames_np = (frames_np - 0.5) / 0.5
 
-            #print(f"video1 shape: {frames_np.shape}, dtype: {frames_np.dtype}") #shape: (16, 320, 512, 3), dtype: float32
+            print(f"video1 shape: {frames_np.shape}, dtype: {frames_np.dtype}") #shape: (16, 320, 512, 3), dtype: float32
 
-            video = torch.tensor(frames_np)  # (T, H, W, C) -> (C, T, H, W)
+            video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
 
-            #print(f"video2 shape: {video.shape}, dtype: {video.dtype}") #shape: torch.Size([3, 16, 320, 512]), dtype: torch.float32
+            print(f"video2 shape: {video.shape}, dtype: {video.dtype}") #shape: torch.Size([3, 16, 320, 512]), dtype: torch.float32
             
             # Estrarre un frame centrale
             mid_frame = frames[len(frames) // 2]
@@ -76,8 +76,11 @@ class VideoDatasetMsvd(Dataset):
             #mid_frame_np = mid_frame_np.astype(np.float32) / 255.0  # Normalizza in [0, 1]
             #mid_frame_np = (mid_frame_np - 0.5) / 0.5
 
+            print(f"mid_frame_np shape: {mid_frame_np.shape}, dtype: {mid_frame_np.dtype}") #shape: (16, 320, 512, 3), dtype: float32
+
+
             #print(f"mid_frame1 shape: {mid_frame_np.shape}, dtype: {mid_frame_np.dtype}") #shape: (320, 512, 3), dtype: uint8
-            mid_frame = torch.tensor(mid_frame_np)  # (H, W, C) -> (C, H, W)
+            mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
             #print(f"mid_frame2 shape: {mid_frame.shape}, dtype: {mid_frame.dtype}") #shape: torch.Size([3, 320, 512]), dtype: torch.uint8
             
             # Ottieni le descrizioni del video
