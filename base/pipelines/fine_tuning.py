@@ -82,19 +82,27 @@ class AttentionWithVisualization(nn.Module):
         # Normalize frame to [0, 1] for visualization
         frame = frame / 255.0
 
-        # Get the attention map (assuming we want to visualize attention for all text tokens)
-        attention_map = attention_weights.mean(dim=1)  # Average over attention heads
-        attention_map = attention_map[:, 1:]  # Remove CLS token attention
+        # Process attention weights
+        if attention_weights.dim() == 3:
+            # If we have [batch, seq_len, seq_len] shape
+            attention_map = attention_weights.mean(dim=0)  # Average over batch
+        elif attention_weights.dim() == 2:
+            # If we already have [seq_len, seq_len] shape
+            attention_map = attention_weights
+        else:
+            raise ValueError(f"Unexpected attention weights shape: {attention_weights.shape}")
 
-        # Reshape attention map to 2D
-        attention_size = int(attention_map.size(1)**0.5)
-        attention_map = attention_map.view(-1, attention_size, attention_size)
+        # Assuming the last dimension corresponds to the image tokens
+        image_attention = attention_map[:, -196:]  # 14x14 = 196 image tokens for ViT-B/32
+
+        # Reshape to 14x14
+        image_attention = image_attention.view(-1, 14, 14)
 
         # Average over all text tokens
-        attention_map = attention_map.mean(dim=0)
+        image_attention = image_attention.mean(dim=0)
 
         # Upsample the attention map to match the image size
-        attention_map = resize(attention_map.unsqueeze(0).unsqueeze(0), size=frame.shape[:2], mode='bilinear', align_corners=False)
+        attention_map = resize(image_attention.unsqueeze(0).unsqueeze(0), size=frame.shape[:2], mode='bilinear', align_corners=False)
         attention_map = attention_map.squeeze().cpu().numpy()
 
         # Normalize attention map
@@ -110,9 +118,12 @@ class AttentionWithVisualization(nn.Module):
 
         # Plot image with attention overlay
         ax2.imshow(frame)
-        ax2.imshow(attention_map, alpha=0.5, cmap='jet')
+        im = ax2.imshow(attention_map, alpha=0.5, cmap='jet')
         ax2.set_title('Attention Map Overlay')
         ax2.axis('off')
+
+        # Add colorbar
+        plt.colorbar(im, ax=ax2)
 
         plt.tight_layout()
 
@@ -127,7 +138,13 @@ class AttentionWithVisualization(nn.Module):
         attn_output, attn_output_weights = self.attention(query, key, value)
         
         # Visualize attention for the first element of the batch
-        self.visualize_attention(frame_tensor[0], attn_output_weights[0], save_path=f"attention_map_{self.current_step}.png")
+        try:
+            self.visualize_attention(frame_tensor[0], attn_output_weights[0], save_path=f"attention_map_{self.current_step}.png")
+        except Exception as e:
+            print(f"Error in visualizing attention: {e}")
+            print(f"Attention weights shape: {attn_output_weights.shape}")
+            print(f"Frame tensor shape: {frame_tensor.shape}")
+        
         self.current_step += 1
         
         return attn_output, attn_output_weights
@@ -683,7 +700,7 @@ def lora_model(data, video_folder, args, training=True):
                     last_hidden_state = last_hidden_state.transpose(0, 1)
 
                     encoder_hidden_states, attention_weights = attention_layer(text_features, last_hidden_state, last_hidden_state, frame_tensor)
-                    
+
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
 
