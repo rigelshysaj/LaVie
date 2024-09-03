@@ -70,18 +70,22 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
+
 def visualize_attention(image, attention_weights, save_path=None):
+    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
+    print(f"image shape: {image.shape}, dtype: {image.dtype}")
+
     # Ensure image is detached, on CPU and convert to numpy
-    image = image.detach().squeeze(0).permute(1, 2, 0).cpu().numpy()
+    image = image.detach().permute(1, 2, 0).cpu().numpy()
     
     # Normalize image to 0-1 range
     image = image.astype(np.float32) / 255.0
 
     # Get attention weights, ensure they are detached
-    attention = attention_weights.detach().squeeze(0).mean(dim=0).cpu().numpy()
+    attention = attention_weights.detach().mean(dim=0).cpu().numpy()
 
     print(f"attention shape: {attention.shape}, dtype: {attention.dtype}")
-    print(f"image shape: {image.shape}, dtype: {image.dtype}")
+    print(f"image2 shape: {image.shape}, dtype: {image.dtype}")
     
     # Resize attention to match image size
     zoom_factors = (image.shape[0] / attention.shape[0], image.shape[1] / attention.shape[1])
