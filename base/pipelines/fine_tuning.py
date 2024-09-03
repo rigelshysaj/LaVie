@@ -86,7 +86,7 @@ def save_attention_map(frame_tensor, attention_weights, output_path, original_im
     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
     # Step 1: Media degli attention weights lungo la dimensione dei token di testo
-    mean_attention_weights = attention_weights.mean(dim=1)  # [1, 50]
+    mean_attention_weights = attention_weights.mean(dim=0)  # [1, 50]
     print(f"attention_weights2 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
 
 
