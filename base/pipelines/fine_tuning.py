@@ -90,8 +90,8 @@ class AttentionWithVisualization(nn.Module):
         # Sum attention over all text tokens
         attention_map = attention_map.sum(dim=0)
         
-        # Reshape to match the image token grid (assuming 7x7 grid for 50 tokens, with 2 extra tokens)
-        attention_map = attention_map[:-2].view(7, 7)
+        # Reshape to match the image token grid (6x8 grid for 48 tokens, with 2 extra tokens)
+        attention_map = attention_map[:-2].view(6, 8)
         
         # Upsample the attention map to match the image size
         attention_map = resize(attention_map.unsqueeze(0).unsqueeze(0), size=frame.shape[:2], mode='bilinear', align_corners=False)
