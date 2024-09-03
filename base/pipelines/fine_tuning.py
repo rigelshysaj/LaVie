@@ -110,7 +110,7 @@ def save_attention_map(frame_tensor, attention_weights, output_path, original_im
     frame = T.ToPILImage()(frame)
 
     # Normalizza la mappa di attenzione per la visualizzazione
-    attention_map = attention_map.cpu().numpy()
+    attention_map = attention_map.detach().cpu().numpy()
     attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())  # Normalizza tra 0 e 1
 
     # Step 4: Creazione della figura e salvataggio dell'immagine
