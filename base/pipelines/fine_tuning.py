@@ -71,7 +71,7 @@ class StableDiffusionPipelineOutput(BaseOutput):
 
 def visualize_attention(image, attention_weights, save_path=None):
     # Ensure image is on CPU and convert to numpy
-    image = image.squeeze().cpu().numpy()
+    image = image.detach().cpu().numpy()
     
     # Transpose image from (C, H, W) to (H, W, C)
     image = np.transpose(image, (1, 2, 0))
@@ -81,7 +81,7 @@ def visualize_attention(image, attention_weights, save_path=None):
         image = image / 255.0
 
     # Get attention weights
-    attention = attention_weights.squeeze().mean(dim=0).cpu().numpy()
+    attention = attention_weights.detach().squeeze().mean(dim=0).cpu().numpy()
     
     # Resize attention to match image size
     from scipy.ndimage import zoom
