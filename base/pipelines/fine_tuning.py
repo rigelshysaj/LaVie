@@ -687,7 +687,7 @@ def lora_model(data, video_folder, args, training=True):
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
-                    save_attention_map(frame_tensor[0], attention_weights[0], '/content/drive/My Drive/attention_visualization.png')
+                    save_attention_map(frame_tensor[0], attention_weights, '/content/drive/My Drive/attention_visualization.png')
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
 
