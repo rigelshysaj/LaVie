@@ -77,32 +77,24 @@ class AttentionWithVisualization(nn.Module):
     
     def visualize_attention(self, frame_tensor, attention_weights, save_path=None):
         # Ensure frame_tensor is on CPU and convert to numpy
-        frame = frame_tensor.cpu().permute(1, 2, 0).numpy()
+        frame = frame_tensor.cpu().squeeze(0).permute(1, 2, 0).numpy()
         
         # Normalize frame to [0, 1] for visualization
         frame = frame / 255.0
 
         # Process attention weights
-        if attention_weights.dim() == 3:
-            # If we have [batch, seq_len, seq_len] shape
-            attention_map = attention_weights.mean(dim=0)  # Average over batch
-        elif attention_weights.dim() == 2:
-            # If we already have [seq_len, seq_len] shape
-            attention_map = attention_weights
-        else:
-            raise ValueError(f"Unexpected attention weights shape: {attention_weights.shape}")
-
-        # Assuming the last dimension corresponds to the image tokens
-        image_attention = attention_map[:, -196:]  # 14x14 = 196 image tokens for ViT-B/32
-
-        # Reshape to 14x14
-        image_attention = image_attention.view(-1, 14, 14)
-
-        # Average over all text tokens
-        image_attention = image_attention.mean(dim=0)
-
+        # Assuming attention_weights shape is [1, 77, 50]
+        # where 77 is text sequence length and 50 is image token sequence length
+        attention_map = attention_weights.squeeze(0)  # Remove batch dimension
+        
+        # Sum attention over all text tokens
+        attention_map = attention_map.sum(dim=0)
+        
+        # Reshape to match the image token grid (assuming 7x7 grid for 50 tokens, with 2 extra tokens)
+        attention_map = attention_map[:-2].view(7, 7)
+        
         # Upsample the attention map to match the image size
-        attention_map = resize(image_attention.unsqueeze(0).unsqueeze(0), size=frame.shape[:2], mode='bilinear', align_corners=False)
+        attention_map = resize(attention_map.unsqueeze(0).unsqueeze(0), size=frame.shape[:2], mode='bilinear', align_corners=False)
         attention_map = attention_map.squeeze().cpu().numpy()
 
         # Normalize attention map
@@ -139,7 +131,7 @@ class AttentionWithVisualization(nn.Module):
         
         # Visualize attention for the first element of the batch
         try:
-            self.visualize_attention(frame_tensor[0], attn_output_weights[0], save_path=f"attention_map_{self.current_step}.png")
+            self.visualize_attention(frame_tensor[0], attn_output_weights, save_path=f"attention_map_{self.current_step}.png")
         except Exception as e:
             print(f"Error in visualizing attention: {e}")
             print(f"Attention weights shape: {attn_output_weights.shape}")
