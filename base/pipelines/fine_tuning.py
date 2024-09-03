@@ -90,7 +90,9 @@ def visualize_attention(image_tensor, attention_weights, save_path=None):
     
     # Upsample the attention map to match the image size
     attention_map = F.interpolate(attention_map, size=(320, 512), mode='bilinear', align_corners=False)
+    print(f"attention_weights4 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
     attention_map = attention_map.squeeze().cpu().numpy()
+    print(f"attention_weights5 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
     
     # Normalize attention map
     attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())
@@ -98,6 +100,7 @@ def visualize_attention(image_tensor, attention_weights, save_path=None):
     # Convert image tensor to numpy for visualization
     image = image_tensor.squeeze().permute(1, 2, 0).cpu().numpy()
     image = (image - image.min()) / (image.max() - image.min())  # Normalize to [0, 1]
+    print(f"image shape: {image.shape}, dtype: {image.dtype}")
     
     # Create a figure with two subplots
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
@@ -136,7 +139,7 @@ def save_attention_map(frame_tensor, attention_weights, output_path, original_im
     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
     # Step 1: Media degli attention weights lungo la dimensione dei token di testo
-    mean_attention_weights = attention_weights.mean(dim=1)  # [1, 50]
+    mean_attention_weights = attention_weights.mean(dim=0)  # [1, 50]
     print(f"attention_weights2 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
 
 
@@ -737,7 +740,7 @@ def lora_model(data, video_folder, args, training=True):
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
-                    save_attention_map(frame_tensor, attention_weights, '/content/drive/My Drive/attention_visualization.png')
+                    visualize_attention(frame_tensor, attention_weights, '/content/drive/My Drive/attention_visualization.png')
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
 
