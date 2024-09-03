@@ -75,24 +75,24 @@ def visualize_attention(image_tensor, attention_weights, save_path=None):
     assert image_tensor.shape == (1, 3, 320, 512), f"Unexpected image shape: {image_tensor.shape}"
     assert attention_weights.shape == (1, 77, 50), f"Unexpected attention weights shape: {attention_weights.shape}"
     
-    print(f"Initial attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
-    print(f"Image tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
+    #print(f"Initial attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
+    #print(f"Image tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
     
     # Average attention weights across all text tokens
     mean_attention = attention_weights.mean(dim=1)  # Shape: [1, 50]
-    print(f"Mean attention shape: {mean_attention.shape}")
+    #print(f"Mean attention shape: {mean_attention.shape}")
     
     # Reshape attention to match spatial dimensions of the image
     attention_map = mean_attention.reshape(1, 1, 5, 10)  # 50 -> 5x10
-    print(f"Reshaped attention_map shape: {attention_map.shape}")
+    #print(f"Reshaped attention_map shape: {attention_map.shape}")
     
     # Upsample the attention map to match the image size
     attention_map = F.interpolate(attention_map, size=(320, 512), mode='bilinear', align_corners=False)
-    print(f"Upsampled attention_map shape: {attention_map.shape}")
+    #print(f"Upsampled attention_map shape: {attention_map.shape}")
     
     attention_map = attention_map.squeeze()
     attention_map = attention_map.detach().cpu().numpy()
-    print(f"Final attention_map shape: {attention_map.shape}, dtype: {attention_map.dtype}")
+    #print(f"Final attention_map shape: {attention_map.shape}, dtype: {attention_map.dtype}")
     
     # Normalize attention map
     attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())
@@ -122,8 +122,16 @@ def visualize_attention(image_tensor, attention_weights, save_path=None):
     plt.tight_layout()
     
     if save_path:
-        plt.savefig(save_path)
-        print(f"Visualization saved to {save_path}")
+        # Create 'Images' folder if it doesn't exist
+        images_folder = os.path.join(os.path.dirname(save_path), 'Images')
+        os.makedirs(images_folder, exist_ok=True)
+
+        # Update save_path to use the 'Images' folder
+        file_name = os.path.basename(save_path)
+        new_save_path = os.path.join(images_folder, file_name)
+
+        plt.savefig(new_save_path)
+        print(f"Visualization saved to {new_save_path}")
     else:
         plt.show()
     
