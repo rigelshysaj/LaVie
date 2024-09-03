@@ -13,6 +13,7 @@ import plotly.graph_objs as go
 import shutil
 from transformers import CLIPProcessor, CLIPModel
 from peft import LoraConfig, get_peft_model
+import torchvision.transforms as T
 import argparse
 from diffusers.utils.torch_utils import is_compiled_module
 from peft.utils import get_peft_model_state_dict
@@ -71,53 +72,45 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 
-def visualize_attention(frame_tensor, attention_weights):
-    # Ensure we're working with CPU tensors
-    frame_tensor = frame_tensor.cpu()
-    attention_weights = attention_weights.cpu()
+def save_attention_map(frame_tensor, attention_weights, output_path, original_image_size=(320, 512)):
+    """
+    Sovrappone la mappa di attenzione all'immagine originale e salva il risultato.
 
-    # Reshape attention weights
-    # attention_weights shape: [1, 77, 50]
-    # We'll use the mean attention across all text tokens
-    attention_map = attention_weights.mean(1).squeeze()  # Shape: [50]
+    Args:
+        frame_tensor (torch.Tensor): Tensor dell'immagine originale di shape [1, 3, H, W].
+        attention_weights (torch.Tensor): Tensor degli attention weights di shape [1, 77, 50].
+        output_path (str): Path dove salvare l'immagine risultante.
+        original_image_size (tuple): Dimensione originale dell'immagine (H, W).
+    """
+    # Step 1: Media degli attention weights lungo la dimensione dei token di testo
+    mean_attention_weights = attention_weights.mean(dim=1)  # [1, 50]
 
-    # Reshape attention map to match the spatial dimensions of the CLIP vision model output
-    attention_map = attention_map.view(7, 7)  # 7x7 is the spatial dimension of CLIP's last hidden state
-
-    # Upsample the attention map to match the image size
-    attention_map = F.interpolate(attention_map.unsqueeze(0).unsqueeze(0), 
-                                  size=(320, 512), 
-                                  mode='bilinear', 
-                                  align_corners=False).squeeze()
-
-    # Normalize the attention map
-    attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())
-
-    # Convert frame tensor to numpy array and transpose to (H, W, C)
-    frame_np = frame_tensor.squeeze().permute(1, 2, 0).numpy()
+    # Step 2: Rimappare l'attenzione ai pixel dell'immagine
+    # Assumiamo che i 50 token visivi derivino da una griglia 7x7
+    grid_size = int(mean_attention_weights.size(-1) ** 0.5)
+    attention_map = mean_attention_weights.view(1, 1, grid_size, grid_size)  # [1, 1, 7, 7]
     
-    # Normalize frame to 0-1 range
-    frame_np = (frame_np - frame_np.min()) / (frame_np.max() - frame_np.min())
+    # Ridimensiona la mappa di attenzione alla dimensione dell'immagine originale
+    attention_map = F.interpolate(attention_map, size=original_image_size, mode='bilinear', align_corners=False)
+    attention_map = attention_map.squeeze()  # [H, W]
 
-    # Create a color map
-    cmap = plt.get_cmap('jet')
-    attention_map_color = cmap(attention_map.numpy())
+    # Step 3: Converti l'immagine originale per il plotting
+    frame = frame_tensor.squeeze().permute(1, 2, 0).cpu().numpy()  # Converti in formato HWC
+    frame = T.ToPILImage()(frame)
 
-    # Combine the original image and the attention map
-    alpha = 0.5  # Transparency of the attention map
-    combined_img = (1-alpha) * frame_np + alpha * attention_map_color[:,:,:3]
+    # Normalizza la mappa di attenzione per la visualizzazione
+    attention_map = attention_map.cpu().numpy()
+    attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())  # Normalizza tra 0 e 1
 
-    # Clip values to 0-1 range
-    combined_img = np.clip(combined_img, 0, 1)
-
-    # Plot
-    plt.figure(figsize=(12, 8))
-    plt.imshow(combined_img)
+    # Step 4: Creazione della figura e salvataggio dell'immagine
+    plt.figure(figsize=(10, 10))
+    plt.imshow(frame)
+    plt.imshow(attention_map, cmap='jet', alpha=0.5)  # Sovrapponi la mappa di attenzione sull'immagine
     plt.axis('off')
-    plt.title("Attention Visualization")
-    plt.show()
-
-
+    
+    # Salva l'immagine risultante
+    plt.savefig(output_path, bbox_inches='tight', pad_inches=0)
+    plt.close()
 
 class AttentionWithVisualization(nn.Module):
     def __init__(self, embed_dim, num_heads):
@@ -683,8 +676,7 @@ def lora_model(data, video_folder, args, training=True):
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
-                    visualize_attention(frame_tensor[0], attention_weights[0])
-
+                    save_attention_map(frame_tensor, attention_weights, '/content/drive/My Drive/attention_visualization.png')
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
 
