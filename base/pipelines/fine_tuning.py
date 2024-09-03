@@ -92,7 +92,8 @@ def save_attention_map(frame_tensor, attention_weights, output_path, original_im
 
     # Step 2: Rimappare l'attenzione ai pixel dell'immagine
     # Assumiamo che i 50 token visivi derivino da una griglia 7x7
-    attention_map = mean_attention_weights.view(1, 1, 5, 10)
+    grid_size = int(mean_attention_weights.size(-1) ** 0.5)  # sqrt(50) ≈ 7
+    attention_map = mean_attention_weights.view(1, 1, grid_size, grid_size)
     print(f"attention_weights3 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
 
     # Ridimensiona la mappa di attenzione alla dimensione dell'immagine originale
