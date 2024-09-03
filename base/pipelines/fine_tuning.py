@@ -91,7 +91,8 @@ def visualize_attention(image_tensor, attention_weights, save_path=None):
     # Upsample the attention map to match the image size
     attention_map = F.interpolate(attention_map, size=(320, 512), mode='bilinear', align_corners=False)
     print(f"attention_weights4 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
-    attention_map = attention_map.squeeze().cpu().numpy()
+    attention_map = attention_map.squeeze()
+    attention_map = attention_map.detach().cpu().numpy()
     print(f"attention_weights5 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
     
     # Normalize attention map
