@@ -65,7 +65,8 @@ class VideoDatasetMsvd(Dataset):
 
             #print(f"video1 shape: {frames_np.shape}, dtype: {frames_np.dtype}") #shape: (16, 320, 512, 3), dtype: float32
 
-            video = torch.tensor(frames_np)  # (T, H, W, C) -> (C, T, H, W)
+            #video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
+            video = torch.tensor(frames_np).permute(0, 3, 1, 2)  # (T, H, W, C) -> (T, C, H, W)
 
             #print(f"video2 shape: {video.shape}, dtype: {video.dtype}") #shape: torch.Size([3, 16, 320, 512]), dtype: torch.float32
             
@@ -78,7 +79,8 @@ class VideoDatasetMsvd(Dataset):
 
 
             #print(f"mid_frame1 shape: {mid_frame_np.shape}, dtype: {mid_frame_np.dtype}") #shape: (320, 512, 3), dtype: uint8
-            mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
+            #mid_frame = torch.tensor(mid_frame_np).permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
+            mid_frame = torch.tensor(mid_frame_np)
             #print(f"mid_frame2 shape: {mid_frame.shape}, dtype: {mid_frame.dtype}") #shape: torch.Size([3, 320, 512]), dtype: torch.uint8
             
             # Ottieni le descrizioni del video
