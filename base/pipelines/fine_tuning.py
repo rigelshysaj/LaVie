@@ -92,8 +92,7 @@ def save_attention_map(frame_tensor, attention_weights, output_path, original_im
 
     # Step 2: Rimappare l'attenzione ai pixel dell'immagine
     # Assumiamo che i 50 token visivi derivino da una griglia 7x7
-    grid_size = int(mean_attention_weights.size(-1) ** 0.5)  # sqrt(50) ≈ 7
-    attention_map = mean_attention_weights.view(1, 1, grid_size, grid_size)
+    attention_map = mean_attention_weights.view(1, 1, 5, 10)
     print(f"attention_weights3 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
 
     # Ridimensiona la mappa di attenzione alla dimensione dell'immagine originale
@@ -105,7 +104,7 @@ def save_attention_map(frame_tensor, attention_weights, output_path, original_im
 
 
     # Step 3: Converti l'immagine originale per il plotting
-    frame = frame_tensor.squeeze().permute(1, 2, 0).cpu().numpy()  # Converti in formato HWC
+    frame = frame_tensor.permute(1, 2, 0).cpu().numpy()  # Converti in formato HWC
     print(f"frame shape: {frame.shape}, dtype: {frame.dtype}")
 
     frame = T.ToPILImage()(frame)
@@ -688,7 +687,7 @@ def lora_model(data, video_folder, args, training=True):
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
-                    save_attention_map(frame_tensor, attention_weights, '/content/drive/My Drive/attention_visualization.png')
+                    save_attention_map(frame_tensor[0], attention_weights[0], '/content/drive/My Drive/attention_visualization.png')
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
 
