@@ -71,6 +71,56 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
+def visualize_attention(image_tensor, attention_weights, save_path=None):
+    # Ensure we're working with the correct shapes
+    assert image_tensor.shape == (1, 3, 320, 512), "Unexpected image shape"
+    assert attention_weights.shape[0] == 1, "Unexpected batch size in attention weights"
+
+    print(f"attention_weights1 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
+    print(f"frame_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
+
+    
+    # Average attention weights across all text tokens
+    mean_attention = attention_weights.mean(dim=1)  # Shape: [1, 50]
+    print(f"attention_weights2 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
+    
+    # Reshape attention to match spatial dimensions of the image
+    attention_map = mean_attention.reshape(1, 1, 5, 10)  # 50 -> 5x10
+    print(f"attention_weights3 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
+    
+    # Upsample the attention map to match the image size
+    attention_map = F.interpolate(attention_map, size=(320, 512), mode='bilinear', align_corners=False)
+    attention_map = attention_map.squeeze().cpu().numpy()
+    
+    # Normalize attention map
+    attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())
+    
+    # Convert image tensor to numpy for visualization
+    image = image_tensor.squeeze().permute(1, 2, 0).cpu().numpy()
+    image = (image - image.min()) / (image.max() - image.min())  # Normalize to [0, 1]
+    
+    # Create a figure with two subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+    
+    # Plot original image
+    ax1.imshow(image)
+    ax1.set_title('Original Image')
+    ax1.axis('off')
+    
+    # Plot image with attention overlay
+    ax2.imshow(image)
+    ax2.imshow(attention_map, cmap='hot', alpha=0.5)
+    ax2.set_title('Attention Map Overlay')
+    ax2.axis('off')
+    
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path)
+    else:
+        plt.show()
+    
+    plt.close()
 
 def save_attention_map(frame_tensor, attention_weights, output_path, original_image_size=(320, 512)):
     """
@@ -86,7 +136,7 @@ def save_attention_map(frame_tensor, attention_weights, output_path, original_im
     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
     # Step 1: Media degli attention weights lungo la dimensione dei token di testo
-    mean_attention_weights = attention_weights.mean(dim=0)  # [1, 50]
+    mean_attention_weights = attention_weights.mean(dim=1)  # [1, 50]
     print(f"attention_weights2 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
 
 
@@ -687,7 +737,7 @@ def lora_model(data, video_folder, args, training=True):
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
-                    save_attention_map(frame_tensor[0], attention_weights, '/content/drive/My Drive/attention_visualization.png')
+                    save_attention_map(frame_tensor, attention_weights, '/content/drive/My Drive/attention_visualization.png')
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
 
