@@ -4,6 +4,7 @@ import torch
 import cv2
 import os
 import json
+from scipy.ndimage import zoom
 from tqdm import tqdm
 from plotly.subplots import make_subplots
 import plotly.io as pio
@@ -70,21 +71,16 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 def visualize_attention(image, attention_weights, save_path=None):
-    # Ensure image is on CPU and convert to numpy
-    image = image.detach().cpu().numpy()
+    # Ensure image is detached, on CPU and convert to numpy
+    image = image.detach().squeeze(0).permute(1, 2, 0).cpu().numpy()
     
-    # Transpose image from (C, H, W) to (H, W, C)
-    image = np.transpose(image, (1, 2, 0))
-    
-    # Normalize image to 0-1 range if it's not already
-    if image.max() > 1:
-        image = image / 255.0
+    # Normalize image to 0-1 range
+    image = image.astype(np.float32) / 255.0
 
-    # Get attention weights
-    attention = attention_weights.detach().squeeze().mean(dim=0).cpu().numpy()
+    # Get attention weights, ensure they are detached
+    attention = attention_weights.detach().squeeze(0).mean(dim=0).cpu().numpy()
     
     # Resize attention to match image size
-    from scipy.ndimage import zoom
     zoom_factors = (image.shape[0] / attention.shape[0], image.shape[1] / attention.shape[1])
     attention = zoom(attention, zoom_factors)
     
@@ -100,12 +96,13 @@ def visualize_attention(image, attention_weights, save_path=None):
     overlayed_image = (1 - alpha) * image + alpha * attention_heatmap[:, :, :3]
     
     # Plot
-    plt.figure(figsize=(10, 10))
+    plt.figure(figsize=(15, 10))
     plt.imshow(overlayed_image)
     plt.axis('off')
+    plt.title("Attention Visualization", fontsize=16)
     
     if save_path:
-        plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
+        plt.savefig(save_path, bbox_inches='tight', pad_inches=0.1, dpi=300)
     
     plt.show()
 
