@@ -74,14 +74,14 @@ class StableDiffusionPipelineOutput(BaseOutput):
 def visualize_attention(image_tensor, attention_weights, save_path=None):
     # Ensure we're working with the correct shapes
     assert image_tensor.shape == (1, 3, 320, 512), "Unexpected image shape"
-    #assert attention_weights.shape[0] == 1, "Unexpected batch size in attention weights"
+    assert attention_weights.shape[0] == 1, "Unexpected batch size in attention weights"
 
     print(f"attention_weights1 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
     print(f"frame_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
 
     
     # Average attention weights across all text tokens
-    mean_attention = attention_weights.mean(dim=0)  # Shape: [1, 50]
+    mean_attention = attention_weights.mean(dim=1)  # Shape: [1, 50]
     print(f"mean_attention shape: {mean_attention.shape}, dtype: {mean_attention.dtype}")
     
     # Reshape attention to match spatial dimensions of the image
@@ -741,7 +741,7 @@ def lora_model(data, video_folder, args, training=True):
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
-                    visualize_attention(frame_tensor, attention_weights[0], '/content/drive/My Drive/attention_visualization.png')
+                    visualize_attention(frame_tensor, attention_weights, '/content/drive/My Drive/attention_visualization.png')
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
 
