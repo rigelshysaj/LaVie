@@ -84,7 +84,7 @@ def visualize_attention(image, attention_weights, save_path=None):
     # Get attention weights, ensure they are detached and convert to float32
     attention = attention_weights.detach().cpu().numpy().astype(np.float32)
     
-    print(f"attention shape: {attention.shape}, dtype: {attention.dtype}")
+    print(f"attention1 shape: {attention.shape}, dtype: {attention.dtype}")
     print(f"image2 shape: {image.shape}, dtype: {image.dtype}")
 
     # Reshape attention if it's 1D
@@ -94,13 +94,20 @@ def visualize_attention(image, attention_weights, save_path=None):
         pass  # It's already 2D, no need to reshape
     else:
         raise ValueError(f"Unexpected attention shape: {attention.shape}")
+    
+    print(f"attention2 shape: {attention.shape}, dtype: {attention.dtype}")
+
 
     # Resize attention to match image size
     zoom_factors = (image.shape[0] / attention.shape[0], image.shape[1] / attention.shape[1])
     attention = zoom(attention, zoom_factors)
+    print(f"attention3 shape: {attention.shape}, dtype: {attention.dtype}")
+
     
     # Normalize attention weights
     attention = (attention - attention.min()) / (attention.max() - attention.min())
+    print(f"attention4 shape: {attention.shape}, dtype: {attention.dtype}")
+
     
     # Create a color map
     cmap = plt.get_cmap('jet')
@@ -111,10 +118,19 @@ def visualize_attention(image, attention_weights, save_path=None):
     overlayed_image = (1 - alpha) * image + alpha * attention_heatmap[:, :, :3]
     
     # Plot
-    plt.figure(figsize=(15, 10))
-    plt.imshow(overlayed_image)
-    plt.axis('off')
-    plt.title("Attention Visualization", fontsize=16)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+    
+    # Original image
+    ax1.imshow(image)
+    ax1.set_title("Original Frame", fontsize=16)
+    ax1.axis('off')
+    
+    # Heatmap overlay
+    ax2.imshow(overlayed_image)
+    ax2.set_title("Attention Heatmap", fontsize=16)
+    ax2.axis('off')
+    
+    plt.tight_layout()
     
     if save_path:
         plt.savefig(save_path, bbox_inches='tight', pad_inches=0.1, dpi=300)
