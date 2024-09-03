@@ -65,8 +65,8 @@ class VideoDatasetMsvd(Dataset):
 
             #print(f"video1 shape: {frames_np.shape}, dtype: {frames_np.dtype}") #shape: (16, 320, 512, 3), dtype: float32
 
-            #video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
-            video = torch.tensor(frames_np).permute(0, 3, 1, 2)  # (T, H, W, C) -> (T, C, H, W)
+            video = torch.tensor(frames_np).permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
+            #video = torch.tensor(frames_np).permute(0, 3, 1, 2)  # (T, H, W, C) -> (T, C, H, W)
 
             #print(f"video2 shape: {video.shape}, dtype: {video.dtype}") #shape: torch.Size([3, 16, 320, 512]), dtype: torch.float32
             

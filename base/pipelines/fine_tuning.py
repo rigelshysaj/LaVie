@@ -298,7 +298,7 @@ def encode_latents(video, vae):
     vae = vae.to(torch.float16)
     video = video.to(torch.float16)
     b, c, f, h, w = video.shape
-    video = einops.rearrange(video, "b c f h w -> (b f) c h w")
+    video = einops.rearrange(video, "b f h w c -> (b f) c h w")
     
     latents = vae.encode(video).latent_dist.sample()
     latents = einops.rearrange(latents, "(b f) c h w -> b c f h w", b=b)
