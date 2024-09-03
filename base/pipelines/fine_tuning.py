@@ -7,6 +7,7 @@ import json
 from tqdm import tqdm
 from plotly.subplots import make_subplots
 import plotly.io as pio
+from torchvision.transforms.functional import resize
 import plotly.graph_objs as go
 import shutil
 from transformers import CLIPProcessor, CLIPModel
@@ -68,79 +69,67 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
-def visualize_attention_heatmap(frame, attention_weights, save_path):
-    # Convert frame to numpy array and ensure it's in the correct format
-    if isinstance(frame, torch.Tensor):
-        frame_np = frame.detach().cpu().numpy().transpose(1, 2, 0)
-    else:
-        frame_np = frame
-    
-    # Ensure frame is in the range [0, 1]
-    frame_np = frame_np.astype(np.float32) / 255.0
-
-    # Handle attention weights
-    if isinstance(attention_weights, torch.Tensor):
-        attn_weights = attention_weights.detach().cpu().numpy()
-    else:
-        attn_weights = attention_weights
-
-    # Reshape attention weights
-    if attn_weights.ndim == 2:
-        # If 2D, assume it's already in the correct shape
-        pass
-    elif attn_weights.ndim == 3:
-        # If 3D, take the mean across the first dimension
-        attn_weights = attn_weights.mean(axis=0)
-    else:
-        raise ValueError(f"Unexpected attention weights shape: {attn_weights.shape}")
-
-    # Get frame dimensions
-    h, w = frame_np.shape[:2]
-
-    # Interpolate attention weights to match frame dimensions
-    attn_weights = torch.from_numpy(attn_weights).float().unsqueeze(0).unsqueeze(0)
-    attn_weights = F.interpolate(attn_weights, size=(h, w), mode='bicubic', align_corners=False)
-    attn_weights = attn_weights.squeeze().numpy()
-
-    # Normalize attention weights
-    attn_weights = (attn_weights - attn_weights.min()) / (attn_weights.max() - attn_weights.min())
-
-    # Create a custom colormap for the heatmap
-    colors = ['blue', 'cyan', 'yellow', 'red']
-    n_bins = 100
-    cmap = LinearSegmentedColormap.from_list('custom', colors, N=n_bins)
-
-    # Create the figure and axes
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
-    fig.suptitle('Attention Visualization', fontsize=16)
-
-    # Plot original frame
-    ax1.imshow(frame_np)
-    ax1.set_title('Original Frame')
-    ax1.axis('off')
-
-    # Plot attention heatmap overlaid on original frame
-    ax2.imshow(frame_np)
-    heatmap = ax2.imshow(attn_weights, cmap=cmap, alpha=0.7)
-    ax2.set_title('Attention Heatmap')
-    ax2.axis('off')
-
-    # Add colorbar
-    plt.colorbar(heatmap, ax=ax2, label='Attention Intensity', fraction=0.046, pad=0.04)
-
-    # Save the figure
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    plt.close(fig)
-    print(f"Attention heatmap image saved to {save_path}")
-
 class AttentionWithVisualization(nn.Module):
     def __init__(self, embed_dim, num_heads):
         super().__init__()
         self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads)
+        self.current_step = 0
+    
+    def visualize_attention(self, frame_tensor, attention_weights, save_path=None):
+        # Ensure frame_tensor is on CPU and convert to numpy
+        frame = frame_tensor.cpu().permute(1, 2, 0).numpy()
         
-    def forward(self, query, key, value):
+        # Normalize frame to [0, 1] for visualization
+        frame = frame / 255.0
+
+        # Get the attention map (assuming we want to visualize attention for all text tokens)
+        attention_map = attention_weights.mean(dim=1)  # Average over attention heads
+        attention_map = attention_map[:, 1:]  # Remove CLS token attention
+
+        # Reshape attention map to 2D
+        attention_size = int(attention_map.size(1)**0.5)
+        attention_map = attention_map.view(-1, attention_size, attention_size)
+
+        # Average over all text tokens
+        attention_map = attention_map.mean(dim=0)
+
+        # Upsample the attention map to match the image size
+        attention_map = resize(attention_map.unsqueeze(0).unsqueeze(0), size=frame.shape[:2], mode='bilinear', align_corners=False)
+        attention_map = attention_map.squeeze().cpu().numpy()
+
+        # Normalize attention map
+        attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())
+
+        # Create a figure with two subplots
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+
+        # Plot original image
+        ax1.imshow(frame)
+        ax1.set_title('Original Image')
+        ax1.axis('off')
+
+        # Plot image with attention overlay
+        ax2.imshow(frame)
+        ax2.imshow(attention_map, alpha=0.5, cmap='jet')
+        ax2.set_title('Attention Map Overlay')
+        ax2.axis('off')
+
+        plt.tight_layout()
+
+        if save_path:
+            plt.savefig(save_path)
+        else:
+            plt.show()
+        
+        plt.close()
+
+    def forward(self, query, key, value, frame_tensor):
         attn_output, attn_output_weights = self.attention(query, key, value)
+        
+        # Visualize attention for the first element of the batch
+        self.visualize_attention(frame_tensor[0], attn_output_weights[0], save_path=f"attention_map_{self.current_step}.png")
+        self.current_step += 1
+        
         return attn_output, attn_output_weights
 
 
@@ -621,7 +610,7 @@ def lora_model(data, video_folder, args, training=True):
 
                     #print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
                     
-                    print(f"frame_tensor111111 shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
+                    #print(f"frame_tensor111111 shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
                     
                     try:
                         description[0]
@@ -693,15 +682,10 @@ def lora_model(data, video_folder, args, training=True):
                     text_features = text_features.transpose(0, 1)
                     last_hidden_state = last_hidden_state.transpose(0, 1)
 
-                    encoder_hidden_states, attention_weights = attention_layer(text_features, last_hidden_state, last_hidden_state)
-
+                    encoder_hidden_states, attention_weights = attention_layer(text_features, last_hidden_state, last_hidden_state, frame_tensor)
+                    
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
-                    # Visualizza e salva le attention maps
-                    #if step % args.save_attention_map_steps == 0:  # Aggiungi questo parametro agli argomenti
-                    attention_map_path = f"{args.output_dir}/attention_heatmap_step_{global_step}.png"
-                    visualize_attention_heatmap(frame_tensor[0], attention_weights[0], attention_map_path)
-                    print(f"Attention heatmap saved to {attention_map_path}")
 
                     # Get the target for loss depending on the prediction type
                     if args.prediction_type is not None:
