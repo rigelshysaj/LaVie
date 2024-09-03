@@ -81,7 +81,7 @@ def visualize_attention(image, attention_weights, save_path=None):
     attention = attention_weights.detach().squeeze(0).mean(dim=0).cpu().numpy()
 
     print(f"attention shape: {attention.shape}, dtype: {attention.dtype}")
-    print(f"attention shape: {attention.shape}, dtype: {attention.dtype}")
+    print(f"image shape: {image.shape}, dtype: {image.dtype}")
     
     # Resize attention to match image size
     zoom_factors = (image.shape[0] / attention.shape[0], image.shape[1] / attention.shape[1])
