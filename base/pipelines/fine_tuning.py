@@ -73,72 +73,9 @@ class AttentionWithVisualization(nn.Module):
     def __init__(self, embed_dim, num_heads):
         super().__init__()
         self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads)
-        self.current_step = 0
-    
-    def visualize_attention(self, frame_tensor, attention_weights, save_path=None):
-        # Ensure frame_tensor is on CPU and convert to numpy
-        frame = frame_tensor.cpu().squeeze(0).permute(1, 2, 0).numpy()
         
-        # Normalize frame to [0, 1] for visualization
-        frame = frame / 255.0
-
-        # Process attention weights
-        # Assuming attention_weights shape is [1, 77, 50]
-        # where 77 is text sequence length and 50 is image token sequence length
-        attention_map = attention_weights.squeeze(0)  # Remove batch dimension
-        
-        # Sum attention over all text tokens
-        attention_map = attention_map.sum(dim=0)
-        
-        # Reshape to match the image token grid (6x8 grid for 48 tokens, with 2 extra tokens)
-        attention_map = attention_map[:-2].view(6, 8)
-        
-        # Upsample the attention map to match the image size
-        attention_map = resize(attention_map.unsqueeze(0).unsqueeze(0), size=frame.shape[:2], mode='bilinear', align_corners=False)
-        attention_map = attention_map.squeeze().cpu().numpy()
-
-        # Normalize attention map
-        attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())
-
-        # Create a figure with two subplots
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
-
-        # Plot original image
-        ax1.imshow(frame)
-        ax1.set_title('Original Image')
-        ax1.axis('off')
-
-        # Plot image with attention overlay
-        ax2.imshow(frame)
-        im = ax2.imshow(attention_map, alpha=0.5, cmap='jet')
-        ax2.set_title('Attention Map Overlay')
-        ax2.axis('off')
-
-        # Add colorbar
-        plt.colorbar(im, ax=ax2)
-
-        plt.tight_layout()
-
-        if save_path:
-            plt.savefig(save_path)
-        else:
-            plt.show()
-        
-        plt.close()
-
-    def forward(self, query, key, value, frame_tensor):
+    def forward(self, query, key, value):
         attn_output, attn_output_weights = self.attention(query, key, value)
-        
-        # Visualize attention for the first element of the batch
-        try:
-            self.visualize_attention(frame_tensor[0], attn_output_weights, save_path=f"attention_map_{self.current_step}.png")
-        except Exception as e:
-            print(f"Error in visualizing attention: {e}")
-            print(f"Attention weights shape: {attn_output_weights.shape}")
-            print(f"Frame tensor shape: {frame_tensor.shape}")
-        
-        self.current_step += 1
-        
         return attn_output, attn_output_weights
 
 
@@ -691,7 +628,9 @@ def lora_model(data, video_folder, args, training=True):
                     text_features = text_features.transpose(0, 1)
                     last_hidden_state = last_hidden_state.transpose(0, 1)
 
-                    encoder_hidden_states, attention_weights = attention_layer(text_features, last_hidden_state, last_hidden_state, frame_tensor)
+                    encoder_hidden_states, attention_weights = attention_layer(text_features, last_hidden_state, last_hidden_state)
+
+                    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
 
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
