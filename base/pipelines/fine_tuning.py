@@ -69,6 +69,46 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
+def visualize_attention(image, attention_weights, save_path=None):
+    # Ensure image is on CPU and convert to numpy
+    image = image.squeeze().cpu().numpy()
+    
+    # Transpose image from (C, H, W) to (H, W, C)
+    image = np.transpose(image, (1, 2, 0))
+    
+    # Normalize image to 0-1 range if it's not already
+    if image.max() > 1:
+        image = image / 255.0
+
+    # Get attention weights
+    attention = attention_weights.squeeze().mean(dim=0).cpu().numpy()
+    
+    # Resize attention to match image size
+    from scipy.ndimage import zoom
+    zoom_factors = (image.shape[0] / attention.shape[0], image.shape[1] / attention.shape[1])
+    attention = zoom(attention, zoom_factors)
+    
+    # Normalize attention weights
+    attention = (attention - attention.min()) / (attention.max() - attention.min())
+    
+    # Create a color map
+    cmap = plt.get_cmap('jet')
+    attention_heatmap = cmap(attention)
+    
+    # Combine original image and attention heatmap
+    alpha = 0.5
+    overlayed_image = (1 - alpha) * image + alpha * attention_heatmap[:, :, :3]
+    
+    # Plot
+    plt.figure(figsize=(10, 10))
+    plt.imshow(overlayed_image)
+    plt.axis('off')
+    
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
+    
+    plt.show()
+
 class AttentionWithVisualization(nn.Module):
     def __init__(self, embed_dim, num_heads):
         super().__init__()
@@ -631,6 +671,9 @@ def lora_model(data, video_folder, args, training=True):
                     encoder_hidden_states, attention_weights = attention_layer(text_features, last_hidden_state, last_hidden_state)
 
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
+                    print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
+
+                    visualize_attention(frame_tensor[0], attention_weights[0], save_path='/content/drive/My Drive/attention_visualization.png')
 
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
