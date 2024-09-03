@@ -72,20 +72,22 @@ class StableDiffusionPipelineOutput(BaseOutput):
 
 
 def visualize_attention(image, attention_weights, save_path=None):
-    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
-    print(f"image shape: {image.shape}, dtype: {image.dtype}")
+
+    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") #shape: torch.Size([77, 50]), dtype: torch.float16
+    print(f"image shape: {image.shape}, dtype: {image.dtype}") #shape: torch.Size([3, 320, 512]), dtype: torch.uint8
+
 
     # Ensure image is detached, on CPU and convert to numpy
     image = image.detach().permute(1, 2, 0).cpu().numpy()
     
     # Normalize image to 0-1 range
-    image = image.astype(np.float32) / 255.0
+    image = image.astype(np.float32) 
 
     # Get attention weights, ensure they are detached and convert to float32
     attention = attention_weights.detach().cpu().numpy().astype(np.float32)
     
-    print(f"attention1 shape: {attention.shape}, dtype: {attention.dtype}")
-    print(f"image2 shape: {image.shape}, dtype: {image.dtype}")
+    print(f"attention1 shape: {attention.shape}, dtype: {attention.dtype}") #shape: (77, 50), dtype: float32
+    print(f"image2 shape: {image.shape}, dtype: {image.dtype}") #shape: (320, 512, 3), dtype: float32
 
     # Reshape attention if it's 1D
     if attention.ndim == 1:
@@ -95,18 +97,18 @@ def visualize_attention(image, attention_weights, save_path=None):
     else:
         raise ValueError(f"Unexpected attention shape: {attention.shape}")
     
-    print(f"attention2 shape: {attention.shape}, dtype: {attention.dtype}")
+    print(f"attention2 shape: {attention.shape}, dtype: {attention.dtype}") #shape: (77, 50), dtype: float32
 
 
     # Resize attention to match image size
     zoom_factors = (image.shape[0] / attention.shape[0], image.shape[1] / attention.shape[1])
     attention = zoom(attention, zoom_factors)
-    print(f"attention3 shape: {attention.shape}, dtype: {attention.dtype}")
+    print(f"attention3 shape: {attention.shape}, dtype: {attention.dtype}") #shape: (320, 512), dtype: float32
 
     
     # Normalize attention weights
     attention = (attention - attention.min()) / (attention.max() - attention.min())
-    print(f"attention4 shape: {attention.shape}, dtype: {attention.dtype}")
+    print(f"attention4 shape: {attention.shape}, dtype: {attention.dtype}") #shape: (320, 512), dtype: float32
 
     
     # Create a color map
