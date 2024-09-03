@@ -82,17 +82,33 @@ def visualize_attention(image, attention_weights, save_path=None):
     image = image.astype(np.float32) / 255.0
 
     # Get attention weights, ensure they are detached
-    attention = attention_weights.detach().mean(dim=0).cpu().numpy()
-
+    attention = attention_weights.detach().cpu().numpy()
+    
     print(f"attention shape: {attention.shape}, dtype: {attention.dtype}")
     print(f"image2 shape: {image.shape}, dtype: {image.dtype}")
+
+    # Reshape attention if it's 1D
+    if attention.ndim == 1:
+        attention = attention.reshape(7, -1)  # Assuming 7x7 grid, adjust if needed
+    elif attention.ndim == 2:
+        pass  # It's already 2D, no need to reshape
+    else:
+        raise ValueError(f"Unexpected attention shape: {attention.shape}")
     
+    
+    print(f"attention2 shape: {attention.shape}, dtype: {attention.dtype}")
+
+
     # Resize attention to match image size
     zoom_factors = (image.shape[0] / attention.shape[0], image.shape[1] / attention.shape[1])
     attention = zoom(attention, zoom_factors)
+    print(f"attention3 shape: {attention.shape}, dtype: {attention.dtype}")
+
     
     # Normalize attention weights
     attention = (attention - attention.min()) / (attention.max() - attention.min())
+    print(f"attention4 shape: {attention.shape}, dtype: {attention.dtype}")
+
     
     # Create a color map
     cmap = plt.get_cmap('jet')
