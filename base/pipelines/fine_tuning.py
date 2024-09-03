@@ -72,8 +72,6 @@ class StableDiffusionPipelineOutput(BaseOutput):
 
 def visualize_attention(image_tensor, attention_weights, save_path=None):
     # Ensure we're working with the correct shapes
-    assert image_tensor.shape == (1, 3, 320, 512), f"Unexpected image shape: {image_tensor.shape}"
-    assert attention_weights.shape == (1, 77, 50), f"Unexpected attention weights shape: {attention_weights.shape}"
     
     #print(f"Initial attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
     #print(f"Image tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
@@ -98,7 +96,7 @@ def visualize_attention(image_tensor, attention_weights, save_path=None):
     attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())
     
     # Convert image tensor to numpy for visualization
-    image = image_tensor.squeeze().permute(1, 2, 0).cpu().numpy()
+    image = image_tensor.squeeze().cpu().numpy()
     image = (image - image.min()) / (image.max() - image.min())  # Normalize to [0, 1]
     print(f"Final image shape: {image.shape}, dtype: {image.dtype}")
     
