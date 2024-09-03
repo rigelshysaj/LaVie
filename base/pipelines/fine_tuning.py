@@ -82,18 +82,31 @@ def save_attention_map(frame_tensor, attention_weights, output_path, original_im
         output_path (str): Path dove salvare l'immagine risultante.
         original_image_size (tuple): Dimensione originale dell'immagine (H, W).
     """
+    print(f"attention_weights1 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
+    print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
+
     # Step 1: Media degli attention weights lungo la dimensione dei token di testo
     mean_attention_weights = attention_weights.mean(dim=1)  # [1, 50]
+    print(f"attention_weights2 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
+
 
     # Step 2: Rimappare l'attenzione ai pixel dell'immagine
     # Assumiamo che i 50 token visivi derivino da una griglia 7x7
     attention_map = mean_attention_weights.view(1, 1, 5, 10)
+    print(f"attention_weights3 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
+
     # Ridimensiona la mappa di attenzione alla dimensione dell'immagine originale
     attention_map = F.interpolate(attention_map, size=original_image_size, mode='bilinear', align_corners=False)
+    print(f"attention_weights4 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
+
     attention_map = attention_map.squeeze()  # [H, W]
+    print(f"attention_weights5 shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
+
 
     # Step 3: Converti l'immagine originale per il plotting
     frame = frame_tensor.squeeze().permute(1, 2, 0).cpu().numpy()  # Converti in formato HWC
+    print(f"frame shape: {frame.shape}, dtype: {frame.dtype}")
+
     frame = T.ToPILImage()(frame)
 
     # Normalizza la mappa di attenzione per la visualizzazione
