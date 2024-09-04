@@ -154,7 +154,7 @@ def visualize_attention_maps(attention_weights, tokens, save_path=None):
     save_or_show_plot(plt, "barchart")
     plt.close()
 
-def visualize_attention(image_tensor, attention_weights, save_path=None):
+def visualize_attention_(image_tensor, attention_weights, save_path=None):
     # Ensure we're working with the correct shapes
     
     #print(f"Initial attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
@@ -784,7 +784,7 @@ def lora_model(data, video_folder, args, training=True):
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
-                    #visualize_attention(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
+                    #visualize_attention_(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
                     path = f"/content/drive/My Drive//visualization_{step}_{global_step}.png"
                     #visualize_attention_maps(attention_weights, description, save_path=path)
                     tokens = tokenizer.convert_ids_to_tokens(text_inputs.input_ids[0])
