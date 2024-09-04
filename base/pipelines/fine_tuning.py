@@ -71,6 +71,50 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
+
+def visualize_attention(attention_weights, tokens, save_path=None):
+    # Usiamo detach() prima di convertire in NumPy
+    att_map = attention_weights.detach().cpu().numpy()
+    
+    plt.figure(figsize=(20, 10))
+    sns.heatmap(att_map, yticklabels=tokens, xticklabels=False, cmap='viridis')
+    plt.title("Attention Map")
+    plt.ylabel("Tokens")
+    plt.xlabel("Image Features")
+    
+    if save_path:
+        images_folder = os.path.join(os.path.dirname(save_path), 'Images')
+        os.makedirs(images_folder, exist_ok=True)
+        file_name = os.path.basename(save_path)
+        new_save_path = os.path.join(images_folder, file_name)
+        plt.savefig(new_save_path)
+        print(f"Visualization saved to {new_save_path}")
+    else:
+        plt.show()
+    
+    plt.close()
+
+def analyze_dominant_tokens(attention_weights, tokens, save_path=None):
+    # Usiamo detach() prima di calcolare la media e convertire in NumPy
+    token_importance = attention_weights.detach().mean(dim=1).cpu().numpy()
+    sorted_indices = np.argsort(token_importance)[::-1]
+    
+    results = "Token dominanti:\n"
+    for idx in sorted_indices[:10]:
+        results += f"{tokens[idx]}: {token_importance[idx]:.4f}\n"
+    
+    print(results)
+    
+    if save_path:
+        results_folder = os.path.join(os.path.dirname(save_path), 'Results')
+        os.makedirs(results_folder, exist_ok=True)
+        file_name = os.path.basename(save_path).replace('.png', '.txt')
+        new_save_path = os.path.join(results_folder, file_name)
+        
+        with open(new_save_path, 'w') as f:
+            f.write(results)
+        print(f"Analysis results saved to {new_save_path}")
+
 def visualize_attention_maps(attention_weights, tokens, save_path=None):
     attention_weights = attention_weights.squeeze().detach().cpu()
     token_importance = attention_weights.mean(dim=1)  # Media su tutte le patch dell'immagine
@@ -742,7 +786,12 @@ def lora_model(data, video_folder, args, training=True):
 
                     #visualize_attention(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
                     path = f"/content/drive/My Drive//visualization_{step}_{global_step}.png"
-                    visualize_attention_maps(attention_weights, description, save_path=path)
+                    #visualize_attention_maps(attention_weights, description, save_path=path)
+                    tokens = tokenizer.convert_ids_to_tokens(text_inputs.input_ids[0])
+
+                    # Usiamo attention_weights[0] che ha dimensione [77, 50]
+                    visualize_attention(attention_weights[0], tokens)
+                    analyze_dominant_tokens(attention_weights[0], tokens) 
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
                     # Get the target for loss depending on the prediction type
