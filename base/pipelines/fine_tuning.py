@@ -81,7 +81,15 @@ def visualize_attention_maps(attention_weights, tokenizer, description_list, sav
     
     # Estrai i pesi di attenzione e calcola la media per ogni token
     attention_weights = attention_weights.squeeze(0)  # Rimuovi la dimensione del batch
+    
+    # Sposta il tensor sulla CPU se è su CUDA
+    if attention_weights.is_cuda:
+        attention_weights = attention_weights.cpu()
+    
     token_importance = attention_weights.mean(dim=1)  # Media su tutte le patch dell'immagine
+    
+    # Converti in numpy array
+    token_importance = token_importance.numpy()
 
     # Taglia o estendi la lista dei token per corrispondere alla lunghezza di token_importance
     tokens = tokens[:len(token_importance)] + [''] * (len(token_importance) - len(tokens))
@@ -102,7 +110,7 @@ def visualize_attention_maps(attention_weights, tokenizer, description_list, sav
 
     # Crea una heatmap
     plt.figure(figsize=(12, 8))
-    sns.heatmap(token_importance.unsqueeze(0), annot=False, cmap='viridis', xticklabels=tokens)
+    sns.heatmap(token_importance.reshape(1, -1), annot=False, cmap='viridis', xticklabels=tokens)
     plt.title('Token Importance Heatmap')
     plt.xlabel('Tokens')
     plt.ylabel('Importance')
