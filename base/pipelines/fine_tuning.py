@@ -71,22 +71,6 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
-def visualize_full_attention_matrix(attention_weights, tokens, save_path=None):
-    attention_matrix = attention_weights.squeeze().detach().cpu().numpy()
-    
-    plt.figure(figsize=(20, 10))
-    sns.heatmap(attention_matrix, cmap='viridis', xticklabels=False, yticklabels=tokens)
-    plt.title('Full Attention Matrix')
-    plt.xlabel('Image Patches')
-    plt.ylabel('Text Tokens')
-    
-    if save_path:
-        plt.savefig(save_path)
-        print(f"Full attention matrix visualization saved to {save_path}")
-    else:
-        plt.show()
-    plt.close()
-
 
 def visualize_attention(attention_weights, tokens, save_path=None):
     # Usiamo detach() prima di convertire in NumPy
@@ -806,8 +790,8 @@ def lora_model(data, video_folder, args, training=True):
                     tokens = tokenizer.convert_ids_to_tokens(text_inputs.input_ids[0])
 
                     # Usiamo attention_weights[0] che ha dimensione [77, 50]
-                    visualize_attention(attention_weights[0], tokens)
-                    analyze_dominant_tokens(attention_weights[0], tokens) 
+                    visualize_attention(attention_weights[0], tokens, f"/content/drive/My Drive//visualization_{step}_{global_step}.png")
+                    analyze_dominant_tokens(attention_weights[0], tokens, f"/content/drive/My Drive//analysis_{step}_{global_step}.png") 
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
                     # Get the target for loss depending on the prediction type
