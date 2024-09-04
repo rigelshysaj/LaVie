@@ -663,12 +663,7 @@ def lora_model(data, video_folder, args, training=True):
                     #print(f"description: {list(description)}")
                     # Get the text embedding for conditioning
 
-                    description1 = ["a lion is playing with a ball"]
-
-                    print(f"description: {description}")
-                    print(f"description1: {description1}")
-                    print(f"type and len of description: {type(description)}, {len(description)}")
-                    print(f"type and len of description1: {type(description1)}, {len(description1)}")
+                    description = ["a lion is playing with a ball"]
 
                     text_inputs = tokenizer(
                         list(description),
