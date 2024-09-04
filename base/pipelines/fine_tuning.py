@@ -72,14 +72,17 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 
-def visualize_attention_maps(attention_weights, tokenizer, description, save_path=None):
+def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
+    # Unisci la lista di descrizioni in una singola stringa
+    description = ' '.join(description_list)
+
+    # Tokenizza la descrizione
+    tokens = tokenizer.tokenize(description)
+    
     # Estrai i pesi di attenzione e calcola la media per ogni token
     attention_weights = attention_weights.squeeze(0)  # Rimuovi la dimensione del batch
     token_importance = attention_weights.mean(dim=1)  # Media su tutte le patch dell'immagine
 
-    # Decodifica i token
-    tokens = tokenizer.tokenize(description)
-    
     # Taglia o estendi la lista dei token per corrispondere alla lunghezza di token_importance
     tokens = tokens[:len(token_importance)] + [''] * (len(token_importance) - len(tokens))
 
@@ -747,7 +750,7 @@ def lora_model(data, video_folder, args, training=True):
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
-                    visualize_attention(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
+                    #visualize_attention(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
 
                     visualize_attention_maps(attention_weights, tokenizer, description, save_path="/content/drive/My Drive//visualization.png")
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
