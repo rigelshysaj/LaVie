@@ -72,7 +72,7 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 def visualize_attention_maps(attention_weights, tokens, save_path=None):
-    attention_weights = attention_weights.squeeze().cpu()
+    attention_weights = attention_weights.squeeze().detach().cpu()
     token_importance = attention_weights.mean(dim=1)  # Media su tutte le patch dell'immagine
     
     # Taglia token_importance per corrispondere alla lunghezza effettiva dei token
@@ -92,7 +92,7 @@ def visualize_attention_maps(attention_weights, tokens, save_path=None):
 
     # Crea una heatmap
     plt.figure(figsize=(12, 8))
-    sns.heatmap(token_importance.unsqueeze(0), annot=False, cmap='viridis', xticklabels=tokens)
+    sns.heatmap(token_importance.unsqueeze(0).numpy(), annot=False, cmap='viridis', xticklabels=tokens)
     plt.title('Token Importance Heatmap')
     plt.xlabel('Tokens')
     plt.ylabel('Importance')
@@ -101,7 +101,7 @@ def visualize_attention_maps(attention_weights, tokens, save_path=None):
 
     # Crea un grafico a barre
     plt.figure(figsize=(12, 8))
-    plt.bar(range(len(token_importance)), token_importance)
+    plt.bar(range(len(token_importance)), token_importance.numpy())
     plt.title('Token Importance Bar Chart')
     plt.xlabel('Tokens')
     plt.ylabel('Importance')
