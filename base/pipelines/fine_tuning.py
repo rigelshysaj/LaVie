@@ -71,7 +71,6 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
-
 def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
     # Unisci la lista di descrizioni in una singola stringa
     description = ' '.join(description_list)
@@ -82,9 +81,8 @@ def visualize_attention_maps(attention_weights, tokenizer, description_list, sav
     # Estrai i pesi di attenzione e calcola la media per ogni token
     attention_weights = attention_weights.squeeze(0)  # Rimuovi la dimensione del batch
     
-    # Sposta il tensor sulla CPU se è su CUDA
-    if attention_weights.is_cuda:
-        attention_weights = attention_weights.cpu()
+    # Sposta il tensor sulla CPU se è su CUDA e staccalo dal grafo computazionale
+    attention_weights = attention_weights.detach().cpu()
     
     token_importance = attention_weights.mean(dim=1)  # Media su tutte le patch dell'immagine
     
