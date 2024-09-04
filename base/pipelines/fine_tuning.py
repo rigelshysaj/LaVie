@@ -53,6 +53,7 @@ import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
+import seaborn as sns
 
 from diffusers.utils import (
     deprecate,
@@ -69,6 +70,52 @@ logger = logging.get_logger(__name__)
 @dataclass
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
+
+
+def visualize_attention_maps(attention_weights, tokenizer, description, save_path=None):
+    # Estrai i pesi di attenzione e calcola la media per ogni token
+    attention_weights = attention_weights.squeeze(0)  # Rimuovi la dimensione del batch
+    token_importance = attention_weights.mean(dim=1)  # Media su tutte le patch dell'immagine
+
+    # Decodifica i token
+    tokens = tokenizer.tokenize(description)
+    
+    # Taglia o estendi la lista dei token per corrispondere alla lunghezza di token_importance
+    tokens = tokens[:len(token_importance)] + [''] * (len(token_importance) - len(tokens))
+
+    # Funzione per salvare o mostrare il plot
+    def save_or_show_plot(plt, name):
+        if save_path:
+            # Create 'Images' folder if it doesn't exist
+            images_folder = os.path.join(os.path.dirname(save_path), 'Images')
+            os.makedirs(images_folder, exist_ok=True)
+            # Update save_path to use the 'Images' folder
+            file_name = f"{os.path.splitext(os.path.basename(save_path))[0]}_{name}.png"
+            new_save_path = os.path.join(images_folder, file_name)
+            plt.savefig(new_save_path)
+            print(f"Visualization saved to {new_save_path}")
+        else:
+            plt.show()
+
+    # Crea una heatmap
+    plt.figure(figsize=(12, 8))
+    sns.heatmap(token_importance.unsqueeze(0), annot=False, cmap='viridis', xticklabels=tokens)
+    plt.title('Token Importance Heatmap')
+    plt.xlabel('Tokens')
+    plt.ylabel('Importance')
+    save_or_show_plot(plt, "heatmap")
+    plt.close()
+
+    # Crea un grafico a barre
+    plt.figure(figsize=(12, 8))
+    plt.bar(range(len(token_importance)), token_importance)
+    plt.title('Token Importance Bar Chart')
+    plt.xlabel('Tokens')
+    plt.ylabel('Importance')
+    plt.xticks(range(len(token_importance)), tokens, rotation=90)
+    plt.tight_layout()
+    save_or_show_plot(plt, "barchart")
+    plt.close()
 
 def visualize_attention(image_tensor, attention_weights, save_path=None):
     # Ensure we're working with the correct shapes
@@ -663,8 +710,6 @@ def lora_model(data, video_folder, args, training=True):
                     #print(f"description: {list(description)}")
                     # Get the text embedding for conditioning
 
-                    description = ["a lion is playing with a ball"]
-
                     text_inputs = tokenizer(
                         list(description),
                         padding="max_length",
@@ -679,13 +724,10 @@ def lora_model(data, video_folder, args, training=True):
                     )[0]
 
 
-                    print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #shape: torch.Size([1, 77, 768]), dtype: torch.float16
+                    #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
-                    frame_tensor1 = load_and_transform_image("/content/drive/My Drive/lion.webp")
-                    frame_tensor1 = torch.tensor(frame_tensor1).permute(0, 2, 3, 1)
-                    print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
-                    print(f"frame_tensor1 shape: {frame_tensor1.shape}, dtype: {frame_tensor1.dtype}")
-                    image_inputs = clip_processor(images=frame_tensor1, return_tensors="pt").pixel_values.to(unet.device)
+
+                    image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
                     #print(f"Processed image shape: {image_inputs.shape}, dtype: {image_inputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
                     #print(f"Min value: {image_inputs.min()}, Max value: {image_inputs.max()}")
                     #print(f"Mean: {image_inputs.mean()}, Std: {image_inputs.std()}")
@@ -703,11 +745,12 @@ def lora_model(data, video_folder, args, training=True):
                     encoder_hidden_states, attention_weights = attention_layer(text_features, last_hidden_state, last_hidden_state)
 
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
-                    
+                    print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
-                    visualize_attention(frame_tensor1, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
+                    visualize_attention(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
+
+                    visualize_attention_maps(attention_weights, tokenizer, description, save_path="/content/drive/My Drive//visualization.png")
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
-
 
                     # Get the target for loss depending on the prediction type
                     if args.prediction_type is not None:
