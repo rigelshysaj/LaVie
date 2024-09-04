@@ -741,8 +741,8 @@ def lora_model(data, video_folder, args, training=True):
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
                     #visualize_attention(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
-
-                    visualize_attention_maps(attention_weights, tokenizer, description, save_path=f"/content/drive/My Drive//visualization_{step}_{global_step}.png")
+                    path = f"/content/drive/My Drive//visualization_{step}_{global_step}.png"
+                    visualize_attention_maps(attention_weights, tokenizer, description, save_path=path)
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
                     # Get the target for loss depending on the prediction type
