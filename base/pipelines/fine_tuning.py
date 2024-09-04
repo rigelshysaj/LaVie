@@ -806,10 +806,8 @@ def lora_model(data, video_folder, args, training=True):
                     tokens = tokenizer.convert_ids_to_tokens(text_inputs.input_ids[0])
 
                     # Usiamo attention_weights[0] che ha dimensione [77, 50]
-                    #visualize_attention(attention_weights[0], tokens)
-                    #analyze_dominant_tokens(attention_weights[0], tokens) 
-                    visualize_full_attention_matrix(attention_weights, tokens, 
-                                save_path=f"/content/drive/My Drive/Images/_{step}_{global_step}.png")
+                    visualize_attention(attention_weights[0], tokens)
+                    analyze_dominant_tokens(attention_weights[0], tokens) 
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
                     # Get the target for loss depending on the prediction type
