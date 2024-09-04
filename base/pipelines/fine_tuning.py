@@ -73,7 +73,7 @@ class StableDiffusionPipelineOutput(BaseOutput):
 
 def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
     # Unisci la lista di descrizioni in una singola stringa
-    description = ' '.join(description_list)
+    description = description_list[0]
 
     # Tokenizza la descrizione
     tokens = tokenizer.tokenize(description)
