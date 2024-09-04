@@ -89,6 +89,9 @@ def visualize_attention_maps(attention_weights, tokenizer, description_list, sav
     # Converti in numpy array
     token_importance = token_importance.numpy()
 
+    print(f"token_importance len: {len(token_importance)}")
+    print(f"tokens len: {len(tokens)}")
+
     # Taglia o estendi la lista dei token per corrispondere alla lunghezza di token_importance
     tokens = tokens[:len(token_importance)] + [''] * (len(token_importance) - len(tokens))
 
@@ -758,7 +761,7 @@ def lora_model(data, video_folder, args, training=True):
 
                     #visualize_attention(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
 
-                    visualize_attention_maps(attention_weights, tokenizer, description, save_path="/content/drive/My Drive//visualization.png")
+                    visualize_attention_maps(attention_weights, tokenizer, description, save_path=f"/content/drive/My Drive//visualization_{step}_{global_step}.png")
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
                     # Get the target for loss depending on the prediction type
