@@ -682,6 +682,7 @@ def lora_model(data, video_folder, args, training=True):
                     #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
                     frame_tensor1 = load_and_transform_image("/content/drive/My Drive/lion.webp")
+                    frame_tensor1 = torch.tensor(frame_tensor1).permute(0, 2, 3, 1)
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
                     print(f"frame_tensor1 shape: {frame_tensor1.shape}, dtype: {frame_tensor1.dtype}")
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
