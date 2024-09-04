@@ -73,24 +73,24 @@ class StableDiffusionPipelineOutput(BaseOutput):
 def visualize_attention(image_tensor, attention_weights, save_path=None):
     # Ensure we're working with the correct shapes
     
-    print(f"Initial attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
-    print(f"Image tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
+    #print(f"Initial attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
+    #print(f"Image tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
     
     # Average attention weights across all text tokens
     mean_attention = attention_weights.mean(dim=1)  # Shape: [1, 50]
-    print(f"Mean attention shape: {mean_attention.shape}")
+    #print(f"Mean attention shape: {mean_attention.shape}")
     
     # Reshape attention to match spatial dimensions of the image
     attention_map = mean_attention.reshape(1, 1, 5, 10)  # 50 -> 5x10
-    print(f"Reshaped attention_map shape: {attention_map.shape}")
+    #print(f"Reshaped attention_map shape: {attention_map.shape}")
     
     # Upsample the attention map to match the image size
     attention_map = F.interpolate(attention_map, size=(320, 512), mode='bilinear', align_corners=False)
-    print(f"Upsampled attention_map shape: {attention_map.shape}")
+    #print(f"Upsampled attention_map shape: {attention_map.shape}")
     
     attention_map = attention_map.squeeze()
     attention_map = attention_map.detach().cpu().numpy()
-    print(f"Final attention_map shape: {attention_map.shape}, dtype: {attention_map.dtype}")
+    #print(f"Final attention_map shape: {attention_map.shape}, dtype: {attention_map.dtype}")
     
     # Normalize attention map
     attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())
@@ -663,6 +663,8 @@ def lora_model(data, video_folder, args, training=True):
                     #print(f"description: {list(description)}")
                     # Get the text embedding for conditioning
 
+                    description = "a lion is playing with a ball"
+
                     text_inputs = tokenizer(
                         list(description),
                         padding="max_length",
@@ -679,7 +681,7 @@ def lora_model(data, video_folder, args, training=True):
 
                     #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
-
+                    frame_tensor = load_and_transform_image("/content/drive/My Drive/lion.webp")
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
                     #print(f"Processed image shape: {image_inputs.shape}, dtype: {image_inputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
                     #print(f"Min value: {image_inputs.min()}, Max value: {image_inputs.max()}")
@@ -695,8 +697,8 @@ def lora_model(data, video_folder, args, training=True):
                     text_features = text_features.transpose(0, 1)
                     last_hidden_state = last_hidden_state.transpose(0, 1)
 
-                    encoder_hidden_states, attention_weights = attention_layer(text_features, last_hidden_state, text_features)
-                    print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
+                    encoder_hidden_states, attention_weights = attention_layer(text_features, last_hidden_state, last_hidden_state)
+
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
