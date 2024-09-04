@@ -663,7 +663,11 @@ def lora_model(data, video_folder, args, training=True):
                     #print(f"description: {list(description)}")
                     # Get the text embedding for conditioning
 
-                    description = "a lion is playing with a ball"
+                    description1 = "a lion is playing with a ball"
+                    print(f"description: {description}")
+                    print(f"description1: {description1}")
+                    print(f"type and len of description: {type(description)}, {len(description)}")
+                    print(f"type and len of description1: {type(description1)}, {len(description1)}")
 
                     text_inputs = tokenizer(
                         list(description),
@@ -679,7 +683,7 @@ def lora_model(data, video_folder, args, training=True):
                     )[0]
 
 
-                    print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                    print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #shape: torch.Size([1, 77, 768]), dtype: torch.float16
 
                     frame_tensor1 = load_and_transform_image("/content/drive/My Drive/lion.webp")
                     frame_tensor1 = torch.tensor(frame_tensor1).permute(0, 2, 3, 1)
