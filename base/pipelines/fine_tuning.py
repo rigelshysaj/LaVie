@@ -681,7 +681,9 @@ def lora_model(data, video_folder, args, training=True):
 
                     #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
-                    frame_tensor = load_and_transform_image("/content/drive/My Drive/lion.webp")
+                    frame_tensor1 = load_and_transform_image("/content/drive/My Drive/lion.webp")
+                    print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
+                    print(f"frame_tensor1 shape: {frame_tensor1.shape}, dtype: {frame_tensor1.dtype}")
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
                     #print(f"Processed image shape: {image_inputs.shape}, dtype: {image_inputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
                     #print(f"Min value: {image_inputs.min()}, Max value: {image_inputs.max()}")
@@ -700,7 +702,7 @@ def lora_model(data, video_folder, args, training=True):
                     encoder_hidden_states, attention_weights = attention_layer(text_features, last_hidden_state, last_hidden_state)
 
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
-                    print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
+                    
 
                     visualize_attention(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
