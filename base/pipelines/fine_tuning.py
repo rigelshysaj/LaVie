@@ -679,7 +679,7 @@ def lora_model(data, video_folder, args, training=True):
                     )[0]
 
 
-                    #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                    print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
                     frame_tensor1 = load_and_transform_image("/content/drive/My Drive/lion.webp")
                     frame_tensor1 = torch.tensor(frame_tensor1).permute(0, 2, 3, 1)
