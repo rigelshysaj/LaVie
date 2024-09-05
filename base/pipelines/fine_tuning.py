@@ -71,62 +71,37 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
+def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
+    # Unisci la lista di descrizioni in una singola stringa
+    description = description_list[0]
 
-def visualize_attention(attention_weights, tokens, save_path=None):
-    # Usiamo detach() prima di convertire in NumPy
-    att_map = attention_weights.detach().cpu().numpy()
+    # Tokenizza la descrizione
+    tokens = tokenizer.tokenize(description)
     
-    plt.figure(figsize=(20, 10))
-    sns.heatmap(att_map, yticklabels=tokens, xticklabels=False, cmap='viridis')
-    plt.title("Attention Map")
-    plt.ylabel("Tokens")
-    plt.xlabel("Image Features")
+    # Estrai i pesi di attenzione e calcola la media per ogni token
+    attention_weights = attention_weights.squeeze(0)  # Rimuovi la dimensione del batch
     
-    if save_path:
-        images_folder = os.path.join(os.path.dirname(save_path), 'Images')
-        os.makedirs(images_folder, exist_ok=True)
-        file_name = os.path.basename(save_path)
-        new_save_path = os.path.join(images_folder, file_name)
-        plt.savefig(new_save_path)
-        print(f"Visualization saved to {new_save_path}")
-    else:
-        plt.show()
+    # Sposta il tensor sulla CPU se è su CUDA e staccalo dal grafo computazionale
+    attention_weights = attention_weights.detach().cpu()
     
-    plt.close()
-
-def analyze_dominant_tokens(attention_weights, tokens, save_path=None):
-    # Usiamo detach() prima di calcolare la media e convertire in NumPy
-    token_importance = attention_weights.detach().mean(dim=1).cpu().numpy()
-    sorted_indices = np.argsort(token_importance)[::-1]
-    
-    results = "Token dominanti:\n"
-    for idx in sorted_indices[:10]:
-        results += f"{tokens[idx]}: {token_importance[idx]:.4f}\n"
-    
-    print(results)
-    
-    if save_path:
-        results_folder = os.path.join(os.path.dirname(save_path), 'Results')
-        os.makedirs(results_folder, exist_ok=True)
-        file_name = os.path.basename(save_path).replace('.png', '.txt')
-        new_save_path = os.path.join(results_folder, file_name)
-        
-        with open(new_save_path, 'w') as f:
-            f.write(results)
-        print(f"Analysis results saved to {new_save_path}")
-
-def visualize_attention_maps(attention_weights, tokens, save_path=None):
-    attention_weights = attention_weights.squeeze().detach().cpu()
     token_importance = attention_weights.mean(dim=1)  # Media su tutte le patch dell'immagine
     
-    # Taglia token_importance per corrispondere alla lunghezza effettiva dei token
-    token_importance = token_importance[:len(tokens)]
+    # Converti in numpy array
+    token_importance = token_importance.numpy()
+
+    print(f"token_importance len: {len(token_importance)}")
+    print(f"tokens len: {len(tokens)}")
+
+    # Taglia o estendi la lista dei token per corrispondere alla lunghezza di token_importance
+    tokens = tokens[:len(token_importance)] + [''] * (len(token_importance) - len(tokens))
 
     # Funzione per salvare o mostrare il plot
     def save_or_show_plot(plt, name):
         if save_path:
+            # Create 'Images' folder if it doesn't exist
             images_folder = os.path.join(os.path.dirname(save_path), 'Images')
             os.makedirs(images_folder, exist_ok=True)
+            # Update save_path to use the 'Images' folder
             file_name = f"{os.path.splitext(os.path.basename(save_path))[0]}_{name}.png"
             new_save_path = os.path.join(images_folder, file_name)
             plt.savefig(new_save_path)
@@ -136,7 +111,7 @@ def visualize_attention_maps(attention_weights, tokens, save_path=None):
 
     # Crea una heatmap
     plt.figure(figsize=(12, 8))
-    sns.heatmap(token_importance.unsqueeze(0).numpy(), annot=False, cmap='viridis', xticklabels=tokens)
+    sns.heatmap(token_importance.reshape(1, -1), annot=False, cmap='viridis', xticklabels=tokens)
     plt.title('Token Importance Heatmap')
     plt.xlabel('Tokens')
     plt.ylabel('Importance')
@@ -145,7 +120,7 @@ def visualize_attention_maps(attention_weights, tokens, save_path=None):
 
     # Crea un grafico a barre
     plt.figure(figsize=(12, 8))
-    plt.bar(range(len(token_importance)), token_importance.numpy())
+    plt.bar(range(len(token_importance)), token_importance)
     plt.title('Token Importance Bar Chart')
     plt.xlabel('Tokens')
     plt.ylabel('Importance')
@@ -154,7 +129,7 @@ def visualize_attention_maps(attention_weights, tokens, save_path=None):
     save_or_show_plot(plt, "barchart")
     plt.close()
 
-def visualize_attention_(image_tensor, attention_weights, save_path=None):
+def visualize_attention(image_tensor, attention_weights, save_path=None):
     # Ensure we're working with the correct shapes
     
     #print(f"Initial attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
@@ -784,14 +759,9 @@ def lora_model(data, video_folder, args, training=True):
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
 
-                    #visualize_attention_(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
-                    path = f"/content/drive/My Drive//visualization_{step}_{global_step}.png"
-                    #visualize_attention_maps(attention_weights, description, save_path=path)
-                    tokens = tokenizer.convert_ids_to_tokens(text_inputs.input_ids[0])
+                    #visualize_attention(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
 
-                    # Usiamo attention_weights[0] che ha dimensione [77, 50]
-                    visualize_attention(attention_weights[0], tokens, f"/content/drive/My Drive//visualization_{step}_{global_step}.png")
-                    analyze_dominant_tokens(attention_weights[0], tokens, f"/content/drive/My Drive//analysis_{step}_{global_step}.png") 
+                    visualize_attention_maps(attention_weights, tokenizer, description, save_path=f"/content/drive/My Drive//visualization_{step}_{global_step}.png")
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
                     # Get the target for loss depending on the prediction type
