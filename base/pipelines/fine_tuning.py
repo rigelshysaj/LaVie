@@ -72,58 +72,60 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
-    # Unisci la lista di descrizioni in una singola stringa
     description = description_list[0]
-
-    # Tokenizza la descrizione
     tokens = tokenizer.tokenize(description)
     
-    # Estrai i pesi di attenzione e calcola la media per ogni token
-    attention_weights = attention_weights.squeeze(0)  # Rimuovi la dimensione del batch
+    # Converti in numpy e applica softmax
+    attention_weights = F.softmax(attention_weights, dim=-1).squeeze(0).cpu().numpy()
     
-    # Sposta il tensor sulla CPU se è su CUDA e staccalo dal grafo computazionale
-    attention_weights = attention_weights.detach().cpu()
+    # Calcola la deviazione dalla media per ogni riga
+    mean_weights = np.mean(attention_weights, axis=1, keepdims=True)
+    attention_diff = attention_weights - mean_weights
     
-    token_importance = attention_weights.mean(dim=1)  # Media su tutte le patch dell'immagine
-    
-    # Converti in numpy array
-    token_importance = token_importance.numpy()
-
-    print(f"token_importance len: {len(token_importance)}")
+    print(f"attention_weights shape: {attention_weights.shape}")
     print(f"tokens len: {len(tokens)}")
-
-    # Taglia o estendi la lista dei token per corrispondere alla lunghezza di token_importance
-    tokens = tokens[:len(token_importance)] + [''] * (len(token_importance) - len(tokens))
-
-    # Funzione per salvare o mostrare il plot
+    
+    tokens = tokens[:attention_weights.shape[0]] + [''] * (attention_weights.shape[0] - len(tokens))
+    
+    # Funzione interna per salvare o mostrare il plot
     def save_or_show_plot(plt, name):
         if save_path:
-            # Create 'Images' folder if it doesn't exist
+            # Crea la cartella 'Images' se non esiste
             images_folder = os.path.join(os.path.dirname(save_path), 'Images')
             os.makedirs(images_folder, exist_ok=True)
-            # Update save_path to use the 'Images' folder
+            # Aggiorna save_path per usare la cartella 'Images'
             file_name = f"{os.path.splitext(os.path.basename(save_path))[0]}_{name}.png"
             new_save_path = os.path.join(images_folder, file_name)
             plt.savefig(new_save_path)
             print(f"Visualization saved to {new_save_path}")
         else:
             plt.show()
-
-    # Crea una heatmap
-    plt.figure(figsize=(12, 8))
-    sns.heatmap(token_importance.reshape(1, -1), annot=False, cmap='viridis', xticklabels=tokens)
-    plt.title('Token Importance Heatmap')
+    
+    # Heatmap con scala logaritmica
+    plt.figure(figsize=(20, 16))
+    sns.heatmap(np.log1p(attention_weights), annot=False, cmap='viridis', xticklabels=tokens, yticklabels=tokens)
+    plt.title('Token Attention Heatmap (Log Scale)')
     plt.xlabel('Tokens')
-    plt.ylabel('Importance')
-    save_or_show_plot(plt, "heatmap")
+    plt.ylabel('Tokens')
+    save_or_show_plot(plt, "heatmap_log")
     plt.close()
-
-    # Crea un grafico a barre
-    plt.figure(figsize=(12, 8))
-    plt.bar(range(len(token_importance)), token_importance)
-    plt.title('Token Importance Bar Chart')
+    
+    # Heatmap delle differenze
+    plt.figure(figsize=(20, 16))
+    sns.heatmap(attention_diff, annot=False, cmap='coolwarm', center=0, xticklabels=tokens, yticklabels=tokens)
+    plt.title('Token Attention Difference from Mean')
     plt.xlabel('Tokens')
-    plt.ylabel('Importance')
+    plt.ylabel('Tokens')
+    save_or_show_plot(plt, "heatmap_diff")
+    plt.close()
+    
+    # Grafico a barre dell'importanza media dei token
+    token_importance = attention_weights.mean(axis=1)
+    plt.figure(figsize=(20, 8))
+    plt.bar(range(len(token_importance)), token_importance)
+    plt.title('Average Token Importance')
+    plt.xlabel('Tokens')
+    plt.ylabel('Average Attention')
     plt.xticks(range(len(token_importance)), tokens, rotation=90)
     plt.tight_layout()
     save_or_show_plot(plt, "barchart")
