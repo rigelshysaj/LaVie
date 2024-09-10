@@ -75,8 +75,8 @@ def visualize_attention_maps(attention_weights, tokenizer, description_list, sav
     description = description_list[0]
     tokens = tokenizer.tokenize(description)
     
-    # Converti in numpy e applica softmax
-    attention_weights = F.softmax(attention_weights, dim=-1).squeeze(0).cpu().numpy()
+    # Stacca il tensor dal grafo computazionale, applica softmax, e converti in numpy
+    attention_weights = F.softmax(attention_weights.detach(), dim=-1).squeeze(0).cpu().numpy()
     
     # Calcola la deviazione dalla media per ogni riga
     mean_weights = np.mean(attention_weights, axis=1, keepdims=True)
