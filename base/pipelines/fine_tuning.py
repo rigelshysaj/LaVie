@@ -761,12 +761,11 @@ def lora_model(data, video_folder, args, training=True):
 
                     # Stampa i pesi di attenzione grezzi
                     print("Raw attention weights shape:", attention_weights.shape)
-                    print("Sample of raw weights:", attention_weights[0, 0, :5, :5])  # Primi 5x5 pesi della prima testa
+                    print("Sample of raw weights:", attention_weights[0, :5, :5])  # Primi 5x5 pesi
 
-                    # Calcola la media su tutte le teste di attenzione
-                    avg_attention = attention_weights.mean(dim=1)
-                    print("Average attention shape:", avg_attention.shape)
-                    print("Sample of average weights:", avg_attention[0, :5, :5])  # Primi 5x5 pesi medi
+                    # Non c'è bisogno di calcolare la media sulle teste, poiché non abbiamo una dimensione separata per le teste
+                    print("Attention weights shape:", attention_weights.shape)
+                    print("Sample of weights:", attention_weights[0, :5, :5])  # Primi 5x5 pesi
 
                     #visualize_attention(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
 
