@@ -723,12 +723,12 @@ def lora_model(data, video_folder, args, training=True):
                     # Get the text embedding for conditioning
 
                     text_inputs = tokenizer(
-                        list(description),
-                        padding="max_length",
-                        max_length=tokenizer.model_max_length,
-                        truncation=True,
-                        return_tensors="pt"
+                        list(description),     # Lista con il testo
+                        padding=False,         # Disabilita il padding
+                        truncation=False,      # Nessuna troncatura automatica
+                        return_tensors="pt"    # Ritorna tensori PyTorch
                     ).to(unet.device)
+
 
                     text_features = text_encoder(
                         text_inputs.input_ids,
@@ -736,7 +736,7 @@ def lora_model(data, video_folder, args, training=True):
                     )[0]
 
 
-                    #print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                    print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
 
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
@@ -758,9 +758,6 @@ def lora_model(data, video_folder, args, training=True):
 
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
-
-                    # Stampa i pesi di attenzione grezzi
-                    print("Raw attention weights shape:", attention_weights.shape)
                     print("Sample of raw weights:", attention_weights[0, :5, :5])  # Primi 5x5 pesi
 
                     #visualize_attention(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
