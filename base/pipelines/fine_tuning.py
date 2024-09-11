@@ -74,41 +74,41 @@ class StableDiffusionPipelineOutput(BaseOutput):
 def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
     # Unisci la lista di descrizioni in una singola stringa
     description = description_list[0]
-
+    print(f"attention_weights shape: {attention_weights.shape}")
+    print(f"attention_weights dtype: {attention_weights.dtype}")
+    
     # Tokenizza la descrizione
     tokens = tokenizer.tokenize(description)
     
-    # Estrai i pesi di attenzione e calcola la media per ogni token
-    attention_weights = attention_weights.squeeze(0)  # Rimuovi la dimensione del batch
+    # Estrai i pesi di attenzione e calcola la media
+    attention_weights = attention_weights.squeeze().detach().cpu().numpy()
     
-    # Sposta il tensor sulla CPU se è su CUDA e staccalo dal grafo computazionale
-    attention_weights = attention_weights.detach().cpu()
+    # Se attention_weights è 4D, calcola la media sulle dimensioni appropriate
+    if attention_weights.ndim == 4:
+        token_importance = attention_weights.mean(axis=(1, 2, 3))
+    elif attention_weights.ndim == 3:
+        token_importance = attention_weights.mean(axis=(1, 2))
+    else:
+        token_importance = attention_weights.mean(axis=1)
     
-    token_importance = attention_weights.mean(dim=1)  # Media su tutte le patch dell'immagine
-    
-    # Converti in numpy array
-    token_importance = token_importance.numpy()
-
-    print(f"token_importance len: {len(token_importance)}")
+    print(f"token_importance shape: {token_importance.shape}")
     print(f"tokens len: {len(tokens)}")
-
-    # Taglia o estendi la lista dei token per corrispondere alla lunghezza di token_importance
-    tokens = tokens[:len(token_importance)] + [''] * (len(token_importance) - len(tokens))
-
+    
+    # Assicurati che ci siano abbastanza token
+    tokens = tokens[:len(token_importance)] + [''] * max(0, len(token_importance) - len(tokens))
+    
     # Funzione per salvare o mostrare il plot
     def save_or_show_plot(plt, name):
         if save_path:
-            # Create 'Images' folder if it doesn't exist
             images_folder = os.path.join(os.path.dirname(save_path), 'Images')
             os.makedirs(images_folder, exist_ok=True)
-            # Update save_path to use the 'Images' folder
             file_name = f"{os.path.splitext(os.path.basename(save_path))[0]}_{name}.png"
             new_save_path = os.path.join(images_folder, file_name)
             plt.savefig(new_save_path)
             print(f"Visualization saved to {new_save_path}")
         else:
             plt.show()
-
+    
     # Crea una heatmap
     plt.figure(figsize=(12, 8))
     sns.heatmap(token_importance.reshape(1, -1), annot=False, cmap='viridis', xticklabels=tokens)
@@ -117,7 +117,7 @@ def visualize_attention_maps(attention_weights, tokenizer, description_list, sav
     plt.ylabel('Importance')
     save_or_show_plot(plt, "heatmap")
     plt.close()
-
+    
     # Crea un grafico a barre
     plt.figure(figsize=(12, 8))
     plt.bar(range(len(token_importance)), token_importance)
