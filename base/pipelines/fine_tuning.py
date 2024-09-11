@@ -775,7 +775,7 @@ def lora_model(data, video_folder, args, training=True):
                     text_features = text_features.transpose(0, 1)
                     last_hidden_state = last_hidden_state.transpose(0, 1)
 
-                    encoder_hidden_states, attention_weights = attention_layer(text_features, text_features, text_features)
+                    encoder_hidden_states, attention_weights = attention_layer(text_features)
 
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
