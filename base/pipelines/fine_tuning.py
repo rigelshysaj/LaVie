@@ -198,11 +198,32 @@ def visualize_attention(image_tensor, attention_weights, save_path=None):
 class AttentionWithVisualization(nn.Module):
     def __init__(self, embed_dim, num_heads):
         super().__init__()
-        self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads)
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
         
-    def forward(self, query, key, value):
-        attn_output, attn_output_weights = self.attention(query, key, value)
-        return attn_output, attn_output_weights
+        self.q_linear = nn.Linear(embed_dim, embed_dim)
+        self.k_linear = nn.Linear(embed_dim, embed_dim)
+        self.v_linear = nn.Linear(embed_dim, embed_dim)
+        
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+        
+    def forward(self, x):
+        batch_size, seq_len, _ = x.size()
+        
+        q = self.q_linear(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        k = self.k_linear(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        v = self.v_linear(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        
+        scores = torch.matmul(q, k.transpose(-2, -1)) / torch.sqrt(torch.tensor(self.head_dim, dtype=torch.float32))
+        attn_weights = F.softmax(scores, dim=-1)
+        
+        context = torch.matmul(attn_weights, v)
+        context = context.transpose(1, 2).contiguous().view(batch_size, seq_len, self.embed_dim)
+        
+        output = self.out_proj(context)
+        
+        return output, attn_weights
 
 
 def load_and_transform_image(path):
@@ -754,7 +775,7 @@ def lora_model(data, video_folder, args, training=True):
                     text_features = text_features.transpose(0, 1)
                     last_hidden_state = last_hidden_state.transpose(0, 1)
 
-                    encoder_hidden_states, attention_weights = attention_layer(text_features, text_features, text_features).to(torch.float32)
+                    encoder_hidden_states, attention_weights = attention_layer(text_features, text_features, text_features)
 
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
