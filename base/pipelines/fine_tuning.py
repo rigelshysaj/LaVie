@@ -750,7 +750,7 @@ def lora_model(data, video_folder, args, training=True):
                         return_dict=True
                     )
 
-                    print(f"image_outputs shape: {image_outputs.shape}, dtype: {image_outputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
+                    #print(f"image_outputs shape: {image_outputs.shape}, dtype: {image_outputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
 
 
                     image_features = image_outputs.last_hidden_state  # Shape: (batch_size, num_patches, hidden_size)
