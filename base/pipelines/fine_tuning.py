@@ -732,7 +732,7 @@ def lora_model(data, video_folder, args, training=True):
                     text_features = text_encoder_outputs.last_hidden_state  # [batch_size, seq_length, embed_dim]
                     print(f" text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
                     attentions = text_encoder_outputs.attentions
-                    print(f" attentions shape: {attentions.shape}, dtype: {attentions.dtype}")
+                    #print(f" attentions shape: {attentions.shape}, dtype: {attentions.dtype}")
                     # Stack attentions over layers
                     attentions = torch.stack(attentions)  # [num_layers, batch_size, num_heads, seq_length, seq_length]
                     print(f" attentions11 shape: {attentions.shape}, dtype: {attentions.dtype}")
