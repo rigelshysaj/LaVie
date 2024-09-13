@@ -727,18 +727,18 @@ def lora_model(data, video_folder, args, training=True):
                     ).to(unet.device)
 
                     # Estrai le caratteristiche di testo dal modello CLIP
-                    text_outputs = clip_model.text_model(
+                    text_outputs = text_encoder(
                         input_ids=text_inputs.input_ids,
                         attention_mask=text_inputs.attention_mask,
                         output_hidden_states=True,
                         return_dict=True
-                    )
+                    )[0]
 
-                    #print(f"train_lora_model text_outputs shape: {text_outputs.shape}, dtype: {text_outputs.dtype}") #[1, 10, 768] torch.float16
+                    print(f"train_lora_model text_outputs shape: {text_outputs.shape}, dtype: {text_outputs.dtype}") #[1, 10, 768] torch.float16
 
                     text_features = text_outputs.last_hidden_state 
 
-                    print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                    print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
 
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
