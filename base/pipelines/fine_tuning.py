@@ -680,9 +680,16 @@ def lora_model(data, video_folder, args, training=True):
 
                     video, description, frame_tensor = batch
 
+                    print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
+                    
+                    print(f"frame_tensor111111 shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
+                    
                     try:
                         description[0]
                     except Exception as e:
+                        print("------------------START--------------------")
+                        print(description)
+                        print("------------------END--------------------")
                         continue
                     
 
@@ -715,63 +722,68 @@ def lora_model(data, video_folder, args, training=True):
                     #print(f"description: {list(description)}")
                     # Get the text embedding for conditioning
 
+                    
+                    # Prepara gli input di testo
                     text_inputs = tokenizer(
-                        list(description),     # Lista con il testo
-                        padding=False,         # Disabilita il padding
-                        truncation=False,      # Nessuna troncatura automatica
-                        return_tensors="pt"    # Ritorna tensori PyTorch
+                        list(description),
+                        padding=True,
+                        truncation=True,
+                        return_tensors="pt"
                     ).to(unet.device)
 
-
-                    text_encoder_outputs = text_encoder(
-                        text_inputs.input_ids,
-                        output_attentions=True,
+                    # Estrai le caratteristiche di testo dal modello CLIP
+                    text_outputs = clip_model.text_model(
+                        input_ids=text_inputs.input_ids,
+                        attention_mask=text_inputs.attention_mask,
+                        output_hidden_states=True,
                         return_dict=True
                     )
 
-                    text_features = text_encoder_outputs.last_hidden_state  # [batch_size, seq_length, embed_dim]
-                    print(f" text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
-                    attentions = text_encoder_outputs.attentions
-                    #print(f" attentions shape: {attentions.shape}, dtype: {attentions.dtype}")
-                    # Stack attentions over layers
-                    attentions = torch.stack(attentions)  # [num_layers, batch_size, num_heads, seq_length, seq_length]
-                    print(f" attentions11 shape: {attentions.shape}, dtype: {attentions.dtype}")
+                    print(f"train_lora_model text_outputs shape: {text_outputs.shape}, dtype: {text_outputs.dtype}") #[1, 10, 768] torch.float16
 
-                    # Media su layer e teste
-                    avg_attentions = attentions.mean(dim=[0, 2])  # [batch_size, seq_length, seq_length]
-                    print(f" avg_attentions shape: {avg_attentions.shape}, dtype: {avg_attentions.dtype}")
+                    text_features = text_outputs.last_hidden_state 
 
-                    # Seleziona le auto-attention (attenzione del token su sé stesso)
-                    token_importance = avg_attentions[0].mean(dim=1)
-                    print(f" token_importance shape: {token_importance.shape}, dtype: {token_importance.dtype}")
+                    print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+
 
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
-                    #print(f"Processed image shape: {image_inputs.shape}, dtype: {image_inputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
-                    #print(f"Min value: {image_inputs.min()}, Max value: {image_inputs.max()}")
-                    #print(f"Mean: {image_inputs.mean()}, Std: {image_inputs.std()}")
+                    print(f"image_inputs shape: {image_inputs.shape}, dtype: {image_inputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
 
-                    outputs = clip_model.vision_model(image_inputs, output_hidden_states=True)
-                    #last_hidden_state = outputs.hidden_states[-1].to(torch.float16)
-                    last_hidden_state = outputs.last_hidden_state.to(torch.float16)
+                    image_outputs = clip_model.vision_model(
+                        pixel_values=image_inputs,
+                        output_hidden_states=True,
+                        return_dict=True
+                    )
 
-                    #print(f"train_lora_model last_hidden_state shape: {last_hidden_state.shape}, dtype: {last_hidden_state.dtype}") #[1, 50, 768] torch.float16
-                    
-                    
-                    text_features = text_features.transpose(0, 1)
-                    last_hidden_state = last_hidden_state.transpose(0, 1)
+                    print(f"image_outputs shape: {image_outputs.shape}, dtype: {image_outputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
 
-                    encoder_hidden_states, attention_weights = attention_layer(text_features, text_features, text_features)
 
-                    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
-                    print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
-                    print("Sample of raw weights:", attention_weights[0, :5, :5])  # Primi 5x5 pesi
+                    image_features = image_outputs.last_hidden_state  # Shape: (batch_size, num_patches, hidden_size)
+                    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") 
 
-                    #visualize_attention(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
+                    # Trasponi per adattare le dimensioni attese dall'attenzione
+                    text_features = text_features.transpose(0, 1)  # Shape: (sequence_length, batch_size, hidden_size)
+                    image_features = image_features.transpose(0, 1)
 
-                    visualize_attention_maps(token_importance, tokenizer, description, save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png")
+                    # Applica la cross-attention
+                    encoder_hidden_states, attention_weights = attention_layer(
+                        query=text_features,
+                        key=image_features,
+                        value=image_features
+                    )
+
+                    print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
+                    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
+
+                    # Visualizza le mappe di attenzione
+                    visualize_attention_maps(
+                        attention_weights,
+                        tokenizer,
+                        description,
+                        save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png"
+                    )
 
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
-
 
                     # Get the target for loss depending on the prediction type
                     if args.prediction_type is not None:
