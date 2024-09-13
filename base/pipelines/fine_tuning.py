@@ -734,7 +734,7 @@ def lora_model(data, video_folder, args, training=True):
                         return_dict=True
                     )
 
-                    print(f"train_lora_model text_outputs shape: {text_outputs.shape}, dtype: {text_outputs.dtype}") #[1, 10, 768] torch.float16
+                    #print(f"train_lora_model text_outputs shape: {text_outputs.shape}, dtype: {text_outputs.dtype}") #[1, 10, 768] torch.float16
 
                     text_features = text_outputs.last_hidden_state 
 
