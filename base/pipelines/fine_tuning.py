@@ -72,28 +72,32 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
-    # Unisci la lista di descrizioni in una singola stringa
+    # Assumi che batch_size sia 1
     description = description_list[0]
 
-    # Tokenizza la descrizione
+    # Ottieni i token IDs e convertili in token
     tokens = tokenizer.tokenize(description)
-    
+    tokens = [token.replace('Ġ', '') for token in tokens]  # Rimuovi caratteri speciali se presenti
+
     # Estrai i pesi di attenzione e calcola la media per ogni token
     attention_weights = attention_weights.squeeze(0)  # Rimuovi la dimensione del batch
-    
-    # Sposta il tensor sulla CPU se è su CUDA e staccalo dal grafo computazionale
+
+    # Sposta il tensor sulla CPU e staccalo dal grafo computazionale
     attention_weights = attention_weights.detach().cpu()
-    
+
+    attention_weights = attention_weights.mean(dim=1)  # Media su tutte le teste
     token_importance = attention_weights.mean(dim=1)  # Media su tutte le patch dell'immagine
-    
+
     # Converti in numpy array
     token_importance = token_importance.numpy()
 
     print(f"token_importance len: {len(token_importance)}")
     print(f"tokens len: {len(tokens)}")
 
-    # Taglia o estendi la lista dei token per corrispondere alla lunghezza di token_importance
-    tokens = tokens[:len(token_importance)] + [''] * (len(token_importance) - len(tokens))
+    # Assicurati che la lunghezza dei token corrisponda alla lunghezza di token_importance
+    min_len = min(len(tokens), len(token_importance))
+    tokens = tokens[:min_len]
+    token_importance = token_importance[:min_len]
 
     # Funzione per salvare o mostrare il plot
     def save_or_show_plot(plt, name):
@@ -108,15 +112,6 @@ def visualize_attention_maps(attention_weights, tokenizer, description_list, sav
             print(f"Visualization saved to {new_save_path}")
         else:
             plt.show()
-
-    # Crea una heatmap
-    plt.figure(figsize=(12, 8))
-    sns.heatmap(token_importance.reshape(1, -1), annot=False, cmap='viridis', xticklabels=tokens)
-    plt.title('Token Importance Heatmap')
-    plt.xlabel('Tokens')
-    plt.ylabel('Importance')
-    save_or_show_plot(plt, "heatmap")
-    plt.close()
 
     # Crea un grafico a barre
     plt.figure(figsize=(12, 8))
