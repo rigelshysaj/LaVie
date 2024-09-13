@@ -74,41 +74,41 @@ class StableDiffusionPipelineOutput(BaseOutput):
 def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
     # Unisci la lista di descrizioni in una singola stringa
     description = description_list[0]
-    print(f"attention_weights shape: {attention_weights.shape}")
-    print(f"attention_weights dtype: {attention_weights.dtype}")
-    
+
     # Tokenizza la descrizione
     tokens = tokenizer.tokenize(description)
     
-    # Estrai i pesi di attenzione e calcola la media
-    attention_weights = attention_weights.squeeze().detach().cpu().numpy()
+    # Estrai i pesi di attenzione e calcola la media per ogni token
+    attention_weights = attention_weights.squeeze(0)  # Rimuovi la dimensione del batch
     
-    # Se attention_weights è 4D, calcola la media sulle dimensioni appropriate
-    if attention_weights.ndim == 4:
-        token_importance = attention_weights.mean(axis=(1, 2, 3))
-    elif attention_weights.ndim == 3:
-        token_importance = attention_weights.mean(axis=(1, 2))
-    else:
-        token_importance = attention_weights.mean(axis=1)
+    # Sposta il tensor sulla CPU se è su CUDA e staccalo dal grafo computazionale
+    attention_weights = attention_weights.detach().cpu()
     
-    print(f"token_importance shape: {token_importance.shape}")
+    token_importance = attention_weights.mean(dim=1)  # Media su tutte le patch dell'immagine
+    
+    # Converti in numpy array
+    token_importance = token_importance.numpy()
+
+    print(f"token_importance len: {len(token_importance)}")
     print(f"tokens len: {len(tokens)}")
-    
-    # Assicurati che ci siano abbastanza token
-    tokens = tokens[:len(token_importance)] + [''] * max(0, len(token_importance) - len(tokens))
-    
+
+    # Taglia o estendi la lista dei token per corrispondere alla lunghezza di token_importance
+    tokens = tokens[:len(token_importance)] + [''] * (len(token_importance) - len(tokens))
+
     # Funzione per salvare o mostrare il plot
     def save_or_show_plot(plt, name):
         if save_path:
+            # Create 'Images' folder if it doesn't exist
             images_folder = os.path.join(os.path.dirname(save_path), 'Images')
             os.makedirs(images_folder, exist_ok=True)
+            # Update save_path to use the 'Images' folder
             file_name = f"{os.path.splitext(os.path.basename(save_path))[0]}_{name}.png"
             new_save_path = os.path.join(images_folder, file_name)
             plt.savefig(new_save_path)
             print(f"Visualization saved to {new_save_path}")
         else:
             plt.show()
-    
+
     # Crea una heatmap
     plt.figure(figsize=(12, 8))
     sns.heatmap(token_importance.reshape(1, -1), annot=False, cmap='viridis', xticklabels=tokens)
@@ -117,7 +117,7 @@ def visualize_attention_maps(attention_weights, tokenizer, description_list, sav
     plt.ylabel('Importance')
     save_or_show_plot(plt, "heatmap")
     plt.close()
-    
+
     # Crea un grafico a barre
     plt.figure(figsize=(12, 8))
     plt.bar(range(len(token_importance)), token_importance)
@@ -198,32 +198,11 @@ def visualize_attention(image_tensor, attention_weights, save_path=None):
 class AttentionWithVisualization(nn.Module):
     def __init__(self, embed_dim, num_heads):
         super().__init__()
-        self.embed_dim = embed_dim
-        self.num_heads = num_heads
-        self.head_dim = embed_dim // num_heads
+        self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads)
         
-        self.q_linear = nn.Linear(embed_dim, embed_dim)
-        self.k_linear = nn.Linear(embed_dim, embed_dim)
-        self.v_linear = nn.Linear(embed_dim, embed_dim)
-        
-        self.out_proj = nn.Linear(embed_dim, embed_dim)
-        
-    def forward(self, x):
-        batch_size, seq_len, _ = x.size()
-        
-        q = self.q_linear(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        k = self.k_linear(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        v = self.v_linear(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        
-        scores = torch.matmul(q, k.transpose(-2, -1)) / torch.sqrt(torch.tensor(self.head_dim, dtype=torch.float32))
-        attn_weights = F.softmax(scores, dim=-1)
-        
-        context = torch.matmul(attn_weights, v)
-        context = context.transpose(1, 2).contiguous().view(batch_size, seq_len, self.embed_dim)
-        
-        output = self.out_proj(context)
-        
-        return output, attn_weights
+    def forward(self, query, key, value):
+        attn_output, attn_output_weights = self.attention(query, key, value)
+        return attn_output, attn_output_weights
 
 
 def load_and_transform_image(path):
@@ -701,16 +680,9 @@ def lora_model(data, video_folder, args, training=True):
 
                     video, description, frame_tensor = batch
 
-                    #print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
-                    
-                    #print(f"frame_tensor111111 shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
-                    
                     try:
                         description[0]
                     except Exception as e:
-                        print("------------------START--------------------")
-                        print(description)
-                        print("------------------END--------------------")
                         continue
                     
 
@@ -751,14 +723,27 @@ def lora_model(data, video_folder, args, training=True):
                     ).to(unet.device)
 
 
-                    text_features = text_encoder(
+                    text_encoder_outputs = text_encoder(
                         text_inputs.input_ids,
-                        return_dict=False
-                    )[0]
+                        output_attentions=True,
+                        return_dict=True
+                    )
 
+                    text_features = text_encoder_outputs.last_hidden_state  # [batch_size, seq_length, embed_dim]
+                    print(f" text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
+                    attentions = text_encoder_outputs.attentions
+                    print(f" attentions shape: {attentions.shape}, dtype: {attentions.dtype}")
+                    # Stack attentions over layers
+                    attentions = torch.stack(attentions)  # [num_layers, batch_size, num_heads, seq_length, seq_length]
+                    print(f" attentions11 shape: {attentions.shape}, dtype: {attentions.dtype}")
 
-                    print(f"train_lora_model text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                    # Media su layer e teste
+                    avg_attentions = attentions.mean(dim=[0, 2])  # [batch_size, seq_length, seq_length]
+                    print(f" avg_attentions shape: {avg_attentions.shape}, dtype: {avg_attentions.dtype}")
 
+                    # Seleziona le auto-attention (attenzione del token su sé stesso)
+                    token_importance = avg_attentions[0].mean(dim=1)
+                    print(f" token_importance shape: {token_importance.shape}, dtype: {token_importance.dtype}")
 
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
                     #print(f"Processed image shape: {image_inputs.shape}, dtype: {image_inputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
@@ -775,7 +760,7 @@ def lora_model(data, video_folder, args, training=True):
                     text_features = text_features.transpose(0, 1)
                     last_hidden_state = last_hidden_state.transpose(0, 1)
 
-                    encoder_hidden_states, attention_weights = attention_layer(text_features)
+                    encoder_hidden_states, attention_weights = attention_layer(text_features, text_features, text_features)
 
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
                     print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
@@ -783,8 +768,10 @@ def lora_model(data, video_folder, args, training=True):
 
                     #visualize_attention(frame_tensor, attention_weights, f'/content/drive/My Drive/attention_visualization_{step}_{global_step}.png')
 
-                    visualize_attention_maps(attention_weights, tokenizer, description, save_path=f"/content/drive/My Drive//visualization_{step}_{global_step}.png")
+                    visualize_attention_maps(token_importance, tokenizer, description, save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png")
+
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
+
 
                     # Get the target for loss depending on the prediction type
                     if args.prediction_type is not None:
