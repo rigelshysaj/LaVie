@@ -628,10 +628,6 @@ def lora_model(data, video_folder, args, training=True):
 
     if(training):
 
-        # Definisci il layer di proiezione per l'immagine
-        projection = nn.Linear(512, 768).to(device).to(torch.float16)
-
-
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
             attention_layer.train()
@@ -690,16 +686,15 @@ def lora_model(data, video_folder, args, training=True):
                     ).to(unet.device)
 
                     # Estrai le caratteristiche di testo dal modello CLIP
-                    text_outputs = clip_model.text_model(
+                    text_features = text_encoder(
                         input_ids=text_inputs.input_ids,
                         attention_mask=text_inputs.attention_mask,
                         output_hidden_states=True,
                         return_dict=True
-                    )
-                    text_features = text_outputs.last_hidden_state
+                    ).last_hidden_state 
 
 
-                    #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                    print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
 
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
@@ -718,8 +713,6 @@ def lora_model(data, video_folder, args, training=True):
                     image_features=image_features.to(torch.float16)
                     text_features=text_features.to(torch.float16)
                     #print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
-
-                    text_features = projection(text_features) 
 
                     # Trasponi per adattare le dimensioni attese dall'attenzione
                     text_features = text_features.transpose(0, 1)  # Shape: (sequence_length, batch_size, hidden_size)
