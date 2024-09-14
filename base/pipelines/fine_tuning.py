@@ -672,7 +672,7 @@ def lora_model(data, video_folder, args, training=True):
     if(training):
 
         # Definisci il layer di proiezione per l'immagine
-        projection = nn.Linear(512, 768).to(device).to(torch.float32)
+        projection = nn.Linear(512, 768).to(device).to(torch.float16)
 
 
         for epoch in range(first_epoch, args.num_train_epochs):
@@ -762,6 +762,7 @@ def lora_model(data, video_folder, args, training=True):
 
                     image_features = image_outputs.last_hidden_state  # Shape: (batch_size, num_patches, hidden_size)
                     image_features=image_features.to(torch.float16)
+                    text_features=text_features.to(torch.float16)
                     print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") 
 
                     # Trasponi per adattare le dimensioni attese dall'attenzione
