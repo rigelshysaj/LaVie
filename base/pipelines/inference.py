@@ -301,6 +301,8 @@ class VideoGenPipeline(DiffusionPipeline):
         prompt_embeds = prompt_embeds.repeat(1, num_images_per_prompt, 1)
         prompt_embeds = prompt_embeds.view(bs_embed * num_images_per_prompt, seq_len, -1)
 
+        prompt_embeds = projection(prompt_embeds)
+
         if input_image is not None:
             # Process the image with CLIP
             image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
@@ -310,13 +312,10 @@ class VideoGenPipeline(DiffusionPipeline):
             print(f"inference image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
             print(f"inference prompt_embeds shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
-            prompt_embeds = projection(prompt_embeds)
-
             # Transpose dimensions for attention: (batch_size, seq_len, embed_dim) -> (seq_len, batch_size, embed_dim)
             prompt_embeds_t = prompt_embeds.transpose(0, 1)
             image_features_t = image_features.transpose(0, 1)
 
-            print(f"inference prompt_embeds shape: {prompt_embeds_t.shape}, dtype: {prompt_embeds_t.dtype}")
 
             # Apply attention_layer
             # Query: prompt_embeds, Key: image_features, Value: image_features
