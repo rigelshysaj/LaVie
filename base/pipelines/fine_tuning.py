@@ -195,14 +195,6 @@ def visualize_attention(image_tensor, attention_weights, save_path=None):
     plt.close()
 
 
-class AttentionWithVisualization(nn.Module):
-    def __init__(self, embed_dim, num_heads):
-        super().__init__()
-        self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads)
-        
-    def forward(self, query, key, value):
-        attn_output, attn_output_weights = self.attention(query, key, value)
-        return attn_output, attn_output_weights
 
 
 def load_and_transform_image(path):
@@ -269,7 +261,7 @@ def compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model,
     print(f"  L2 norm: {gradient.norm().item():.4f}")
 
 
-def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device):
+def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer):
     with torch.no_grad():
         # Funzione per generare video
         def generate_video(unet, is_original):
@@ -280,7 +272,8 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 scheduler=noise_scheduler, 
                 unet=unet,
                 clip_processor=clip_processor,
-                clip_model=clip_model
+                clip_model=clip_model,
+                attention_layer=attention_layer
             ).to(device)
 
             pipeline.enable_xformers_memory_efficient_attention()
@@ -531,12 +524,14 @@ def lora_model(data, video_folder, args, training=True):
         # only upcast trainable parameters (LoRA) into fp32
         cast_training_params(unet, dtype=torch.float32)
 
+    attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device).to(weight_dtype)
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
     train_dataloader = DataLoader(dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=custom_collate)
     print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
 
     lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
+    trainable_params = list(lora_layers) + list(attention_layer.parameters())
 
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
@@ -565,7 +560,7 @@ def lora_model(data, video_folder, args, training=True):
         optimizer_cls = torch.optim.AdamW
 
     optimizer = optimizer_cls(
-        lora_layers,
+        trainable_params,
         lr=args.learning_rate,
         betas=(args.adam_beta1, args.adam_beta2),
         weight_decay=args.adam_weight_decay,
@@ -591,7 +586,7 @@ def lora_model(data, video_folder, args, training=True):
 
     # Prepare everything with our `accelerator`.
     unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        unet, optimizer, train_dataloader, lr_scheduler
+        unet, attention_layer, optimizer, train_dataloader, lr_scheduler
     )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
@@ -669,10 +664,10 @@ def lora_model(data, video_folder, args, training=True):
 
     if(training):
 
-        attention_layer = AttentionWithVisualization(embed_dim=768, num_heads=8).to(unet.device).to(torch.float16)
-
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
+            attention_layer.train()
+
             batch_losses = []
             train_loss = 0.0
             for step, batch in enumerate(train_dataloader):
@@ -829,7 +824,7 @@ def lora_model(data, video_folder, args, training=True):
                     # Backpropagate
                     accelerator.backward(loss)
                     if accelerator.sync_gradients:
-                        params_to_clip = lora_layers
+                        params_to_clip = trainable_params
                         accelerator.clip_grad_norm_(params_to_clip, args.max_grad_norm)
                     optimizer.step()
                     lr_scheduler.step()
@@ -886,7 +881,7 @@ def lora_model(data, video_folder, args, training=True):
                             logger.info(f"Saved state to {save_path}")
                     
 
-                        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device)
+                        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer)
 
                 logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
                 progress_bar.set_postfix(**logs)
@@ -922,7 +917,7 @@ def lora_model(data, video_folder, args, training=True):
         # Opzionale: visualizza il grafico interattivo in Colab
         fig.show()
     else:
-        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device)
+        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer)
 
 
 

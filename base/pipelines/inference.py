@@ -67,7 +67,8 @@ class VideoGenPipeline(DiffusionPipeline):
         unet: UNet3DConditionModel,
         scheduler: KarrasDiffusionSchedulers,
         clip_processor: CLIPProcessor,
-        clip_model: CLIPModel
+        clip_model: CLIPModel,
+        attention_layer: nn.MultiheadAttention,
     ):
         super().__init__()
 
@@ -128,7 +129,8 @@ class VideoGenPipeline(DiffusionPipeline):
             unet=unet,
             scheduler=scheduler,
             clip_processor=clip_processor,
-            clip_model=clip_model
+            clip_model=clip_model,
+            attention_layer=attention_layer,
         )
 
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
@@ -245,15 +247,12 @@ class VideoGenPipeline(DiffusionPipeline):
         negative_prompt_embeds: Optional[torch.FloatTensor] = None,
         input_image: Optional[torch.FloatTensor] = None,
     ):
-        
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
         elif prompt is not None and isinstance(prompt, list):
             batch_size = len(prompt)
         else:
             batch_size = prompt_embeds.shape[0]
-
-        print(f"prompt1: {prompt}")
 
         if prompt_embeds is None:
             text_inputs = self.tokenizer(
@@ -278,7 +277,6 @@ class VideoGenPipeline(DiffusionPipeline):
                 )
 
             if hasattr(self.text_encoder.config, "use_attention_mask") and self.text_encoder.config.use_attention_mask:
-                print("usa attention mask")
                 attention_mask = text_inputs.attention_mask.to(device)
             else:
                 attention_mask = None
@@ -286,51 +284,53 @@ class VideoGenPipeline(DiffusionPipeline):
             prompt_embeds = self.text_encoder(
                 text_input_ids.to(device),
                 attention_mask=attention_mask,
-            )
-            prompt_embeds = prompt_embeds[0]
+            )[0]
 
         prompt_embeds = prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
-        print(f"prompt_embeds1 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
+        # Duplicate text embeddings for each generation per prompt
         bs_embed, seq_len, _ = prompt_embeds.shape
-        # duplicate text embeddings for each generation per prompt, using mps friendly method
         prompt_embeds = prompt_embeds.repeat(1, num_images_per_prompt, 1)
         prompt_embeds = prompt_embeds.view(bs_embed * num_images_per_prompt, seq_len, -1)
-        prompt_embeds = prompt_embeds.to(torch.float32)
 
         if input_image is not None:
-            # Processa l'immagine con CLIP
+            # Process the image with CLIP
             image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
             outputs = self.clip_model.vision_model(image_inputs, output_hidden_states=True)
-            image_features = outputs.last_hidden_state.to(torch.float32)
-            print(f"image_features1 shape: {image_features.shape}, dtype: {image_features.dtype}")
+            image_features = outputs.last_hidden_state.to(dtype=prompt_embeds.dtype)
 
+            print(f"inference image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
+            print(f"inference prompt_embeds shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
-            assert prompt_embeds.dtype == image_features.dtype, "prompt_embeds and image_features must have the same dtype"
+            # Transpose dimensions for attention: (batch_size, seq_len, embed_dim) -> (seq_len, batch_size, embed_dim)
+            prompt_embeds_t = prompt_embeds.transpose(0, 1)
+            image_features_t = image_features.transpose(0, 1)
 
-            print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
-            
-            prompt_embeds = torch.cat([prompt_embeds, image_features], dim=1)
+            # Apply attention_layer
+            # Query: prompt_embeds, Key: image_features, Value: image_features
+            encoder_hidden_states_t, _ = self.attention_layer(prompt_embeds_t, image_features_t, image_features_t)
 
-            print(f"prompt_embeds3 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
+            # Transpose back to (batch_size, seq_len, embed_dim)
+            encoder_hidden_states = encoder_hidden_states_t.transpose(0, 1)
 
-        # get unconditional embeddings for classifier free guidance
+            print(f"inference encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
+
+            prompt_embeds = encoder_hidden_states
+
+        # Handle negative prompts for classifier-free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
             uncond_tokens: List[str]
             if negative_prompt is None:
                 uncond_tokens = [""] * batch_size
             elif type(prompt) is not type(negative_prompt):
                 raise TypeError(
-                    f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
-                    f" {type(prompt)}."
+                    f"`negative_prompt` should be the same type as `prompt`, but got {type(negative_prompt)} != {type(prompt)}."
                 )
             elif isinstance(negative_prompt, str):
                 uncond_tokens = [negative_prompt]
             elif batch_size != len(negative_prompt):
                 raise ValueError(
-                    f"`negative_prompt`: {negative_prompt} has batch size {len(negative_prompt)}, but `prompt`:"
-                    f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
-                    " the batch size of `prompt`."
+                    f"`negative_prompt` has batch size {len(negative_prompt)}, but `prompt` has batch size {batch_size}."
                 )
             else:
                 uncond_tokens = negative_prompt
@@ -352,42 +352,35 @@ class VideoGenPipeline(DiffusionPipeline):
             negative_prompt_embeds = self.text_encoder(
                 uncond_input.input_ids.to(device),
                 attention_mask=attention_mask,
-            )
-            negative_prompt_embeds = negative_prompt_embeds[0]
-
-            print(f"negative_prompt_embeds1 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
-
-
-        if do_classifier_free_guidance:
-            # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
-            seq_len = negative_prompt_embeds.shape[1]
+            )[0]
 
             negative_prompt_embeds = negative_prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
 
+            # Duplicate unconditional embeddings
+            seq_len = negative_prompt_embeds.shape[1]
             negative_prompt_embeds = negative_prompt_embeds.repeat(1, num_images_per_prompt, 1)
-            print(f"negative_prompt_embeds2 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
-
             negative_prompt_embeds = negative_prompt_embeds.view(batch_size * num_images_per_prompt, seq_len, -1)
-            print(f"negative_prompt_embeds3 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
-
 
             if input_image is not None:
-                padding = torch.zeros(negative_prompt_embeds.shape[0], 
-                                prompt_embeds.shape[1] - negative_prompt_embeds.shape[1], 
-                                negative_prompt_embeds.shape[2], 
-                                device=device, 
-                                dtype=negative_prompt_embeds.dtype)
-                
-                negative_prompt_embeds = torch.cat([negative_prompt_embeds, padding], dim=1)
-                print(f"negative_prompt_embeds4 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
+                # Process the image for negative prompt
+                image_features_neg = image_features  # Reuse the image features
+                # Transpose dimensions
+                negative_prompt_embeds_t = negative_prompt_embeds.transpose(0, 1)
+                image_features_t = image_features_neg.transpose(0, 1)
 
+                # Apply attention_layer
+                encoder_hidden_states_neg_t, _ = self.attention_layer(
+                    negative_prompt_embeds_t, image_features_t, image_features_t
+                )
 
-            # For classifier free guidance, we need to do two forward passes.
-            # Here we concatenate the unconditional and text embeddings into a single batch
-            # to avoid doing two forward passes
+                # Transpose back
+                encoder_hidden_states_neg = encoder_hidden_states_neg_t.transpose(0, 1)
+
+                negative_prompt_embeds = encoder_hidden_states_neg
+
+        if do_classifier_free_guidance:
+            # Concatenate the unconditional and conditional embeddings
             prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds])
-            print(f"prompt_embeds4 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
-
 
         return prompt_embeds
 
