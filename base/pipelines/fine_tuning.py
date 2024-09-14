@@ -671,6 +671,10 @@ def lora_model(data, video_folder, args, training=True):
 
     if(training):
 
+        # Definisci il layer di proiezione per l'immagine
+        projection = nn.Linear(512, 768).to(device).to(torch.float16)
+
+
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
             attention_layer.train()
@@ -763,6 +767,11 @@ def lora_model(data, video_folder, args, training=True):
                     # Trasponi per adattare le dimensioni attese dall'attenzione
                     text_features = text_features.transpose(0, 1)  # Shape: (sequence_length, batch_size, hidden_size)
                     image_features = image_features.transpose(0, 1)
+
+                    text_features = projection(text_features)
+
+                    print(f"text_features111 shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                   
 
                     # Applica la cross-attention
                     encoder_hidden_states, attention_weights = attention_layer(

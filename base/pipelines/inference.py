@@ -248,6 +248,9 @@ class VideoGenPipeline(DiffusionPipeline):
         negative_prompt_embeds: Optional[torch.FloatTensor] = None,
         input_image: Optional[torch.FloatTensor] = None,
     ):
+        
+        projection = nn.Linear(512, 768).to(device).to(torch.float16)
+
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
         elif prompt is not None and isinstance(prompt, list):
@@ -310,6 +313,9 @@ class VideoGenPipeline(DiffusionPipeline):
             # Transpose dimensions for attention: (batch_size, seq_len, embed_dim) -> (seq_len, batch_size, embed_dim)
             prompt_embeds_t = prompt_embeds.transpose(0, 1)
             image_features_t = image_features.transpose(0, 1)
+
+            prompt_embeds_t = projection(prompt_embeds_t)
+            print(f"inference prompt_embeds_t shape: {prompt_embeds_t.shape}, dtype: {prompt_embeds_t.dtype}")
 
             # Apply attention_layer
             # Query: prompt_embeds, Key: image_features, Value: image_features
