@@ -680,11 +680,11 @@ def lora_model(data, video_folder, args, training=True):
                    
                     text_inputs = tokenizer(
                         list(description),
-                        max_length=tokenizer.model_max_length,
-                        padding="max_length",
+                        padding=True,
                         truncation=True,
                         return_tensors="pt"
                     ).to(unet.device)
+
 
                     # Estrai le caratteristiche di testo dal modello CLIP
                     text_features = text_encoder(
