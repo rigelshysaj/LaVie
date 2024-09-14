@@ -262,14 +262,7 @@ def compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model,
 
 
 def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer):
-    
-    vae = vae.to(torch.float32)
-    text_encoder = text_encoder.to(torch.float32)
-    unet = unet.to(torch.float32)
-    original_unet = original_unet.to(torch.float32)
-    clip_model = clip_model.to(torch.float32)
-    attention_layer = attention_layer.to(torch.float32)
-    
+        
     attention_layer.dtype = next(attention_layer.parameters()).dtype
 
     with torch.no_grad():
@@ -534,7 +527,7 @@ def lora_model(data, video_folder, args, training=True):
 
     if args.mixed_precision == "fp16":
         # only upcast trainable parameters (LoRA) into fp32
-        cast_training_params([unet, attention_layer], dtype=torch.float32)
+        cast_training_params([unet, original_unet, attention_layer], dtype=torch.float32)
 
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
@@ -678,13 +671,6 @@ def lora_model(data, video_folder, args, training=True):
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
             attention_layer.train()
-
-            vae = vae.to(torch.float16)
-            text_encoder = text_encoder.to(torch.float16)
-            unet = unet.to(torch.float16)
-            original_unet = original_unet.to(torch.float16)
-            clip_model = clip_model.to(torch.float16)
-            attention_layer = attention_layer.to(torch.float16)
 
             batch_losses = []
             train_loss = 0.0
