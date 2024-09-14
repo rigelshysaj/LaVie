@@ -641,18 +641,15 @@ def lora_model(data, video_folder, args, training=True):
             for step, batch in enumerate(train_dataloader):
                 with accelerator.accumulate(unet):
 
-                    video, description, frame_tensor = batch
-
-                    print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
-                    
-                    print(f"frame_tensor111111 shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
-                    
                     try:
-                        description[0]
+                        video, description, frame_tensor = batch
+
+                        #print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
+                        
+                        #print(f"frame_tensor111111 shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
+                        
                     except Exception as e:
-                        print("------------------START--------------------")
-                        print(description)
-                        print("------------------END--------------------")
+                        print(f"Skipping iteration due to error: {e}")
                         continue
                     
 
@@ -702,11 +699,11 @@ def lora_model(data, video_folder, args, training=True):
                     text_features = text_outputs.last_hidden_state
 
 
-                    print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                    #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
 
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
-                    print(f"image_inputs shape: {image_inputs.shape}, dtype: {image_inputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
+                    #print(f"image_inputs shape: {image_inputs.shape}, dtype: {image_inputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
 
                     image_outputs = clip_model.vision_model(
                         pixel_values=image_inputs,
@@ -720,7 +717,7 @@ def lora_model(data, video_folder, args, training=True):
                     image_features = image_outputs.last_hidden_state  # Shape: (batch_size, num_patches, hidden_size)
                     image_features=image_features.to(torch.float16)
                     text_features=text_features.to(torch.float16)
-                    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
+                    #print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
 
                     text_features = projection(text_features) 
 
@@ -728,7 +725,7 @@ def lora_model(data, video_folder, args, training=True):
                     text_features = text_features.transpose(0, 1)  # Shape: (sequence_length, batch_size, hidden_size)
                     image_features = image_features.transpose(0, 1)
 
-                    print(f"text_features111 shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                    #print(f"text_features111 shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
                    
 
                     # Applica la cross-attention
@@ -738,8 +735,8 @@ def lora_model(data, video_folder, args, training=True):
                         value=image_features
                     )
 
-                    print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
-                    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
+                    #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
+                    #print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
 
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
