@@ -255,8 +255,6 @@ class VideoGenPipeline(DiffusionPipeline):
         else:
             batch_size = prompt_embeds.shape[0]
 
-        print(f"prompt1: {prompt}")
-
         if prompt_embeds is None:
             text_inputs = self.tokenizer(
                 prompt,
