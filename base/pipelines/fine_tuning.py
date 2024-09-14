@@ -768,14 +768,6 @@ def lora_model(data, video_folder, args, training=True):
                     print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
 
-                    # Visualizza le mappe di attenzione
-                    visualize_attention_maps(
-                        attention_weights,
-                        tokenizer,
-                        description,
-                        save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png"
-                    )
-
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
                     # Get the target for loss depending on the prediction type
@@ -882,6 +874,14 @@ def lora_model(data, video_folder, args, training=True):
                     
 
                         inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer)
+
+                        # Visualizza le mappe di attenzione
+                        visualize_attention_maps(
+                            attention_weights,
+                            tokenizer,
+                            description,
+                            save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png"
+                        )
 
                 logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
                 progress_bar.set_postfix(**logs)
