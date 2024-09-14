@@ -442,7 +442,7 @@ def lora_model(data, video_folder, args, training=True):
     unet.load_state_dict(state_dict)
 
     # Carica il modello UNet originale
-    original_unet = get_models(args, sd_path).to(device, dtype=torch.float16)
+    original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
     original_unet.load_state_dict(state_dict)
 
 
