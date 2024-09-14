@@ -520,11 +520,12 @@ def lora_model(data, video_folder, args, training=True):
     
     unet = get_peft_model(unet, lora_config)
 
+    attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device).to(weight_dtype)
+
     if args.mixed_precision == "fp16":
         # only upcast trainable parameters (LoRA) into fp32
-        cast_training_params(unet, dtype=torch.float32)
+        cast_training_params([unet, attention_layer], dtype=torch.float32)
 
-    attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device).to(weight_dtype)
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
     train_dataloader = DataLoader(dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=custom_collate)
