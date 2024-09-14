@@ -485,7 +485,7 @@ def lora_model(data, video_folder, args, training=True):
     unet.load_state_dict(state_dict)
 
     # Carica il modello UNet originale
-    original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
+    original_unet = get_models(args, sd_path).to(device, dtype=torch.float16)
     original_unet.load_state_dict(state_dict)
 
     tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
@@ -527,7 +527,7 @@ def lora_model(data, video_folder, args, training=True):
 
     if args.mixed_precision == "fp16":
         # only upcast trainable parameters (LoRA) into fp32
-        cast_training_params([unet, original_unet, attention_layer], dtype=torch.float32)
+        cast_training_params([unet, attention_layer], dtype=torch.float32)
 
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
