@@ -137,6 +137,17 @@ class VideoGenPipeline(DiffusionPipeline):
         
         # self.register_to_config(requires_safety_checker=requires_safety_checker)
 
+    def to(self, torch_device: Optional[torch.device] = None, torch_dtype: Optional[torch.dtype] = None):
+        self.device = torch_device
+        for module in self.components.values():
+            if module is not None:
+                module.to(torch_device)
+                if torch_dtype is not None:
+                    try:
+                        module.to(dtype=torch_dtype)
+                    except AttributeError:
+                        pass
+
     def enable_vae_slicing(self):
         r"""
         Enable sliced VAE decoding.
