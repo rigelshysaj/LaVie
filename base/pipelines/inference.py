@@ -277,15 +277,19 @@ class VideoGenPipeline(DiffusionPipeline):
                     f" {self.tokenizer.model_max_length} tokens: {removed_text}"
                 )
 
-            if hasattr(self.text_encoder.config, "use_attention_mask") and self.text_encoder.config.use_attention_mask:
+            if hasattr(self.clip_model.text_model.config, "use_attention_mask") and self.clip_model.text_model.config.use_attention_mask:
                 attention_mask = text_inputs.attention_mask.to(device)
             else:
                 attention_mask = None
 
-            prompt_embeds = self.text_encoder(
-                text_input_ids.to(device),
+            # Estrai le caratteristiche testuali utilizzando self.clip_model.text_model
+            prompt_embeds = self.clip_model.text_model(
+                input_ids=text_input_ids.to(device),
                 attention_mask=attention_mask,
-            )[0]
+                output_hidden_states=True,
+                return_dict=True,
+            ).last_hidden_state
+
 
         prompt_embeds = prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
 

@@ -488,7 +488,10 @@ def lora_model(data, video_folder, args, training=True):
     original_unet = get_models(args, sd_path).to(device, dtype=torch.float16)
     original_unet.load_state_dict(state_dict)
 
-    tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
+
+
+    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+    #tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
     text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
     # Load CLIP model and processor for image conditioning
@@ -720,9 +723,7 @@ def lora_model(data, video_folder, args, training=True):
 
                     #print(f"description: {list(description)}")
                     # Get the text embedding for conditioning
-
-                    
-                    # Prepara gli input di testo
+                   
                     text_inputs = tokenizer(
                         list(description),
                         padding=True,
@@ -731,12 +732,13 @@ def lora_model(data, video_folder, args, training=True):
                     ).to(unet.device)
 
                     # Estrai le caratteristiche di testo dal modello CLIP
-                    text_features = text_encoder(
+                    text_outputs = clip_model.text_model(
                         input_ids=text_inputs.input_ids,
                         attention_mask=text_inputs.attention_mask,
                         output_hidden_states=True,
                         return_dict=True
-                    )[0]
+                    )
+                    text_features = text_outputs.last_hidden_state
 
 
                     print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
