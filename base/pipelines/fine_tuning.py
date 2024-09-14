@@ -763,13 +763,13 @@ def lora_model(data, video_folder, args, training=True):
                     image_features = image_outputs.last_hidden_state  # Shape: (batch_size, num_patches, hidden_size)
                     image_features=image_features.to(torch.float16)
                     text_features=text_features.to(torch.float16)
-                    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") 
+                    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
+
+                    text_features = projection(text_features) 
 
                     # Trasponi per adattare le dimensioni attese dall'attenzione
                     text_features = text_features.transpose(0, 1)  # Shape: (sequence_length, batch_size, hidden_size)
                     image_features = image_features.transpose(0, 1)
-
-                    text_features = projection(text_features)
 
                     print(f"text_features111 shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
                    

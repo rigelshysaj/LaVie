@@ -310,12 +310,13 @@ class VideoGenPipeline(DiffusionPipeline):
             print(f"inference image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
             print(f"inference prompt_embeds shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
+            prompt_embeds = projection(prompt_embeds)
+
             # Transpose dimensions for attention: (batch_size, seq_len, embed_dim) -> (seq_len, batch_size, embed_dim)
             prompt_embeds_t = prompt_embeds.transpose(0, 1)
             image_features_t = image_features.transpose(0, 1)
 
-            prompt_embeds_t = projection(prompt_embeds_t)
-            print(f"inference prompt_embeds_t shape: {prompt_embeds_t.shape}, dtype: {prompt_embeds_t.dtype}")
+            print(f"inference prompt_embeds shape: {prompt_embeds_t.shape}, dtype: {prompt_embeds_t.dtype}")
 
             # Apply attention_layer
             # Query: prompt_embeds, Key: image_features, Value: image_features
