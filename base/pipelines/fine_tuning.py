@@ -585,7 +585,7 @@ def lora_model(data, video_folder, args, training=True):
     )
 
     # Prepare everything with our `accelerator`.
-    unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+    unet, attention_layer, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         unet, attention_layer, optimizer, train_dataloader, lr_scheduler
     )
 
