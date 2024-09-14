@@ -549,8 +549,6 @@ class VideoGenPipeline(DiffusionPipeline):
         height = height or self.unet.config.sample_size * self.vae_scale_factor
         width = width or self.unet.config.sample_size * self.vae_scale_factor
 
-        print(f"prompt2: {prompt}")
-
         # 1. Check inputs. Raise error if not correct
         self.check_inputs(
             prompt, height, width, callback_steps, negative_prompt, prompt_embeds, negative_prompt_embeds
