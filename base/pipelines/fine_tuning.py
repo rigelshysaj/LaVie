@@ -680,7 +680,8 @@ def lora_model(data, video_folder, args, training=True):
                    
                     text_inputs = tokenizer(
                         list(description),
-                        padding=True,
+                        max_length=tokenizer.model_max_length,
+                        padding="max_length",
                         truncation=True,
                         return_tensors="pt"
                     ).to(unet.device)
