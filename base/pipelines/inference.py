@@ -311,8 +311,19 @@ class VideoGenPipeline(DiffusionPipeline):
             assert prompt_embeds.dtype == image_features.dtype, "prompt_embeds and image_features must have the same dtype"
 
             print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
-            
-            prompt_embeds = torch.cat([prompt_embeds, image_features], dim=1)
+
+            # Transpose dimensions for attention: (batch_size, seq_len, embed_dim) -> (seq_len, batch_size, embed_dim)
+            prompt_embeds_t = prompt_embeds.transpose(0, 1)
+            image_features_t = image_features.transpose(0, 1)
+
+            # Apply attention_layer
+            # Query: prompt_embeds, Key: image_features, Value: image_features
+            encoder_hidden_states_t, _ = self.attention_layer(prompt_embeds_t, image_features_t, image_features_t)
+
+            # Transpose back to (batch_size, seq_len, embed_dim)
+            encoder_hidden_states = encoder_hidden_states_t.transpose(0, 1)
+
+            prompt_embeds = encoder_hidden_states
 
             print(f"prompt_embeds3 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
