@@ -262,6 +262,9 @@ def compute_and_analyze_gradient(unet, vae, text_encoder, tokenizer, clip_model,
 
 
 def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer):
+    
+    attention_layer.dtype = next(attention_layer.parameters()).dtype
+
     with torch.no_grad():
         # Funzione per generare video
         def generate_video(unet, is_original):
