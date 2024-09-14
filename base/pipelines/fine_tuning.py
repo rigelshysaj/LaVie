@@ -672,7 +672,7 @@ def lora_model(data, video_folder, args, training=True):
     if(training):
 
         # Definisci il layer di proiezione per l'immagine
-        projection = nn.Linear(512, 768).to(device).to(torch.float16)
+        projection = nn.Linear(512, 768).to(device).to(torch.float32)
 
 
         for epoch in range(first_epoch, args.num_train_epochs):
