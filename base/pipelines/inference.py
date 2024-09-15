@@ -303,17 +303,29 @@ class VideoGenPipeline(DiffusionPipeline):
         if input_image is not None:
             # Processa l'immagine con CLIP
             image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
-            outputs = self.clip_model.vision_model(image_inputs, output_hidden_states=False)
-            image_features = outputs.pooler_output.to(dtype=prompt_embeds.dtype)
+            image_outputs = self.clip_model.vision_model(
+                        pixel_values=image_inputs,
+                        output_hidden_states=True,
+                        return_dict=True
+                    )
+            image_features = image_outputs.last_hidden_state
 
             # Map image embeddings to text embedding space
             mapped_image_features = self.mapper(image_features)
 
-            # Expand dimensions to match text embeddings
-            mapped_image_features = mapped_image_features.unsqueeze(1)  # Shape: (batch_size, 1, embed_dim)
+            # Trasponi per adattare le dimensioni attese dall'attenzione
+            text_features_t = prompt_embeds.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
+            mapped_image_features_t = mapped_image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
 
-            # Concatenate mapped image embeddings with text embeddings
-            prompt_embeds = torch.cat([mapped_image_features, prompt_embeds], dim=1)
+            # Applica il cross-attention
+            encoder_hidden_states_t, attention_weights = self.attention_layer(
+                query=text_features_t,          # Query: testo
+                key=mapped_image_features_t,    # Key: immagini
+                value=mapped_image_features_t   # Value: immagini
+            )
+
+            # Trasponi per ottenere la forma originale
+            prompt_embeds = encoder_hidden_states_t.transpose(0, 1)
 
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
