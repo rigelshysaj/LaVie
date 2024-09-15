@@ -662,7 +662,6 @@ def lora_model(data, video_folder, args, training=True):
 
                     #print(f"image_outputs shape: {image_outputs.shape}, dtype: {image_outputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
 
-                    image_outputs=image_outputs.to(torch.float16)
                     text_features=text_features.to(torch.float16)
 
                     image_features = image_outputs.pooler_output
