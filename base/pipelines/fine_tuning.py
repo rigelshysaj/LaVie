@@ -660,12 +660,12 @@ def lora_model(data, video_folder, args, training=True):
                         return_dict=True
                     )
 
-                    print(f"image_outputs shape: {image_outputs.shape}, dtype: {image_outputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
+                    #print(f"image_outputs shape: {image_outputs.shape}, dtype: {image_outputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
 
-
-                    image_features = image_outputs.pooler_output
                     image_features=image_features.to(torch.float16)
                     text_features=text_features.to(torch.float16)
+
+                    image_features = image_outputs.pooler_output
 
                     # Map image embeddings to text embedding space using the mapping network
                     mapped_image_features = mapper(image_features)  # Shape: (batch_size, hidden_size)
