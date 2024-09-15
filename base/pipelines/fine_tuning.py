@@ -697,7 +697,7 @@ def lora_model(data, video_folder, args, training=True):
 
                     # Map image embeddings to text embedding space using the mapping network
                     mapped_image_features = mapper(image_features)  # Shape: (batch_size, hidden_size)
-                    #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
+                    print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
                     #mapped_image_features = mapped_image_features.unsqueeze(1)
                     #encoder_hidden_states = torch.cat([mapped_image_features, text_features], dim=1)
