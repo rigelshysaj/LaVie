@@ -165,7 +165,7 @@ def load_and_transform_image(path):
 def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer, mapper):
         
     attention_layer.dtype = next(attention_layer.parameters()).dtype
-    #mapper.dtype = next(mapper.parameters()).dtype
+    mapper.dtype = next(mapper.parameters()).dtype
 
     with torch.no_grad():
         # Funzione per generare video
@@ -558,7 +558,7 @@ def lora_model(data, video_folder, args, training=True):
             accelerator.print(f"Resuming from checkpoint {path}")
             accelerator.load_state(os.path.join(args.output_dir, path))
             # Load the mapper state dict
-            mapper.load_state_dict(torch.load(os.path.join(path, 'mapper.pt')))
+            mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
 
             global_step = int(path.split("-")[1])
 
