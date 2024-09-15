@@ -72,7 +72,7 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 
-class EmbeddingMapper(nn.Module):
+class EmbeddingMapper_(nn.Module):
     def __init__(self, input_dim=768, output_dim=768, hidden_dim=512):
         super(EmbeddingMapper, self).__init__()
         self.fc = nn.Sequential(
@@ -85,7 +85,7 @@ class EmbeddingMapper(nn.Module):
         return self.fc(x)
 
 
-class EmbeddingMapper_(nn.Module):
+class EmbeddingMapper(nn.Module):
     def __init__(self, input_dim=768, output_dim=768, hidden_dim=512):
         super(EmbeddingMapper, self).__init__()
         self.fc = nn.Sequential(
@@ -184,8 +184,14 @@ def load_and_transform_image(path):
 
 def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer, mapper):
         
-    attention_layer.dtype = next(attention_layer.parameters()).dtype
-    mapper.dtype = next(mapper.parameters()).dtype
+    #attention_layer.dtype = next(attention_layer.parameters()).dtype
+    #mapper.dtype = next(mapper.parameters()).dtype
+
+    vae = vae.to(device)
+    text_encoder = text_encoder.to(device)
+    unet = unet.to(device)
+    attention_layer = attention_layer.to(device)
+    mapper = mapper.to(device)
 
     with torch.no_grad():
         # Funzione per generare video
@@ -200,7 +206,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 clip_model=clip_model,
                 attention_layer=attention_layer,
                 mapper=mapper
-            ).to(device)
+            )
 
             pipeline.enable_xformers_memory_efficient_attention()
 
@@ -685,16 +691,16 @@ def lora_model(data, video_folder, args, training=True):
 
                     text_features=text_features.to(torch.float16)
 
-                    #image_features = image_outputs.last_hidden_state
-                    image_features = image_outputs.pooler_output
+                    image_features = image_outputs.last_hidden_state
+                    #image_features = image_outputs.pooler_output
                     #print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
 
                     # Map image embeddings to text embedding space using the mapping network
                     mapped_image_features = mapper(image_features)  # Shape: (batch_size, hidden_size)
                     #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
-                    mapped_image_features = mapped_image_features.unsqueeze(1)
-                    #prompt_embeds = torch.cat([mapped_image_features, prompt_embeds], dim=1)
+                    #mapped_image_features = mapped_image_features.unsqueeze(1)
+                    #encoder_hidden_states = torch.cat([mapped_image_features, text_features], dim=1)
 
                     # Trasponi per adattare le dimensioni attese dall'attenzione
                     text_features_t = text_features.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
