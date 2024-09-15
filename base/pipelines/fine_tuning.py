@@ -713,8 +713,6 @@ def lora_model(data, video_folder, args, training=True):
 
                     #encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
-                    # Concatenate mapped image embeddings with text embeddings
-                    encoder_hidden_states = torch.cat([mapped_image_features, text_features], dim=1)
                     print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
 
 

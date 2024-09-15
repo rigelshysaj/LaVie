@@ -301,30 +301,29 @@ class VideoGenPipeline(DiffusionPipeline):
         prompt_embeds = prompt_embeds.to(torch.float32)
 
         if input_image is not None:
-            # Processa l'immagine con CLIP
             image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
             image_outputs = self.clip_model.vision_model(
-                        pixel_values=image_inputs,
-                        output_hidden_states=True,
-                        return_dict=True
-                    )
-            image_features = image_outputs.last_hidden_state
-
-            # Map image embeddings to text embedding space
-            mapped_image_features = self.mapper(image_features)
-
-            # Trasponi per adattare le dimensioni attese dall'attenzione
-            text_features_t = prompt_embeds.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
-            mapped_image_features_t = mapped_image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
-
-            # Applica il cross-attention
-            encoder_hidden_states_t, attention_weights = self.attention_layer(
-                query=text_features_t,          # Query: testo
-                key=mapped_image_features_t,    # Key: immagini
-                value=mapped_image_features_t   # Value: immagini
+                pixel_values=image_inputs,
+                output_hidden_states=True,
+                return_dict=True
             )
-
-            # Trasponi per ottenere la forma originale
+            image_features = image_outputs.last_hidden_state  # Shape: (batch_size, seq_len_img, hidden_size)
+            
+            # Mappa le embedding di immagine nello spazio delle embedding del testo
+            mapped_image_features = self.mapper(image_features)  # Shape: (batch_size, seq_len_img, hidden_size)
+            
+            # Trasponi le embedding per l'attenzione
+            prompt_embeds_t = prompt_embeds.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
+            mapped_image_features_t = mapped_image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
+            
+            # Applica il cross-attention
+            encoder_hidden_states_t, _ = self.attention_layer(
+                query=prompt_embeds_t,
+                key=mapped_image_features_t,
+                value=mapped_image_features_t
+            )
+            
+            # Trasponi di nuovo
             prompt_embeds = encoder_hidden_states_t.transpose(0, 1)
 
         # get unconditional embeddings for classifier free guidance
