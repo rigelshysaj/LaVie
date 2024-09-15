@@ -71,6 +71,19 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
+class EmbeddingMapper(nn.Module):
+    def __init__(self, input_dim=768, output_dim=768, hidden_dim=512):
+        super(EmbeddingMapper, self).__init__()
+        self.fc = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, output_dim)
+        )
+
+    def forward(self, x):
+        return self.fc(x)
+
+
 def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
     # Unisci la lista di descrizioni in una singola stringa
     description = description_list[0]
@@ -129,73 +142,6 @@ def visualize_attention_maps(attention_weights, tokenizer, description_list, sav
     save_or_show_plot(plt, "barchart")
     plt.close()
 
-def visualize_attention(image_tensor, attention_weights, save_path=None):
-    # Ensure we're working with the correct shapes
-    
-    #print(f"Initial attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}")
-    #print(f"Image tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
-    
-    # Average attention weights across all text tokens
-    mean_attention = attention_weights.mean(dim=1)  # Shape: [1, 50]
-    #print(f"Mean attention shape: {mean_attention.shape}")
-    
-    # Reshape attention to match spatial dimensions of the image
-    attention_map = mean_attention.reshape(1, 1, 5, 10)  # 50 -> 5x10
-    #print(f"Reshaped attention_map shape: {attention_map.shape}")
-    
-    # Upsample the attention map to match the image size
-    attention_map = F.interpolate(attention_map, size=(320, 512), mode='bilinear', align_corners=False)
-    #print(f"Upsampled attention_map shape: {attention_map.shape}")
-    
-    attention_map = attention_map.squeeze()
-    attention_map = attention_map.detach().cpu().numpy()
-    #print(f"Final attention_map shape: {attention_map.shape}, dtype: {attention_map.dtype}")
-    
-    # Normalize attention map
-    attention_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())
-    
-    # Convert image tensor to numpy for visualization
-    image = image_tensor.squeeze().cpu().numpy()
-    image = (image - image.min()) / (image.max() - image.min())  # Normalize to [0, 1]
-    print(f"Final image shape: {image.shape}, dtype: {image.dtype}")
-    
-    # Create a figure with two subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
-    
-    # Plot original image
-    ax1.imshow(image)
-    ax1.set_title('Original Image')
-    ax1.axis('off')
-    
-    # Plot image with attention overlay
-    ax2.imshow(image)
-    im = ax2.imshow(attention_map, cmap='hot', alpha=0.5)
-    ax2.set_title('Attention Map Overlay')
-    ax2.axis('off')
-    
-    # Add colorbar
-    plt.colorbar(im, ax=ax2, label='Attention Intensity')
-    
-    plt.tight_layout()
-    
-    if save_path:
-        # Create 'Images' folder if it doesn't exist
-        images_folder = os.path.join(os.path.dirname(save_path), 'Images')
-        os.makedirs(images_folder, exist_ok=True)
-
-        # Update save_path to use the 'Images' folder
-        file_name = os.path.basename(save_path)
-        new_save_path = os.path.join(images_folder, file_name)
-
-        plt.savefig(new_save_path)
-        print(f"Visualization saved to {new_save_path}")
-    else:
-        plt.show()
-    
-    plt.close()
-
-
-
 
 def load_and_transform_image(path):
     image = Image.open(path)
@@ -216,7 +162,7 @@ def load_and_transform_image(path):
     return image_tensor
 
 
-def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer):
+def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer, mapper):
         
     attention_layer.dtype = next(attention_layer.parameters()).dtype
 
@@ -231,7 +177,8 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 unet=unet,
                 clip_processor=clip_processor,
                 clip_model=clip_model,
-                attention_layer=attention_layer
+                attention_layer=attention_layer,
+                mapper=mapper
             ).to(device)
 
             pipeline.enable_xformers_memory_efficient_attention()
@@ -445,6 +392,8 @@ def lora_model(data, video_folder, args, training=True):
     original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
     original_unet.load_state_dict(state_dict)
 
+    # Instantiate the mapping network
+    mapper = EmbeddingMapper().to(unet.device)
 
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
@@ -495,7 +444,10 @@ def lora_model(data, video_folder, args, training=True):
     print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
 
     lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
-    trainable_params = list(lora_layers) + list(attention_layer.parameters())
+
+    #trainable_params = list(lora_layers) + list(attention_layer.parameters()) + list(mapper.parameters())
+
+    trainable_params = list(lora_layers) + list(mapper.parameters())
 
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
@@ -549,8 +501,8 @@ def lora_model(data, video_folder, args, training=True):
     )
 
     # Prepare everything with our `accelerator`.
-    unet, attention_layer, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        unet, attention_layer, optimizer, train_dataloader, lr_scheduler
+    unet, mapper, attention_layer, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+        unet, mapper, attention_layer, optimizer, train_dataloader, lr_scheduler
     )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
@@ -604,6 +556,9 @@ def lora_model(data, video_folder, args, training=True):
         else:
             accelerator.print(f"Resuming from checkpoint {path}")
             accelerator.load_state(os.path.join(args.output_dir, path))
+            # Load the mapper state dict
+            mapper.load_state_dict(torch.load(os.path.join(path, 'mapper.pt')))
+
             global_step = int(path.split("-")[1])
 
             initial_global_step = global_step
@@ -692,47 +647,57 @@ def lora_model(data, video_folder, args, training=True):
                         attention_mask=text_inputs.attention_mask,
                         output_hidden_states=True,
                         return_dict=True
-                    ).last_hidden_state 
+                    ).last_hidden_state
 
 
                     print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
 
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
-                    #print(f"image_inputs shape: {image_inputs.shape}, dtype: {image_inputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
-
                     image_outputs = clip_model.vision_model(
                         pixel_values=image_inputs,
                         output_hidden_states=True,
                         return_dict=True
                     )
 
-                    #print(f"image_outputs shape: {image_outputs.shape}, dtype: {image_outputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
+                    print(f"image_outputs shape: {image_outputs.shape}, dtype: {image_outputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
 
 
-                    image_features = image_outputs.last_hidden_state  # Shape: (batch_size, num_patches, hidden_size)
+                    image_features = image_outputs.pooler_output
                     image_features=image_features.to(torch.float16)
                     text_features=text_features.to(torch.float16)
-                    #print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
+
+                    # Map image embeddings to text embedding space using the mapping network
+                    mapped_image_features = mapper(image_features)  # Shape: (batch_size, hidden_size)
+                    print(f"mapped_image_features111 shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
+
+                    # Expand dimensions to match text features
+                    mapped_image_features = mapped_image_features.unsqueeze(1)
+                    print(f"mapped_image_features222 shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
                     # Trasponi per adattare le dimensioni attese dall'attenzione
-                    text_features = text_features.transpose(0, 1)  # Shape: (sequence_length, batch_size, hidden_size)
-                    image_features = image_features.transpose(0, 1)
+                    #text_features = text_features.transpose(0, 1)  # Shape: (sequence_length, batch_size, hidden_size)
+                    #image_features = image_features.transpose(0, 1)
 
                     #print(f"text_features111 shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
                    
 
                     # Applica la cross-attention
-                    encoder_hidden_states, attention_weights = attention_layer(
-                        query=text_features,
-                        key=image_features,
-                        value=image_features
-                    )
+                    #encoder_hidden_states, attention_weights = attention_layer(
+                    #    query=text_features,
+                    #    key=image_features,
+                    #    value=image_features
+                    #)
 
                     #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
                     #print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
 
-                    encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
+                    #encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
+
+                    # Concatenate mapped image embeddings with text embeddings
+                    encoder_hidden_states = torch.cat([mapped_image_features, text_features], dim=1)
+                    print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}")
+
 
                     # Get the target for loss depending on the prediction type
                     if args.prediction_type is not None:
@@ -832,20 +797,24 @@ def lora_model(data, video_folder, args, training=True):
                                 safe_serialization=True,
                             )
 
+                            # Save the mapper state dict
+                            torch.save(mapper.state_dict(), os.path.join(save_path, 'mapper.pt'))
+
+
                             print("modello salvatooooooooooo")
 
                             logger.info(f"Saved state to {save_path}")
                     
 
-                        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer)
+                        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer, mapper)
 
                         # Visualizza le mappe di attenzione
-                        visualize_attention_maps(
-                            attention_weights,
-                            tokenizer,
-                            description,
-                            save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png"
-                        )
+                        #visualize_attention_maps(
+                        #    attention_weights,
+                        #    tokenizer,
+                        #    description,
+                        #    save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png"
+                        #)
 
                 logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
                 progress_bar.set_postfix(**logs)
@@ -881,7 +850,7 @@ def lora_model(data, video_folder, args, training=True):
         # Opzionale: visualizza il grafico interattivo in Colab
         fig.show()
     else:
-        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer)
+        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer, mapper)
 
 
 

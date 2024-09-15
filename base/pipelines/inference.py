@@ -69,6 +69,7 @@ class VideoGenPipeline(DiffusionPipeline):
         clip_processor: CLIPProcessor,
         clip_model: CLIPModel,
         attention_layer: nn.MultiheadAttention,
+        mapper,
     ):
         super().__init__()
 
@@ -131,6 +132,7 @@ class VideoGenPipeline(DiffusionPipeline):
             clip_processor=clip_processor,
             clip_model=clip_model,
             attention_layer=attention_layer,
+            mapper=mapper
         )
 
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
@@ -301,29 +303,17 @@ class VideoGenPipeline(DiffusionPipeline):
         if input_image is not None:
             # Processa l'immagine con CLIP
             image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
-            outputs = self.clip_model.vision_model(image_inputs, output_hidden_states=True)
-            image_features = outputs.last_hidden_state.to(torch.float32)
-            print(f"image_features1 shape: {image_features.shape}, dtype: {image_features.dtype}")
+            outputs = self.clip_model.vision_model(image_inputs, output_hidden_states=False)
+            image_features = outputs.pooler_output.to(dtype=prompt_embeds.dtype)
 
+            # Map image embeddings to text embedding space
+            mapped_image_features = self.mapper(image_features)
 
-            assert prompt_embeds.dtype == image_features.dtype, "prompt_embeds and image_features must have the same dtype"
+            # Expand dimensions to match text embeddings
+            mapped_image_features = mapped_image_features.unsqueeze(1)  # Shape: (batch_size, 1, embed_dim)
 
-            print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
-
-            # Transpose dimensions for attention: (batch_size, seq_len, embed_dim) -> (seq_len, batch_size, embed_dim)
-            prompt_embeds_t = prompt_embeds.transpose(0, 1)
-            image_features_t = image_features.transpose(0, 1)
-
-            # Apply attention_layer
-            # Query: prompt_embeds, Key: image_features, Value: image_features
-            encoder_hidden_states_t, _ = self.attention_layer(prompt_embeds_t, image_features_t, image_features_t)
-
-            # Transpose back to (batch_size, seq_len, embed_dim)
-            encoder_hidden_states = encoder_hidden_states_t.transpose(0, 1)
-
-            prompt_embeds = encoder_hidden_states
-
-            print(f"prompt_embeds3 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
+            # Concatenate mapped image embeddings with text embeddings
+            prompt_embeds = torch.cat([mapped_image_features, prompt_embeds], dim=1)
 
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
