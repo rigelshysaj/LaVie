@@ -71,7 +71,21 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
+
 class EmbeddingMapper(nn.Module):
+    def __init__(self, input_dim=768, output_dim=768, hidden_dim=512):
+        super(EmbeddingMapper, self).__init__()
+        self.fc = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, output_dim)
+        )
+
+    def forward(self, x):
+        return self.fc(x)
+
+
+class EmbeddingMapper_(nn.Module):
     def __init__(self, input_dim=768, output_dim=768, hidden_dim=512):
         super(EmbeddingMapper, self).__init__()
         self.fc = nn.Sequential(
@@ -671,12 +685,16 @@ def lora_model(data, video_folder, args, training=True):
 
                     text_features=text_features.to(torch.float16)
 
-                    image_features = image_outputs.last_hidden_state
+                    #image_features = image_outputs.last_hidden_state
+                    image_features = image_outputs.pooler_output
                     #print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
 
                     # Map image embeddings to text embedding space using the mapping network
                     mapped_image_features = mapper(image_features)  # Shape: (batch_size, hidden_size)
                     #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
+
+                    mapped_image_features = mapped_image_features.unsqueeze(1)
+                    #prompt_embeds = torch.cat([mapped_image_features, prompt_embeds], dim=1)
 
                     # Trasponi per adattare le dimensioni attese dall'attenzione
                     text_features_t = text_features.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
