@@ -162,6 +162,15 @@ def visualize_attention_maps(attention_weights, tokenizer, description_list, sav
     save_or_show_plot(plt, "barchart")
     plt.close()
 
+def compute_cosine_similarity(text_features, image_features):
+    # Aggrega le embedding lungo la dimensione della sequenza (media)
+    text_embedding = text_features.mean(dim=1)  # Shape: [1, 768]
+    image_embedding = image_features.mean(dim=1)  # Shape: [1, 768]
+    
+    # Calcola la similarità coseno
+    cosine_similarity = F.cosine_similarity(text_embedding, image_embedding)
+    return cosine_similarity.item()
+
 
 def load_and_transform_image(path):
     image = Image.open(path)
@@ -709,6 +718,9 @@ def lora_model(data, video_folder, args, training=True):
                     #mapped_image_features = mapped_image_features.unsqueeze(1)
                     #encoder_hidden_states = torch.cat([mapped_image_features, text_features], dim=1)
 
+                    similarity = compute_cosine_similarity(text_features, mapped_image_features)
+                    print(f"Cosine Similarity between text and image embeddings: {similarity}")
+
                     # Trasponi per adattare le dimensioni attese dall'attenzione
                     text_features_t = text_features.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
                     mapped_image_features_t = mapped_image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
@@ -723,15 +735,15 @@ def lora_model(data, video_folder, args, training=True):
                     # Trasponi per ottenere la forma originale
                     encoder_hidden_states = encoder_hidden_states_t.transpose(0, 1)  # Shape: (batch_size, seq_len_text, hidden_size)
 
-                    if global_step % 5 == 0:
+                    if (global_step + 1) % 5 == 0:
                     
                         for name, param in attention_layer.named_parameters():
                             if param.grad is not None:
-                                print(f"Gradient for {name}: {param.grad.abs().mean()}")
+                                print(f"Gradient for attention {name}: {param.grad.abs().mean()}")
 
                         for name, param in mapper.named_parameters():
                             if param.grad is not None:
-                                print(f"Gradient for {name}: {param.grad.abs().mean()}")
+                                print(f"Gradient for mapper {name}: {param.grad.abs().mean()}")
 
                     
                     #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
