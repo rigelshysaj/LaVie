@@ -480,10 +480,7 @@ def lora_model(data, video_folder, args, training=True):
     train_dataloader = DataLoader(dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=custom_collate)
     print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
 
-    for param in attention_layer.parameters():
-        param.requires_grad = True
-    for param in mapper.parameters():
-        param.requires_grad = True
+    
 
 
     lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
