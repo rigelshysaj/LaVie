@@ -709,11 +709,6 @@ def lora_model(data, video_folder, args, training=True):
                     #mapped_image_features = mapped_image_features.unsqueeze(1)
                     #encoder_hidden_states = torch.cat([mapped_image_features, text_features], dim=1)
 
-                    cosine_similarity = F.cosine_similarity(text_features, mapped_image_features, dim=-1)
-                    # Stampa la similarità media per verificare l'allineamento
-                    mean_similarity = cosine_similarity.mean().item()
-                    print(f"Mean cosine similarity between text and mapped image features: {mean_similarity}")
-
                     # Trasponi per adattare le dimensioni attese dall'attenzione
                     text_features_t = text_features.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
                     mapped_image_features_t = mapped_image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
