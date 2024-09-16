@@ -72,7 +72,7 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 
-class EmbeddingMapper_(nn.Module):
+class EmbeddingMapper_1(nn.Module):
     def __init__(self, input_dim=768, output_dim=768, hidden_dim=512):
         super(EmbeddingMapper, self).__init__()
         self.fc = nn.Sequential(
@@ -85,7 +85,7 @@ class EmbeddingMapper_(nn.Module):
         return self.fc(x)
 
 
-class EmbeddingMapper(nn.Module):
+class EmbeddingMapper_(nn.Module):
     def __init__(self, input_dim=768, output_dim=768, hidden_dim=512):
         super(EmbeddingMapper, self).__init__()
         self.fc = nn.Sequential(
@@ -102,6 +102,42 @@ class EmbeddingMapper(nn.Module):
         x = x.view(batch_size, seq_len, -1)  # Ricostruisce la sequenza
         return x
 
+class EmbeddingMapper(nn.Module):
+    def __init__(self, input_dim=768, output_dim=768, hidden_dim=1024, num_layers=3):
+        super(EmbeddingMapper, self).__init__()
+        
+        layers = []
+        layers.append(nn.Linear(input_dim, hidden_dim))
+        layers.append(nn.LayerNorm(hidden_dim))
+        layers.append(nn.ReLU())
+        layers.append(nn.Dropout(0.1))
+        
+        for _ in range(num_layers - 2):
+            layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.LayerNorm(hidden_dim))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(0.1))
+        
+        layers.append(nn.Linear(hidden_dim, output_dim))
+        
+        self.fc = nn.Sequential(*layers)
+        
+        # Connessione residuale
+        self.residual = nn.Linear(input_dim, output_dim) if input_dim != output_dim else nn.Identity()
+
+    def forward(self, x):
+        # x è di forma [batch_size, seq_len, input_dim]
+        batch_size, seq_len, input_dim = x.size()
+        x_flat = x.view(-1, input_dim)  # Appiattisce la sequenza
+        
+        out = self.fc(x_flat)
+        out = out.view(batch_size, seq_len, -1)  # Ricostruisce la sequenza
+        
+        # Aggiunge la connessione residuale
+        residual = self.residual(x)
+        out = out + residual
+        
+        return out
 
 
 def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
@@ -161,6 +197,8 @@ def visualize_attention_maps(attention_weights, tokenizer, description_list, sav
     plt.tight_layout()
     save_or_show_plot(plt, "barchart")
     plt.close()
+
+
 
 def compute_cosine_similarity(text_features, image_features):
     # Aggrega le embedding lungo la dimensione della sequenza (media)
@@ -480,7 +518,10 @@ def lora_model(data, video_folder, args, training=True):
     train_dataloader = DataLoader(dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=custom_collate)
     print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
 
-    
+    for param in attention_layer.parameters():
+        param.requires_grad = True
+    for param in mapper.parameters():
+        param.requires_grad = True
 
 
     lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
@@ -715,9 +756,6 @@ def lora_model(data, video_folder, args, training=True):
                     #mapped_image_features = mapped_image_features.unsqueeze(1)
                     #encoder_hidden_states = torch.cat([mapped_image_features, text_features], dim=1)
 
-                    similarity = compute_cosine_similarity(text_features, mapped_image_features)
-                    print(f"Cosine Similarity between text and image embeddings: {similarity}")
-
                     # Trasponi per adattare le dimensioni attese dall'attenzione
                     text_features_t = text_features.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
                     mapped_image_features_t = mapped_image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
@@ -732,7 +770,10 @@ def lora_model(data, video_folder, args, training=True):
                     # Trasponi per ottenere la forma originale
                     encoder_hidden_states = encoder_hidden_states_t.transpose(0, 1)  # Shape: (batch_size, seq_len_text, hidden_size)
 
-                    if (global_step + 1) % 5 == 0:
+                    if (global_step + 1) % 10 == 0:
+
+                        similarity = compute_cosine_similarity(text_features, mapped_image_features)
+                        print(f"Cosine Similarity between text and image embeddings: {similarity}")
                     
                         for name, param in attention_layer.named_parameters():
                             if param.grad is not None:
