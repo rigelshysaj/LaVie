@@ -425,8 +425,8 @@ def lora_model(data, video_folder, args, training=True):
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
     #tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
-    #text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
-    text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+    text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
+    #text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
     # Load CLIP model and processor for image conditioning
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
