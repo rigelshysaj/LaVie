@@ -425,7 +425,8 @@ def lora_model(data, video_folder, args, training=True):
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
     #tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
-    text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
+    #text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
+    text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
     # Load CLIP model and processor for image conditioning
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
@@ -469,6 +470,12 @@ def lora_model(data, video_folder, args, training=True):
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
     train_dataloader = DataLoader(dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=custom_collate)
     print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
+
+    for param in attention_layer.parameters():
+        param.requires_grad = True
+    for param in mapper.parameters():
+        param.requires_grad = True
+
 
     lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
 
@@ -585,7 +592,7 @@ def lora_model(data, video_folder, args, training=True):
             accelerator.load_state(os.path.join(args.output_dir, path))
             # Load the mapper state dict
             mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
-
+            mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'attention_layer.pt')))
             global_step = int(path.split("-")[1])
 
             initial_global_step = global_step
@@ -702,6 +709,11 @@ def lora_model(data, video_folder, args, training=True):
                     #mapped_image_features = mapped_image_features.unsqueeze(1)
                     #encoder_hidden_states = torch.cat([mapped_image_features, text_features], dim=1)
 
+                    cosine_similarity = F.cosine_similarity(text_features, mapped_image_features, dim=-1)
+                    # Stampa la similarità media per verificare l'allineamento
+                    mean_similarity = cosine_similarity.mean().item()
+                    print(f"Mean cosine similarity between text and mapped image features: {mean_similarity}")
+
                     # Trasponi per adattare le dimensioni attese dall'attenzione
                     text_features_t = text_features.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
                     mapped_image_features_t = mapped_image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
@@ -716,6 +728,17 @@ def lora_model(data, video_folder, args, training=True):
                     # Trasponi per ottenere la forma originale
                     encoder_hidden_states = encoder_hidden_states_t.transpose(0, 1)  # Shape: (batch_size, seq_len_text, hidden_size)
 
+                    if global_step % 5 == 0:
+                    
+                        for name, param in attention_layer.named_parameters():
+                            if param.grad is not None:
+                                print(f"Gradient for {name}: {param.grad.abs().mean()}")
+
+                        for name, param in mapper.named_parameters():
+                            if param.grad is not None:
+                                print(f"Gradient for {name}: {param.grad.abs().mean()}")
+
+                    
                     #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
                     #print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
 
@@ -819,6 +842,7 @@ def lora_model(data, video_folder, args, training=True):
 
                             # Save the mapper state dict
                             torch.save(mapper.state_dict(), os.path.join(save_path, 'mapper.pt'))
+                            torch.save(attention_layer.state_dict(), os.path.join(save_path, 'attention_layer.pt'))
 
 
                             print("modello salvatooooooooooo")
