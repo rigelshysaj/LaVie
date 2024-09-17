@@ -664,7 +664,7 @@ def lora_model(data, video_folder, args, training=True):
 
     if(training):
 
-        projection_layer = nn.Linear(512, 768).to(device)
+        projection_layer = nn.Linear(512, 768).to(device).to(torch.float16)
 
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
