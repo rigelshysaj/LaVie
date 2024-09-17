@@ -761,7 +761,7 @@ def lora_model(data, video_folder, args, training=True):
 
                     # Trasponi per adattare le dimensioni attese dall'attenzione
                     text_features_t = text_features.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
-                    mapped_image_features_t = mapped_image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
+                    mapped_image_features_t = image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
 
                     # Applica il cross-attention
                     encoder_hidden_states_t, attention_weights = attention_layer(
