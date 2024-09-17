@@ -310,6 +310,7 @@ class VideoGenPipeline(DiffusionPipeline):
                 return_dict=True
             )
             image_features = image_outputs.last_hidden_state  # Shape: (batch_size, seq_len_img, hidden_size)
+            image_features=image_features.to(torch.float16)
             image_features = projection(image_features)
             #image_features = image_outputs.pooler_output.to(dtype=prompt_embeds.dtype)
             

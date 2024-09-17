@@ -748,6 +748,7 @@ def lora_model(data, video_folder, args, training=True):
                     text_features=text_features.to(torch.float16)
 
                     image_features = image_outputs.last_hidden_state
+                    image_features=image_features.to(torch.float16)
                     image_features = projection(image_features)
                     #image_features = image_outputs.pooler_output
                     print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
