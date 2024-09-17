@@ -776,7 +776,7 @@ def lora_model(data, video_folder, args, training=True):
 
                     if (global_step + 1) % 10 == 0:
 
-                        similarity = compute_cosine_similarity(text_features, mapped_image_features)
+                        similarity = compute_cosine_similarity(text_features, image_features)
                         print(f"Cosine Similarity between text and image embeddings: {similarity}")
                     
                         for name, param in attention_layer.named_parameters():
