@@ -314,7 +314,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 '''
 
         # Genera video con il modello fine-tuned
-        generate_video(unet, is_original=False)
+        #generate_video(unet, is_original=False)
 
         generate_video(original_unet, is_original=True)
 
@@ -472,8 +472,8 @@ def lora_model(data, video_folder, args, training=True):
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
     #tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
-    text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
-    #text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+    #text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
+    text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
     # Load CLIP model and processor for image conditioning
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
@@ -664,6 +664,8 @@ def lora_model(data, video_folder, args, training=True):
 
     if(training):
 
+        projection_layer = nn.Linear(512, 768).to(device)
+
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
             attention_layer.train()
@@ -731,7 +733,11 @@ def lora_model(data, video_folder, args, training=True):
                     ).last_hidden_state
 
 
-                    #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                    print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") 
+
+                    text_features = projection_layer(text_features)
+
+                    print(f"text_features1 shape: {text_features.shape}, dtype: {text_features.dtype}") 
 
 
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
