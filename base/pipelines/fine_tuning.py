@@ -733,7 +733,7 @@ def lora_model(data, video_folder, args, training=True):
                     ).last_hidden_state
 
 
-                    print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                    #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
 
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
@@ -751,7 +751,7 @@ def lora_model(data, video_folder, args, training=True):
                     image_features=image_features.to(torch.float16)
                     image_features = projection(image_features)
                     #image_features = image_outputs.pooler_output
-                    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
+                    #print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
 
                     # Map image embeddings to text embedding space using the mapping network
                     #mapped_image_features = mapper(image_features)  # Shape: (batch_size, hidden_size)
