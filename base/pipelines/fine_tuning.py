@@ -664,6 +664,8 @@ def lora_model(data, video_folder, args, training=True):
 
     if(training):
 
+        projection = nn.Linear(1024, 768)
+
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
             attention_layer.train()
@@ -746,11 +748,12 @@ def lora_model(data, video_folder, args, training=True):
                     text_features=text_features.to(torch.float16)
 
                     image_features = image_outputs.last_hidden_state
+                    image_features = projection(image_features)
                     #image_features = image_outputs.pooler_output
                     print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
 
                     # Map image embeddings to text embedding space using the mapping network
-                    mapped_image_features = mapper(image_features)  # Shape: (batch_size, hidden_size)
+                    #mapped_image_features = mapper(image_features)  # Shape: (batch_size, hidden_size)
                     #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
                     #mapped_image_features = mapped_image_features.unsqueeze(1)

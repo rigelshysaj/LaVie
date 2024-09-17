@@ -250,6 +250,8 @@ class VideoGenPipeline(DiffusionPipeline):
         input_image: Optional[torch.FloatTensor] = None,
     ):
         
+        projection = nn.Linear(1024, 768)
+        
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
         elif prompt is not None and isinstance(prompt, list):
@@ -308,16 +310,17 @@ class VideoGenPipeline(DiffusionPipeline):
                 return_dict=True
             )
             image_features = image_outputs.last_hidden_state  # Shape: (batch_size, seq_len_img, hidden_size)
+            image_features = projection(image_features)
             #image_features = image_outputs.pooler_output.to(dtype=prompt_embeds.dtype)
             
             # Mappa le embedding di immagine nello spazio delle embedding del testo
-            mapped_image_features = self.mapper(image_features)  # Shape: (batch_size, seq_len_img, hidden_size)
+            #mapped_image_features = self.mapper(image_features)  # Shape: (batch_size, seq_len_img, hidden_size)
             #mapped_image_features = mapped_image_features.unsqueeze(1)
             #prompt_embeds = torch.cat([mapped_image_features, prompt_embeds], dim=1)
             
             # Trasponi le embedding per l'attenzione
             prompt_embeds_t = prompt_embeds.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
-            mapped_image_features_t = mapped_image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
+            mapped_image_features_t = image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
             
             # Applica il cross-attention
             encoder_hidden_states_t, _ = self.attention_layer(
