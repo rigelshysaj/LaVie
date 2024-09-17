@@ -249,7 +249,7 @@ class VideoGenPipeline(DiffusionPipeline):
         negative_prompt_embeds: Optional[torch.FloatTensor] = None,
         input_image: Optional[torch.FloatTensor] = None,
     ):
-        projection_layer = nn.Linear(512, 768).to(device)
+        projection_layer = nn.Linear(512, 768).to(device).to(torch.float16)
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
         elif prompt is not None and isinstance(prompt, list):
