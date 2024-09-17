@@ -250,7 +250,7 @@ class VideoGenPipeline(DiffusionPipeline):
         input_image: Optional[torch.FloatTensor] = None,
     ):
         
-        projection = nn.Linear(1024, 768)
+        projection = nn.Linear(1024, 768).to(device).to(torch.float16)
         
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
