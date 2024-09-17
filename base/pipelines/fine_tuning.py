@@ -314,7 +314,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 '''
 
         # Genera video con il modello fine-tuned
-        #generate_video(unet, is_original=False)
+        generate_video(unet, is_original=False)
 
         generate_video(original_unet, is_original=True)
 
@@ -470,14 +470,14 @@ def lora_model(data, video_folder, args, training=True):
     mapper = EmbeddingMapper().to(unet.device)
 
 
-    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
-    #tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
-    #text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
-    text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+    #tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+    tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
+    text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
+    #text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
     # Load CLIP model and processor for image conditioning
-    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
-    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
+    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
     noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
 
     unet.requires_grad_(False)
@@ -664,8 +664,6 @@ def lora_model(data, video_folder, args, training=True):
 
     if(training):
 
-        projection_layer = nn.Linear(512, 768).to(device).to(torch.float16)
-
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
             attention_layer.train()
@@ -733,11 +731,7 @@ def lora_model(data, video_folder, args, training=True):
                     ).last_hidden_state
 
 
-                    print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") 
-
-                    text_features = projection_layer(text_features)
-
-                    print(f"text_features1 shape: {text_features.shape}, dtype: {text_features.dtype}") 
+                    print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
 
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
@@ -747,7 +741,7 @@ def lora_model(data, video_folder, args, training=True):
                         return_dict=True
                     )
 
-                    #print(f"image_outputs shape: {image_outputs.shape}, dtype: {image_outputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
+                    print(f"image_outputs shape: {image_outputs.shape}, dtype: {image_outputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
 
                     text_features=text_features.to(torch.float16)
 

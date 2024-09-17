@@ -249,7 +249,7 @@ class VideoGenPipeline(DiffusionPipeline):
         negative_prompt_embeds: Optional[torch.FloatTensor] = None,
         input_image: Optional[torch.FloatTensor] = None,
     ):
-        projection_layer = nn.Linear(512, 768).to(device).to(torch.float16)
+        
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
         elif prompt is not None and isinstance(prompt, list):
@@ -290,9 +290,6 @@ class VideoGenPipeline(DiffusionPipeline):
                 attention_mask=attention_mask,
             )
             prompt_embeds = prompt_embeds[0]
-            print(f"prompt_embeds shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}") 
-            prompt_embeds = projection_layer(prompt_embeds)
-            print(f"prompt_embeds1 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}") 
 
         prompt_embeds = prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
         print(f"prompt_embeds1 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
@@ -373,10 +370,6 @@ class VideoGenPipeline(DiffusionPipeline):
                 attention_mask=attention_mask,
             )
             negative_prompt_embeds = negative_prompt_embeds[0]
-
-            print(f"negative_prompt_embeds0 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
-
-            negative_prompt_embeds = projection_layer(negative_prompt_embeds)
 
             print(f"negative_prompt_embeds1 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
 
