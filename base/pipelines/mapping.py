@@ -191,7 +191,6 @@ if __name__ == "__main__":
         mapping_dataset,
         batch_size=32,
         shuffle=True,
-        collate_fn=custom_collate
     )
 
     # Avvia il training
