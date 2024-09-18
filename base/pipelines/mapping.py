@@ -42,7 +42,7 @@ class MappingDataset(Dataset):
         print(f"video_descriptions: {self.video_descriptions}")
 
     def __len__(self):
-        return len(self.annotations)
+        return len(self.video_files)
 
     def __getitem__(self, idx):
         video_file = self.video_files[idx]
