@@ -130,7 +130,7 @@ class MappingNetwork(nn.Module):
         return self.mapping(x)
     
 
-def training():
+def training(mapping_dataloader):
     # Instantiate the mapping network
     mapping_network = MappingNetwork().to(device)
 
