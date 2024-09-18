@@ -5,7 +5,6 @@ from transformers import CLIPTextModel
 from diffusers import AutoencoderKL
 from PIL import Image
 import os
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import torch.nn as nn
 from torchvision import transforms
 import cv2
@@ -14,18 +13,12 @@ import imageio
 import torch.optim as optim
 import torch.nn.functional as F
 
-
-
 class MappingDataset(Dataset):
-    def __init__(self, annotations_file, video_dir, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, target_size=(512, 320)):
+    def __init__(self, annotations_file, video_dir, target_size=(512, 320)):
         self.video_dir = video_dir
-        self.clip_model = clip_model
-        self.clip_processor = clip_processor
-        self.sd_tokenizer = sd_tokenizer
-        self.sd_text_encoder = sd_text_encoder
         self.target_size = target_size
 
-    # Legge il file annotations.txt e memorizza le descrizioni in un dizionario
+        # Legge il file annotations.txt e memorizza le descrizioni in un dizionario
         self.video_descriptions = {}
         with open(annotations_file, 'r') as f:
             lines = f.readlines()
@@ -35,7 +28,7 @@ class MappingDataset(Dataset):
                 description = ' '.join(parts[1:])
                 if video_id not in self.video_descriptions:
                     self.video_descriptions[video_id] = description
-        
+
         # Ottieni la lista dei file video nella cartella YouTubeClips
         self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
 
@@ -49,8 +42,6 @@ class MappingDataset(Dataset):
         video_file = self.video_files[idx]
         video_path = os.path.join(self.video_dir, video_file)
 
-        
-
         # Carica il video utilizzando OpenCV
         cap = cv2.VideoCapture(video_path)
         frames = []
@@ -62,54 +53,18 @@ class MappingDataset(Dataset):
             frames.append(frame)
         cap.release()
 
-        #print(f"len frames: {len(frames)}")
-
-        
         # Estrarre un frame centrale
         mid_frame = frames[len(frames) // 2]
         mid_frame_np = np.array(mid_frame)
 
-        mid_frame = torch.tensor(mid_frame_np)
-        #print(f"mid_frame2 shape: {mid_frame.shape}, dtype: {mid_frame.dtype}") #shape: torch.Size([3, 320, 512]), dtype: torch.uint8
-        
+        # Converti il frame in formato PIL per il preprocessamento
+        mid_frame_pil = Image.fromarray(cv2.cvtColor(mid_frame_np, cv2.COLOR_BGR2RGB))
+
         # Ottieni le descrizioni del video
         video_id = os.path.splitext(video_file)[0]
-        descriptions = self.video_descriptions.get(video_id, [])
+        description = self.video_descriptions.get(video_id, "")
 
-        #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
-        
-
-        # Tokenize and encode the caption using Stable Diffusion's tokenizer and text encoder
-        text_inputs = self.sd_tokenizer(
-            list(descriptions),
-            max_length=self.sd_tokenizer.model_max_length,
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt"
-        )
-        with torch.no_grad():
-            text_embeddings = self.sd_text_encoder(
-                input_ids=text_inputs.input_ids,
-                attention_mask=text_inputs.attention_mask,
-            ).last_hidden_state  # Shape: [max_length, 768]
-            print(f"text_embeddings11 shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
-            text_embeddings = text_embeddings.squeeze(0)
-            print(f"text_embeddings22 shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
-
-        # Encode the image using CLIP's image encoder
-        image_inputs = self.clip_processor(images=mid_frame, return_tensors="pt")
-        with torch.no_grad():
-            image_embeddings = self.clip_model.vision_model(
-                pixel_values=image_inputs.pixel_values
-            ).last_hidden_state  # Shape: [num_patches, 1024]
-            print(f"image_embeddings11 shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
-            image_embeddings = image_embeddings.squeeze(0)
-            print(f"image_embeddings22 shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
-
-        return image_embeddings, text_embeddings
-        
-
-
+        return mid_frame_pil, description
 
 class MappingNetwork(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, hidden_dim=512):
@@ -123,40 +78,65 @@ class MappingNetwork(nn.Module):
     def forward(self, x):
         return self.mapping(x)
     
-
-def training(mapping_dataloader):
-    # Instantiate the mapping network
+    
+def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device):
+    # Instanzia la rete di mapping
     mapping_network = MappingNetwork().to(device)
 
-    # Define optimizer and loss function
+    # Definisci l'ottimizzatore e la funzione di perdita
     optimizer = optim.Adam(mapping_network.parameters(), lr=1e-4)
     criterion = nn.MSELoss()
 
-    num_epochs = 10  # Adjust as needed
+    num_epochs = 10  # Regola secondo necessità
 
     for epoch in range(num_epochs):
         mapping_network.train()
         epoch_loss = 0
         for batch in mapping_dataloader:
-            # Filter out None values
-            batch = [item for item in batch if item is not None]
-            if not batch:
-                continue
+            # batch è una lista di tuple (mid_frame_pil, description)
+            images, descriptions = zip(*batch)
 
-            # batch è una lista di tuple (image_embeddings, text_embeddings)
-            image_embeddings_batch, text_embeddings_batch = zip(*batch)
+            # Preprocessa le immagini
+            image_inputs = clip_processor(images=list(images), return_tensors="pt").pixel_values.to(device)
 
-            image_embeddings_batch = torch.stack(image_embeddings_batch).to(device)  # Shape: [batch_size, num_patches, 1024]
-            text_embeddings_batch = torch.stack(text_embeddings_batch).to(device)    # Shape: [batch_size, max_length, 768]
+            # Tokenizza e codifica le descrizioni
+            text_inputs = sd_tokenizer(
+                list(descriptions),
+                max_length=sd_tokenizer.model_max_length,
+                padding="max_length",
+                truncation=True,
+                return_tensors="pt"
+            ).to(device)
 
-            # You may need to flatten the sequences
-            image_embeddings_batch = image_embeddings_batch.view(-1, 1024)  # [batch_size * num_patches, 1024]
-            text_embeddings_batch = text_embeddings_batch.view(-1, 768)     # [batch_size * max_length, 768]
+            with torch.no_grad():
+                text_embeddings = sd_text_encoder(
+                    input_ids=text_inputs.input_ids,
+                    attention_mask=text_inputs.attention_mask,
+                ).last_hidden_state  # Shape: [batch_size, max_length, 768]
+
+                print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+
+                image_embeddings = clip_model.vision_model(
+                    pixel_values=image_inputs
+                ).last_hidden_state  # Shape: [batch_size, num_patches, 1024]
+
+                print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+
+            # Reshape le embeddings
+            image_embeddings = image_embeddings.view(image_embeddings.size(0) * image_embeddings.size(1), -1)  # [batch_size * num_patches, 1024]
+            print(f"image_embeddings2222 shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+            text_embeddings = text_embeddings.view(text_embeddings.size(0) * text_embeddings.size(1), -1)    # [batch_size * max_length, 768]
+            print(f"text_embeddings222 shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+
+            # Assicurati che le dimensioni corrispondano
+            #min_len = min(image_embeddings.size(0), text_embeddings.size(0))
+            #image_embeddings = image_embeddings[:min_len]
+            #text_embeddings = text_embeddings[:min_len]
 
             optimizer.zero_grad()
-            mapped_embeddings = mapping_network(image_embeddings_batch)  # Shape: [batch_size * num_patches, 768]
+            mapped_embeddings = mapping_network(image_embeddings)  # Shape: [min_len, 768]
 
-            loss = criterion(mapped_embeddings, text_embeddings_batch)
+            loss = criterion(mapped_embeddings, text_embeddings)
             loss.backward()
             optimizer.step()
 
@@ -165,38 +145,44 @@ def training(mapping_dataloader):
         avg_loss = epoch_loss / len(mapping_dataloader)
         print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.4f}")
 
-    # Save the trained mapping network
+    # Salva la rete di mapping addestrata
     torch.save(mapping_network.state_dict(), '/content/drive/My Drive/mapping_network.pth')
-    
 
 
 if __name__ == "__main__":
-
     dataset_path = '/content/drive/My Drive/msvd'
-    
+
     # Percorsi dei file
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
 
-    # Instantiate the dataset
+    # Imposta il dispositivo
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # Load models
+    # Carica i modelli
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
     clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
     sd_tokenizer = CLIPTokenizer.from_pretrained("CompVis/stable-diffusion-v1-4", subfolder="tokenizer")
     sd_text_encoder = CLIPTextModel.from_pretrained("CompVis/stable-diffusion-v1-4", subfolder="text_encoder").to(device)
 
-    # Instantiate dataset
+    # Imposta i modelli in modalità eval
+    clip_model.eval()
+    sd_text_encoder.eval()
+
+    # Instanzia il dataset
     mapping_dataset = MappingDataset(
         annotations_file=data,
         video_dir=video_folder,
-        clip_model=clip_model,
-        clip_processor=clip_processor,
-        sd_tokenizer=sd_tokenizer,
-        sd_text_encoder=sd_text_encoder,
     )
 
-    # Create DataLoader
-    mapping_dataloader = DataLoader(mapping_dataset, batch_size=32, shuffle=True, num_workers=4, collate_fn=lambda x: x)
-    training(mapping_dataloader)
+    # Crea il DataLoader con num_workers=0
+    mapping_dataloader = DataLoader(
+        mapping_dataset,
+        batch_size=32,
+        shuffle=True,
+        num_workers=0,  # Impostato a 0 per evitare problemi con CUDA nei worker
+        collate_fn=lambda x: x
+    )
+
+    # Avvia il training
+    training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device)
