@@ -184,7 +184,6 @@ if __name__ == "__main__":
     mapping_dataset = MappingDataset(
         annotations_file=data,
         video_dir=video_folder,
-        collate_fn=custom_collate
     )
 
     # Crea il DataLoader con num_workers=0
@@ -192,8 +191,7 @@ if __name__ == "__main__":
         mapping_dataset,
         batch_size=32,
         shuffle=True,
-        num_workers=0,  # Impostato a 0 per evitare problemi con CUDA nei worker
-        collate_fn=lambda x: x
+        collate_fn=custom_collate
     )
 
     # Avvia il training
