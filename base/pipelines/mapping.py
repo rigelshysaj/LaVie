@@ -22,6 +22,7 @@ class MappingDataset(Dataset):
         self.clip_processor = clip_processor
         self.sd_tokenizer = sd_tokenizer
         self.sd_text_encoder = sd_text_encoder
+        self.target_size = target_size
 
     # Legge il file annotations.txt e memorizza le descrizioni in un dizionario
         self.video_descriptions = {}
