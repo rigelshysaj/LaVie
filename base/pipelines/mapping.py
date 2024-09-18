@@ -48,69 +48,66 @@ class MappingDataset(Dataset):
         video_file = self.video_files[idx]
         video_path = os.path.join(self.video_dir, video_file)
 
-        try:
-
-            # Carica il video utilizzando OpenCV
-            cap = cv2.VideoCapture(video_path)
-            frames = []
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                frame = cv2.resize(frame, self.target_size)
-                frames.append(frame)
-            cap.release()
-
-            #print(f"len frames: {len(frames)}")
-
-            
-            # Estrarre un frame centrale
-            mid_frame = frames[len(frames) // 2]
-            mid_frame_np = np.array(mid_frame)
-
-            mid_frame = torch.tensor(mid_frame_np)
-            #print(f"mid_frame2 shape: {mid_frame.shape}, dtype: {mid_frame.dtype}") #shape: torch.Size([3, 320, 512]), dtype: torch.uint8
-            
-            # Ottieni le descrizioni del video
-            video_id = os.path.splitext(video_file)[0]
-            descriptions = self.video_descriptions.get(video_id, [])
-
-            #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
-            
-
-            # Tokenize and encode the caption using Stable Diffusion's tokenizer and text encoder
-            text_inputs = self.sd_tokenizer(
-                list(descriptions),
-                max_length=self.sd_tokenizer.model_max_length,
-                padding="max_length",
-                truncation=True,
-                return_tensors="pt"
-            )
-            with torch.no_grad():
-                text_embeddings = self.sd_text_encoder(
-                    input_ids=text_inputs.input_ids,
-                    attention_mask=text_inputs.attention_mask,
-                ).last_hidden_state  # Shape: [max_length, 768]
-                print(f"text_embeddings11 shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
-                text_embeddings = text_embeddings.squeeze(0)
-                print(f"text_embeddings22 shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
-
-            # Encode the image using CLIP's image encoder
-            image_inputs = self.clip_processor(images=mid_frame, return_tensors="pt")
-            with torch.no_grad():
-                image_embeddings = self.clip_model.vision_model(
-                    pixel_values=image_inputs.pixel_values
-                ).last_hidden_state  # Shape: [num_patches, 1024]
-                print(f"image_embeddings11 shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
-                image_embeddings = image_embeddings.squeeze(0)
-                print(f"image_embeddings22 shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
-
-            return image_embeddings, text_embeddings
         
+
+        # Carica il video utilizzando OpenCV
+        cap = cv2.VideoCapture(video_path)
+        frames = []
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frame = cv2.resize(frame, self.target_size)
+            frames.append(frame)
+        cap.release()
+
+        #print(f"len frames: {len(frames)}")
+
         
-        except Exception as e:
-            print(f"Skipping video {video_file} due to error: {e}")
-            return None
+        # Estrarre un frame centrale
+        mid_frame = frames[len(frames) // 2]
+        mid_frame_np = np.array(mid_frame)
+
+        mid_frame = torch.tensor(mid_frame_np)
+        #print(f"mid_frame2 shape: {mid_frame.shape}, dtype: {mid_frame.dtype}") #shape: torch.Size([3, 320, 512]), dtype: torch.uint8
+        
+        # Ottieni le descrizioni del video
+        video_id = os.path.splitext(video_file)[0]
+        descriptions = self.video_descriptions.get(video_id, [])
+
+        #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
+        
+
+        # Tokenize and encode the caption using Stable Diffusion's tokenizer and text encoder
+        text_inputs = self.sd_tokenizer(
+            list(descriptions),
+            max_length=self.sd_tokenizer.model_max_length,
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt"
+        )
+        with torch.no_grad():
+            text_embeddings = self.sd_text_encoder(
+                input_ids=text_inputs.input_ids,
+                attention_mask=text_inputs.attention_mask,
+            ).last_hidden_state  # Shape: [max_length, 768]
+            print(f"text_embeddings11 shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+            text_embeddings = text_embeddings.squeeze(0)
+            print(f"text_embeddings22 shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+
+        # Encode the image using CLIP's image encoder
+        image_inputs = self.clip_processor(images=mid_frame, return_tensors="pt")
+        with torch.no_grad():
+            image_embeddings = self.clip_model.vision_model(
+                pixel_values=image_inputs.pixel_values
+            ).last_hidden_state  # Shape: [num_patches, 1024]
+            print(f"image_embeddings11 shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+            image_embeddings = image_embeddings.squeeze(0)
+            print(f"image_embeddings22 shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+
+        return image_embeddings, text_embeddings
+        
+
 
 
 class MappingNetwork(nn.Module):
