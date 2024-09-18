@@ -49,7 +49,6 @@ class MappingDataset(Dataset):
         video_path = os.path.join(self.video_dir, video_file)
 
         try:
-
             # Carica il video utilizzando OpenCV
             cap = cv2.VideoCapture(video_path)
             frames = []
@@ -61,56 +60,56 @@ class MappingDataset(Dataset):
                 frames.append(frame)
             cap.release()
 
-            #print(f"len frames: {len(frames)}")
+            if not frames:
+                raise ValueError("No frames extracted from video.")
 
-            
             # Estrarre un frame centrale
             mid_frame = frames[len(frames) // 2]
-            mid_frame_np = np.array(mid_frame)
 
-            mid_frame = torch.tensor(mid_frame_np)
-            #print(f"mid_frame2 shape: {mid_frame.shape}, dtype: {mid_frame.dtype}") #shape: torch.Size([3, 320, 512]), dtype: torch.uint8
-            
+            # Converti il frame in RGB e in PIL Image
+            mid_frame_rgb = cv2.cvtColor(mid_frame, cv2.COLOR_BGR2RGB)
+            mid_frame_pil = Image.fromarray(mid_frame_rgb)
+
             # Ottieni le descrizioni del video
             video_id = os.path.splitext(video_file)[0]
-            descriptions = self.video_descriptions.get(video_id, [])
+            description = self.video_descriptions.get(video_id, None)
 
-            #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
-            
+            if description is None:
+                raise ValueError(f"No description found for video {video_id}")
 
             # Tokenize and encode the caption using Stable Diffusion's tokenizer and text encoder
             text_inputs = self.sd_tokenizer(
-                list(descriptions),
+                [description],  # Assicurati che sia una lista di stringhe
                 max_length=self.sd_tokenizer.model_max_length,
                 padding="max_length",
                 truncation=True,
                 return_tensors="pt"
             )
+            text_inputs = {k: v.to(self.sd_text_encoder.device) for k, v in text_inputs.items()}
+
             with torch.no_grad():
                 text_embeddings = self.sd_text_encoder(
-                    input_ids=text_inputs.input_ids,
-                    attention_mask=text_inputs.attention_mask,
-                ).last_hidden_state  # Shape: [max_length, 768]
-                print(f"text_embeddings11 shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
-                text_embeddings = text_embeddings.squeeze(0)
-                print(f"text_embeddings22 shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+                    input_ids=text_inputs["input_ids"],
+                    attention_mask=text_inputs["attention_mask"],
+                ).last_hidden_state  # Shape: [batch_size, max_length, 768]
+                text_embeddings = text_embeddings.squeeze(0)  # Shape: [max_length, 768]
 
             # Encode the image using CLIP's image encoder
-            image_inputs = self.clip_processor(images=mid_frame, return_tensors="pt")
+            image_inputs = self.clip_processor(images=mid_frame_pil, return_tensors="pt")
+            image_inputs = {k: v.to(self.clip_model.device) for k, v in image_inputs.items()}
+
             with torch.no_grad():
                 image_embeddings = self.clip_model.vision_model(
-                    pixel_values=image_inputs.pixel_values
-                ).last_hidden_state  # Shape: [num_patches, 1024]
-                print(f"image_embeddings11 shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
-                image_embeddings = image_embeddings.squeeze(0)
-                print(f"image_embeddings22 shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+                    pixel_values=image_inputs["pixel_values"]
+                ).last_hidden_state  # Shape: [batch_size, num_patches, 1024]
+                image_embeddings = image_embeddings.squeeze(0)  # Shape: [num_patches, 1024]
 
             return image_embeddings, text_embeddings
-        
-        
+
         except Exception as e:
             print(f"Skipping video {video_file} due to error: {e}")
-            return None, None, None
+            return None
+
 
 
 class MappingNetwork(nn.Module):
@@ -145,7 +144,9 @@ def training(mapping_dataloader):
             if not batch:
                 continue
 
+            # batch è una lista di tuple (image_embeddings, text_embeddings)
             image_embeddings_batch, text_embeddings_batch = zip(*batch)
+
             image_embeddings_batch = torch.stack(image_embeddings_batch).to(device)  # Shape: [batch_size, num_patches, 1024]
             text_embeddings_batch = torch.stack(text_embeddings_batch).to(device)    # Shape: [batch_size, max_length, 768]
 
