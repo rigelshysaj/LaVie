@@ -5,6 +5,7 @@ from transformers import CLIPTextModel
 from diffusers import AutoencoderKL
 from PIL import Image
 import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import torch.nn as nn
 from torchvision import transforms
 import cv2
