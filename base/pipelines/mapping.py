@@ -199,5 +199,5 @@ if __name__ == "__main__":
     )
 
     # Create DataLoader
-    mapping_dataloader = DataLoader(mapping_dataset, batch_size=1, shuffle=True, num_workers=4, collate_fn=lambda x: x)
+    mapping_dataloader = DataLoader(mapping_dataset, batch_size=32, shuffle=True, num_workers=4, collate_fn=lambda x: x)
     training(mapping_dataloader)
