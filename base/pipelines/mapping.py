@@ -191,6 +191,7 @@ if __name__ == "__main__":
         mapping_dataset,
         batch_size=32,
         shuffle=True,
+        collate_fn=lambda x: x
     )
 
     # Avvia il training
