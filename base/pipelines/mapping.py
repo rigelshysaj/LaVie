@@ -98,6 +98,9 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
             # batch è una lista di tuple (mid_frame_pil, description)
             images, descriptions = zip(*batch)
 
+            if(images is None or descriptions is None or len(descriptions) == 0):
+                continue
+
             # Preprocessa le immagini
             image_inputs = clip_processor(images=list(images), return_tensors="pt").pixel_values.to(device)
 
@@ -143,12 +146,18 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
             optimizer.zero_grad()
 
             epoch_loss += loss.item()
-            
+
         avg_loss = epoch_loss / len(mapping_dataloader)
         print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.4f}")
 
     # Salva la rete di mapping addestrata
     torch.save(mapping_network.state_dict(), '/content/drive/My Drive/mapping_network.pth')
+
+def custom_collate(batch):
+    batch = list(filter(lambda x: x[0] is not None and x[1] is not None, batch))
+    if len(batch) == 0:
+        return None, None
+    return torch.utils.data.dataloader.default_collate(batch)
 
 
 if __name__ == "__main__":
@@ -175,6 +184,7 @@ if __name__ == "__main__":
     mapping_dataset = MappingDataset(
         annotations_file=data,
         video_dir=video_folder,
+        collate_fn=custom_collate
     )
 
     # Crea il DataLoader con num_workers=0

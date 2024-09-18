@@ -671,13 +671,10 @@ def lora_model(data, video_folder, args, training=True):
 
                     try:
                         video, description, frame_tensor = batch
-
-                        #print(f"train_lora_model video shape: {video.shape}, dtype: {video.dtype}") #[1, 3, 16, 320, 512] torch.float32
-                        
-                        #print(f"frame_tensor111111 shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #frame_tensor shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
-                        
+                        description[0]
                     except Exception as e:
                         print(f"Skipping iteration due to error: {e}")
+                        print(description)
                         continue
                     
 
