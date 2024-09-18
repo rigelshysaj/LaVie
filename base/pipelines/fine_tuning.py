@@ -103,7 +103,7 @@ class EmbeddingMapper_(nn.Module):
         return x
 
 class EmbeddingMapper(nn.Module):
-    def __init__(self, input_dim=768, output_dim=768, hidden_dim=1024, num_layers=3):
+    def __init__(self, input_dim=1024, output_dim=768, hidden_dim=1024, num_layers=3):
         super(EmbeddingMapper, self).__init__()
         
         layers = []
@@ -314,7 +314,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 '''
 
         # Genera video con il modello fine-tuned
-        generate_video(unet, is_original=False)
+        #generate_video(unet, is_original=False)
 
         generate_video(original_unet, is_original=True)
 
@@ -470,10 +470,10 @@ def lora_model(data, video_folder, args, training=True):
     mapper = EmbeddingMapper().to(unet.device)
 
 
-    #tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
-    tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
-    text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
-    #text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+    tokenizer =CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
+    #tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
+    #text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
+    text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
     # Load CLIP model and processor for image conditioning
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
@@ -733,7 +733,7 @@ def lora_model(data, video_folder, args, training=True):
                     ).last_hidden_state
 
 
-                    #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                    print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
 
 
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
@@ -751,7 +751,7 @@ def lora_model(data, video_folder, args, training=True):
                     image_features=image_features.to(torch.float16)
                     image_features = projection(image_features)
                     #image_features = image_outputs.pooler_output
-                    #print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
+                    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
 
                     # Map image embeddings to text embedding space using the mapping network
                     #mapped_image_features = mapper(image_features)  # Shape: (batch_size, hidden_size)
