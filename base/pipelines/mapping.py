@@ -65,6 +65,8 @@ class MappingDataset(Dataset):
         description = self.video_descriptions.get(video_id, "")
 
         return mid_frame_pil, description
+    
+
 
 class MappingNetwork(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, hidden_dim=512):
@@ -129,9 +131,12 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
             print(f"text_embeddings222 shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
 
             # Assicurati che le dimensioni corrispondano
-            #min_len = min(image_embeddings.size(0), text_embeddings.size(0))
-            #image_embeddings = image_embeddings[:min_len]
-            #text_embeddings = text_embeddings[:min_len]
+            min_len = min(image_embeddings.size(0), text_embeddings.size(0))
+            image_embeddings = image_embeddings[:min_len]
+            text_embeddings = text_embeddings[:min_len]
+
+            print(f"image_embeddings3333 shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+            print(f"text_embeddings3333 shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
 
             optimizer.zero_grad()
             mapped_embeddings = mapping_network(image_embeddings)  # Shape: [min_len, 768]
