@@ -16,13 +16,12 @@ import torch.nn.functional as F
 
 
 class MappingDataset(Dataset):
-    def __init__(self, annotations_file, video_dir, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, frame_transform=None):
+    def __init__(self, annotations_file, video_dir, clip_model, clip_processor, sd_tokenizer, sd_text_encoder):
         self.video_dir = video_dir
         self.clip_model = clip_model
         self.clip_processor = clip_processor
         self.sd_tokenizer = sd_tokenizer
         self.sd_text_encoder = sd_text_encoder
-        self.frame_transform = frame_transform
 
     # Legge il file annotations.txt e memorizza le descrizioni in un dizionario
         self.video_descriptions = {}
@@ -77,10 +76,6 @@ class MappingDataset(Dataset):
 
             #print(f"description of __getitem__: {descriptions} video_id: {video_id}")
             
-            # Applica trasformazioni, se presenti
-            if self.frame_transform:
-                video = self.transform(video)
-                mid_frame = self.transform(mid_frame)
 
             # Tokenize and encode the caption using Stable Diffusion's tokenizer and text encoder
             text_inputs = self.sd_tokenizer(
@@ -199,7 +194,6 @@ if __name__ == "__main__":
         clip_processor=clip_processor,
         sd_tokenizer=sd_tokenizer,
         sd_text_encoder=sd_text_encoder,
-        frame_transform=frame_transform
     )
 
     # Create DataLoader
