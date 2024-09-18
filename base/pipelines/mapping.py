@@ -124,21 +124,26 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
 
                 print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
-            # Reshape le embeddings
-            image_embeddings = image_embeddings.view(image_embeddings.size(0) * image_embeddings.size(1), -1)  # [batch_size * num_patches, 1024]
-            print(f"image_embeddings2222 shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
-            text_embeddings = text_embeddings.view(text_embeddings.size(0) * text_embeddings.size(1), -1)    # [batch_size * max_length, 768]
-            print(f"text_embeddings222 shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+            # Mappa le embedding delle immagini
+            mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
 
-            optimizer.zero_grad()
-            mapped_embeddings = mapping_network(image_embeddings)  # Shape: [min_len, 768]
+            print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
 
-            loss = criterion(mapped_embeddings, text_embeddings)
+            # Aggrega le embedding per campione (es. media)
+            mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)  # [batch_size, 768]
+            text_embeddings_pooled = text_embeddings.mean(dim=1)  
+            
+            print(f"mapped_image_embeddings_pooled shape: {mapped_image_embeddings_pooled.shape}, dtype: {mapped_image_embeddings_pooled.dtype}")
+            print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
+
+            # Calcola la perdita
+            loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled)
             loss.backward()
             optimizer.step()
+            optimizer.zero_grad()
 
             epoch_loss += loss.item()
-
+            
         avg_loss = epoch_loss / len(mapping_dataloader)
         print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.4f}")
 
