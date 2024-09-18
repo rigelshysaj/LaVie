@@ -231,14 +231,8 @@ def load_and_transform_image(path):
 
 def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer, mapper):
         
-    #attention_layer.dtype = next(attention_layer.parameters()).dtype
-    #mapper.dtype = next(mapper.parameters()).dtype
-
-    vae = vae.to(device)
-    text_encoder = text_encoder.to(device)
-    unet = unet.to(device)
-    attention_layer = attention_layer.to(device)
-    mapper = mapper.to(device)
+    attention_layer.dtype = next(attention_layer.parameters()).dtype
+    mapper.dtype = next(mapper.parameters()).dtype
 
     with torch.no_grad():
         # Funzione per generare video
@@ -253,7 +247,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 clip_model=clip_model,
                 attention_layer=attention_layer,
                 mapper=mapper
-            )
+            ).to(device)
 
             pipeline.enable_xformers_memory_efficient_attention()
 
