@@ -16,7 +16,7 @@ import torch.nn.functional as F
 
 
 class MappingDataset(Dataset):
-    def __init__(self, annotations_file, video_dir, clip_model, clip_processor, sd_tokenizer, sd_text_encoder):
+    def __init__(self, annotations_file, video_dir, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, target_size=(512, 320)):
         self.video_dir = video_dir
         self.clip_model = clip_model
         self.clip_processor = clip_processor
