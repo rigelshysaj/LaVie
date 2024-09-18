@@ -16,7 +16,7 @@ import torch.nn.functional as F
 
 
 class MappingDataset(Dataset):
-    def __init__(self, annotations_file, video_dir, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, frame_transform):
+    def __init__(self, annotations_file, video_dir, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, frame_transform=None):
         self.video_dir = video_dir
         self.clip_model = clip_model
         self.clip_processor = clip_processor
@@ -181,14 +181,6 @@ if __name__ == "__main__":
     # Percorsi dei file
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
-
-
-    frame_transform = transforms.Compose([
-        transforms.Resize((320, 512)),  # CLIP expects 224x224 images
-        transforms.ToTensor(),
-        transforms.Normalize(mean=(0.48145466, 0.4578275, 0.40821073),
-                            std=(0.26862954, 0.26130258, 0.27577711)),
-    ])
 
     # Instantiate the dataset
     device = "cuda" if torch.cuda.is_available() else "cpu"
