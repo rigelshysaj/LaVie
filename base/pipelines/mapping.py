@@ -142,25 +142,25 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
                     attention_mask=text_inputs.attention_mask,
                 ).last_hidden_state  # Shape: [batch_size, max_length, 768]
 
-                print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+                #print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
 
                 image_embeddings = clip_model.vision_model(
                     pixel_values=image_inputs
                 ).last_hidden_state  # Shape: [batch_size, num_patches, 1024]
 
-                print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+                #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
 
-            print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
+            #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
 
             # Aggrega le embedding per campione (es. media)
             mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)  # [batch_size, 768]
             text_embeddings_pooled = text_embeddings.mean(dim=1)  
             
-            print(f"mapped_image_embeddings_pooled shape: {mapped_image_embeddings_pooled.shape}, dtype: {mapped_image_embeddings_pooled.dtype}")
-            print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
+            #print(f"mapped_image_embeddings_pooled shape: {mapped_image_embeddings_pooled.shape}, dtype: {mapped_image_embeddings_pooled.dtype}")
+            #print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
 
             # Normalizzazione
             mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
