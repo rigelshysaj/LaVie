@@ -106,7 +106,7 @@ class MappingNetwork_(nn.Module):
 def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device):
     
     mapping_network = MappingNetwork().to(device)
-    criterion = nn.CosineEmbeddingLoss()
+    criterion = nn.MSELoss()
     optimizer = optim.Adam(mapping_network.parameters(), lr=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
@@ -168,7 +168,7 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
 
             # Calcolo della loss
             target = torch.ones(text_embeddings_pooled.size(0)).to(device)
-            loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
+            loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled)
 
             cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
             mean_cosine_sim = cosine_sim.mean().item()
@@ -188,7 +188,7 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
         # Calcolo della similarità media per l'epoch
         avg_epoch_cosine_sim = epoch_cosine_sim / len(mapping_dataloader)
         print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss/len(mapping_dataloader):.4f},'
-          f'Mean Cosine Similarity: {avg_epoch_cosine_sim:.4f}')
+          f' Mean Cosine Similarity: {avg_epoch_cosine_sim:.4f}')
         
         if(epoch >= 5):
             torch.save(mapping_network.state_dict(), '/content/drive/My Drive/checkpoints/mapping_network.pth')
