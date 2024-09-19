@@ -603,8 +603,6 @@ def lora_model(data, video_folder, args, training=True):
 
     if(training):
 
-        projection = nn.Linear(1024, 768).to(device).to(torch.float16)
-
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
             attention_layer.train()
@@ -884,7 +882,7 @@ def model(args):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, args, training=True)
+    lora_model(data, video_folder, args, training=False)
 
 
 

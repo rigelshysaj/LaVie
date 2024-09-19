@@ -14,6 +14,7 @@
 import inspect
 from typing import Any, Callable, Dict, List, Optional, Union
 import einops
+import torch.nn.functional as F
 import torch
 from packaging import version
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
@@ -54,6 +55,14 @@ class StableDiffusionPipelineOutput(BaseOutput):
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
+def compute_cosine_similarity(text_features, image_features):
+    # Aggrega le embedding lungo la dimensione della sequenza (media)
+    text_embedding = text_features.mean(dim=1)  # Shape: [1, 768]
+    image_embedding = image_features.mean(dim=1)  # Shape: [1, 768]
+    
+    # Calcola la similarità coseno
+    cosine_similarity = F.cosine_similarity(text_embedding, image_embedding)
+    return cosine_similarity.item()
 
 class VideoGenPipeline(DiffusionPipeline):
     
@@ -249,9 +258,7 @@ class VideoGenPipeline(DiffusionPipeline):
         negative_prompt_embeds: Optional[torch.FloatTensor] = None,
         input_image: Optional[torch.FloatTensor] = None,
     ):
-        
-        projection = nn.Linear(1024, 768).to(device).to(torch.float16)
-        
+                
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
         elif prompt is not None and isinstance(prompt, list):
@@ -317,6 +324,10 @@ class VideoGenPipeline(DiffusionPipeline):
             mapped_image_features = self.mapper(image_features)  # Shape: (batch_size, seq_len_img, hidden_size)
             #mapped_image_features = mapped_image_features.unsqueeze(1)
             #prompt_embeds = torch.cat([mapped_image_features, prompt_embeds], dim=1)
+
+            similarity = compute_cosine_similarity(prompt_embeds, mapped_image_features)
+            print(f"Inference Cosine Similarity between text and image embeddings: {similarity}")
+
             
             # Trasponi le embedding per l'attenzione
             prompt_embeds_t = prompt_embeds.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
