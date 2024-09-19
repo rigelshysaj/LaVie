@@ -115,7 +115,8 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
 
     for epoch in range(num_epochs):
         mapping_network.train()
-        epoch_loss = 0
+        epoch_loss = 0.0
+        epoch_cosine_sim = 0.0  # Per monitorare la similarità in questo epoch
         for batch in mapping_dataloader:
             # batch è una lista di tuple (mid_frame_pil, description)
             images, descriptions = zip(*batch)
@@ -170,7 +171,8 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
             loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
 
             cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
-            print(f"Mean Cosine Similarity: {cosine_sim.mean().item()}")
+            mean_cosine_sim = cosine_sim.mean().item()
+            epoch_cosine_sim += mean_cosine_sim
 
             
             # Backpropagation
@@ -182,12 +184,15 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
             epoch_loss += loss.item()
 
         scheduler.step()
-        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss/len(mapping_dataloader)}')
-
+        
+        # Calcolo della similarità media per l'epoch
+        avg_epoch_cosine_sim = epoch_cosine_sim / len(mapping_dataloader)
+        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss/len(mapping_dataloader):.4f},'
+          f'Mean Cosine Similarity: {avg_epoch_cosine_sim:.4f}')
     # Salva la rete di mapping addestrata
     torch.save(mapping_network.state_dict(), '/content/drive/My Drive/mapping_network.pth')
 
-    
+
 
 def custom_collate(batch):
     batch = list(filter(lambda x: x[0] is not None and x[1] is not None, batch))
