@@ -106,8 +106,7 @@ class MappingNetwork(nn.Module):
 def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device):
     
     mapping_network = MappingNetwork().to(device)
-    criterion = nn.MSELoss()
-
+    criterion = nn.CosineEmbeddingLoss()
     optimizer = optim.Adam(mapping_network.parameters(), lr=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
@@ -169,7 +168,7 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
 
             # Calcolo della loss
             target = torch.ones(text_embeddings_pooled.size(0)).to(device)
-            loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled)
+            loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
 
             cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
             mean_cosine_sim = cosine_sim.mean().item()

@@ -417,7 +417,7 @@ def lora_model(data, video_folder, args, training=True):
     mapper = MappingNetwork().to(unet.device)
 
 
-    tokenizer =CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
+    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     #tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
     #text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
     text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
