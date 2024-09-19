@@ -685,20 +685,19 @@ def lora_model(data, video_folder, args, training=True):
 
                     image_features = image_outputs.last_hidden_state
                     image_features=image_features.to(torch.float16)
-                    image_features = projection(image_features)
                     #image_features = image_outputs.pooler_output
                     print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
 
                     # Map image embeddings to text embedding space using the mapping network
-                    #mapped_image_features = mapper(image_features)  # Shape: (batch_size, hidden_size)
-                    #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
+                    mapped_image_features = mapper(image_features)  # Shape: (batch_size, hidden_size)
+                    print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
-                    #mapped_image_features = mapped_image_features.unsqueeze(1)
-                    #encoder_hidden_states = torch.cat([mapped_image_features, text_features], dim=1)
+                    similarity = compute_cosine_similarity(text_features, mapped_image_features)
+                    print(f"Cosine Similarity between text and image embeddings: {similarity}")
 
                     # Trasponi per adattare le dimensioni attese dall'attenzione
                     text_features_t = text_features.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
-                    mapped_image_features_t = image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
+                    mapped_image_features_t = mapped_image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
 
                     # Applica il cross-attention
                     encoder_hidden_states_t, attention_weights = attention_layer(
@@ -709,23 +708,9 @@ def lora_model(data, video_folder, args, training=True):
 
                     # Trasponi per ottenere la forma originale
                     encoder_hidden_states = encoder_hidden_states_t.transpose(0, 1)  # Shape: (batch_size, seq_len_text, hidden_size)
-
-                    if (global_step + 1) % 10 == 0:
-
-                        similarity = compute_cosine_similarity(text_features, image_features)
-                        print(f"Cosine Similarity between text and image embeddings: {similarity}")
                     
-                        for name, param in attention_layer.named_parameters():
-                            if param.grad is not None:
-                                print(f"Gradient for attention {name}: {param.grad.abs().mean()}")
-
-                        for name, param in mapper.named_parameters():
-                            if param.grad is not None:
-                                print(f"Gradient for mapper {name}: {param.grad.abs().mean()}")
-
-                    
-                    #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
-                    #print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
+                    print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
+                    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
 
                     # Get the target for loss depending on the prediction type
                     if args.prediction_type is not None:
