@@ -87,7 +87,7 @@ class MappingNetwork_(nn.Module):
         current_dim = input_dim
         for hidden_dim in hidden_dims:
             layers.append(nn.Linear(current_dim, hidden_dim))
-            layers.append(nn.GELU())
+            layers.append(nn.RELU())
             layers.append(nn.BatchNorm1d(hidden_dim))
             layers.append(nn.Dropout(0.1))
             current_dim = hidden_dim

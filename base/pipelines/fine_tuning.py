@@ -71,74 +71,27 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
-
-class EmbeddingMapper_1(nn.Module):
-    def __init__(self, input_dim=768, output_dim=768, hidden_dim=512):
-        super(EmbeddingMapper, self).__init__()
-        self.fc = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, output_dim)
-        )
-
-    def forward(self, x):
-        return self.fc(x)
-
-
-class EmbeddingMapper_(nn.Module):
-    def __init__(self, input_dim=768, output_dim=768, hidden_dim=512):
-        super(EmbeddingMapper, self).__init__()
-        self.fc = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, output_dim)
-        )
-
-    def forward(self, x):
-        # x è di forma [batch_size, seq_len, input_dim]
-        batch_size, seq_len, input_dim = x.size()
-        x = x.view(-1, input_dim)  # Appiattisce la sequenza
-        x = self.fc(x)
-        x = x.view(batch_size, seq_len, -1)  # Ricostruisce la sequenza
-        return x
-
-class EmbeddingMapper(nn.Module):
-    def __init__(self, input_dim=1024, output_dim=768, hidden_dim=1024, num_layers=3):
-        super(EmbeddingMapper, self).__init__()
-        
+class MappingNetwork(nn.Module):
+    def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
+        super(MappingNetwork, self).__init__()
         layers = []
-        layers.append(nn.Linear(input_dim, hidden_dim))
-        layers.append(nn.LayerNorm(hidden_dim))
-        layers.append(nn.ReLU())
-        layers.append(nn.Dropout(0.1))
-        
-        for _ in range(num_layers - 2):
-            layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(nn.LayerNorm(hidden_dim))
-            layers.append(nn.ReLU())
+        current_dim = input_dim
+        for hidden_dim in hidden_dims:
+            layers.append(nn.Linear(current_dim, hidden_dim))
+            layers.append(nn.RELU())
+            layers.append(nn.BatchNorm1d(hidden_dim))
             layers.append(nn.Dropout(0.1))
-        
-        layers.append(nn.Linear(hidden_dim, output_dim))
-        
-        self.fc = nn.Sequential(*layers)
-        
-        # Connessione residuale
-        self.residual = nn.Linear(input_dim, output_dim) if input_dim != output_dim else nn.Identity()
-
+            current_dim = hidden_dim
+        layers.append(nn.Linear(current_dim, output_dim))
+        self.mapping = nn.Sequential(*layers)
+    
     def forward(self, x):
-        # x è di forma [batch_size, seq_len, input_dim]
-        batch_size, seq_len, input_dim = x.size()
-        x_flat = x.view(-1, input_dim)  # Appiattisce la sequenza
-        
-        out = self.fc(x_flat)
-        out = out.view(batch_size, seq_len, -1)  # Ricostruisce la sequenza
-        
-        # Aggiunge la connessione residuale
-        residual = self.residual(x)
-        out = out + residual
-        
-        return out
-
+        # x: [batch_size, num_patches, 1024]
+        batch_size, num_patches, _ = x.size()
+        x = x.view(batch_size * num_patches, -1)  # [batch_size * num_patches, 1024]
+        x = self.mapping(x)  # [batch_size * num_patches, 768]
+        x = x.view(batch_size, num_patches, -1)  # [batch_size, num_patches, 768]
+        return x
 
 def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
     # Unisci la lista di descrizioni in una singola stringa
@@ -461,7 +414,7 @@ def lora_model(data, video_folder, args, training=True):
     original_unet.load_state_dict(state_dict)
 
     # Instantiate the mapping network
-    mapper = EmbeddingMapper().to(unet.device)
+    mapper = MappingNetwork().to(unet.device)
 
 
     tokenizer =CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
