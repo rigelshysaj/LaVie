@@ -66,9 +66,9 @@ class MappingDataset(Dataset):
 
         return mid_frame_pil, description
     
-class MappingNetwork(nn.Module):
+class MappingNetwork_(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, hidden_dim=512):
-        super(MappingNetwork, self).__init__()
+        super(MappingNetwork_, self).__init__()
         self.mapping = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
@@ -80,9 +80,9 @@ class MappingNetwork(nn.Module):
     def forward(self, x):
         return self.mapping(x)
     
-class MappingNetwork_(nn.Module):
+class MappingNetwork(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
-        super(MappingNetwork_, self).__init__()
+        super(MappingNetwork, self).__init__()
         layers = []
         current_dim = input_dim
         for hidden_dim in hidden_dims:
@@ -107,6 +107,7 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
     
     mapping_network = MappingNetwork().to(device)
     criterion = nn.MSELoss()
+
     optimizer = optim.Adam(mapping_network.parameters(), lr=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
