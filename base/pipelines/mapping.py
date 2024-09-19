@@ -182,10 +182,12 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
             epoch_loss += loss.item()
 
         scheduler.step()
-        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss/len(mapping_dataloader)}, Cosine Similarity: {cosine_sim.mean().item()}')
+        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss/len(mapping_dataloader)}')
 
     # Salva la rete di mapping addestrata
     torch.save(mapping_network.state_dict(), '/content/drive/My Drive/mapping_network.pth')
+
+    
 
 def custom_collate(batch):
     batch = list(filter(lambda x: x[0] is not None and x[1] is not None, batch))
