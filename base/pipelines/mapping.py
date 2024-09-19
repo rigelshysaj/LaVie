@@ -66,13 +66,13 @@ class MappingDataset(Dataset):
 
         return mid_frame_pil, description
     
-
-
-class MappingNetwork(nn.Module):
+class MappingNetwork_(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, hidden_dim=512):
-        super(MappingNetwork, self).__init__()
+        super(MappingNetwork_, self).__init__()
         self.mapping = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, output_dim)
         )
@@ -80,14 +80,36 @@ class MappingNetwork(nn.Module):
     def forward(self, x):
         return self.mapping(x)
     
+class MappingNetwork(nn.Module):
+    def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
+        super(MappingNetwork, self).__init__()
+        layers = []
+        current_dim = input_dim
+        for hidden_dim in hidden_dims:
+            layers.append(nn.Linear(current_dim, hidden_dim))
+            layers.append(nn.GELU())
+            layers.append(nn.BatchNorm1d(hidden_dim))
+            layers.append(nn.Dropout(0.1))
+            current_dim = hidden_dim
+        layers.append(nn.Linear(current_dim, output_dim))
+        self.mapping = nn.Sequential(*layers)
+    
+    def forward(self, x):
+        # x: [batch_size, num_patches, 1024]
+        batch_size, num_patches, _ = x.size()
+        x = x.view(batch_size * num_patches, -1)  # [batch_size * num_patches, 1024]
+        x = self.mapping(x)  # [batch_size * num_patches, 768]
+        x = x.view(batch_size, num_patches, -1)  # [batch_size, num_patches, 768]
+        return x
+    
     
 def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device):
-    # Instanzia la rete di mapping
+    
     mapping_network = MappingNetwork().to(device)
-
-    # Definisci l'ottimizzatore e la funzione di perdita
+    criterion = nn.CosineEmbeddingLoss()
     optimizer = optim.Adam(mapping_network.parameters(), lr=1e-4)
-    criterion = nn.MSELoss()
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+
 
     num_epochs = 10  # Regola secondo necessità
 
@@ -139,16 +161,28 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
             print(f"mapped_image_embeddings_pooled shape: {mapped_image_embeddings_pooled.shape}, dtype: {mapped_image_embeddings_pooled.dtype}")
             print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
 
-            # Calcola la perdita
-            loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled)
+            # Normalizzazione
+            mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
+            text_embeddings_pooled = F.normalize(text_embeddings_pooled, dim=-1)
+
+            # Calcolo della loss
+            target = torch.ones(text_embeddings_pooled.size(0)).to(device)
+            loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
+
+            cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
+            print(f"Mean Cosine Similarity: {cosine_sim.mean().item()}")
+
+            
+            # Backpropagation
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(mapping_network.parameters(), max_norm=1.0)
             optimizer.step()
             optimizer.zero_grad()
-
+            
             epoch_loss += loss.item()
 
-        avg_loss = epoch_loss / len(mapping_dataloader)
-        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.4f}")
+        scheduler.step()
+        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss/len(mapping_dataloader)}, Cosine Similarity: {cosine_sim.mean().item()}')
 
     # Salva la rete di mapping addestrata
     torch.save(mapping_network.state_dict(), '/content/drive/My Drive/mapping_network.pth')
