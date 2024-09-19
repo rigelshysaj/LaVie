@@ -66,9 +66,9 @@ class MappingDataset(Dataset):
 
         return mid_frame_pil, description
     
-class MappingNetwork_(nn.Module):
+class MappingNetwork(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, hidden_dim=512):
-        super(MappingNetwork_, self).__init__()
+        super(MappingNetwork, self).__init__()
         self.mapping = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
@@ -80,9 +80,9 @@ class MappingNetwork_(nn.Module):
     def forward(self, x):
         return self.mapping(x)
     
-class MappingNetwork(nn.Module):
+class MappingNetwork_(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
-        super(MappingNetwork, self).__init__()
+        super(MappingNetwork_, self).__init__()
         layers = []
         current_dim = input_dim
         for hidden_dim in hidden_dims:
@@ -189,8 +189,9 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
         avg_epoch_cosine_sim = epoch_cosine_sim / len(mapping_dataloader)
         print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss/len(mapping_dataloader):.4f},'
           f'Mean Cosine Similarity: {avg_epoch_cosine_sim:.4f}')
-    # Salva la rete di mapping addestrata
-    torch.save(mapping_network.state_dict(), '/content/drive/My Drive/mapping_network.pth')
+        
+        if(epoch >= 5):
+            torch.save(mapping_network.state_dict(), '/content/drive/My Drive/checkpoints/mapping_network.pth')
 
 
 
