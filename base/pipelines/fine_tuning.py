@@ -72,26 +72,18 @@ class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
 class MappingNetwork(nn.Module):
-    def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
+    def __init__(self, input_dim=1024, output_dim=768, hidden_dim=512):
         super(MappingNetwork, self).__init__()
-        layers = []
-        current_dim = input_dim
-        for hidden_dim in hidden_dims:
-            layers.append(nn.Linear(current_dim, hidden_dim))
-            layers.append(nn.ReLU())
-            layers.append(nn.BatchNorm1d(hidden_dim))
-            layers.append(nn.Dropout(0.1))
-            current_dim = hidden_dim
-        layers.append(nn.Linear(current_dim, output_dim))
-        self.mapping = nn.Sequential(*layers)
-    
+        self.mapping = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, output_dim)
+        )
+
     def forward(self, x):
-        # x: [batch_size, num_patches, 1024]
-        batch_size, num_patches, _ = x.size()
-        x = x.view(batch_size * num_patches, -1)  # [batch_size * num_patches, 1024]
-        x = self.mapping(x)  # [batch_size * num_patches, 768]
-        x = x.view(batch_size, num_patches, -1)  # [batch_size, num_patches, 768]
-        return x
+        return self.mapping(x)
 
 def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
     # Unisci la lista di descrizioni in una singola stringa
@@ -415,7 +407,7 @@ def lora_model(data, video_folder, args, training=True):
 
     # Instantiate the mapping network
     mapper = MappingNetwork().to(unet.device)
-
+    mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     #tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
@@ -585,7 +577,7 @@ def lora_model(data, video_folder, args, training=True):
             accelerator.print(f"Resuming from checkpoint {path}")
             accelerator.load_state(os.path.join(args.output_dir, path))
             # Load the mapper state dict
-            mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
+            #mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
             mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'attention_layer.pt')))
             global_step = int(path.split("-")[1])
 
@@ -834,7 +826,7 @@ def lora_model(data, video_folder, args, training=True):
                             )
 
                             # Save the mapper state dict
-                            torch.save(mapper.state_dict(), os.path.join(save_path, 'mapper.pt'))
+                            #torch.save(mapper.state_dict(), os.path.join(save_path, 'mapper.pt'))
                             torch.save(attention_layer.state_dict(), os.path.join(save_path, 'attention_layer.pt'))
 
 
