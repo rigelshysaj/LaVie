@@ -118,10 +118,6 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
             if not images or not descriptions:
                 continue
 
-            print(f"text_embeddings shape: {list(images).shape}, dtype: {list(images).dtype}")
-            print(f"descriptions shape: {list(descriptions).shape}, dtype: {list(descriptions).dtype}")
-
-
             # Preprocessa le immagini
             image_inputs = clip_processor(images=list(images), return_tensors="pt").pixel_values.to(device)
 
