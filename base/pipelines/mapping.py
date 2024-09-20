@@ -12,59 +12,56 @@ import numpy as np
 import imageio
 import torch.optim as optim
 import torch.nn.functional as F
+import random
+
 
 class MappingDataset(Dataset):
-    def __init__(self, annotations_file, video_dir, target_size=(512, 320)):
-        self.video_dir = video_dir
-        self.target_size = target_size
+    def __init__(self, annotations_file, image_dir, transform=None):
+        self.image_dir = image_dir
+        self.transform = transform
 
-        # Legge il file annotations.txt e memorizza le descrizioni in un dizionario
-        self.video_descriptions = {}
+        # Leggi caption.txt e memorizza le descrizioni in un dizionario
+        self.image_descriptions = {}
         with open(annotations_file, 'r') as f:
             lines = f.readlines()
             for line in lines:
-                parts = line.strip().split(' ')
-                video_id = parts[0]
-                description = ' '.join(parts[1:])
-                if video_id not in self.video_descriptions:
-                    self.video_descriptions[video_id] = description
+                line = line.strip()
+                if line:
+                    parts = line.split(',', 1)
+                    if len(parts) == 2:
+                        image_filename, caption = parts
+                        if image_filename in self.image_descriptions:
+                            self.image_descriptions[image_filename].append(caption)
+                        else:
+                            self.image_descriptions[image_filename] = [caption]
 
-        # Ottieni la lista dei file video nella cartella YouTubeClips
-        self.video_files = [f for f in os.listdir(video_dir) if f.endswith('.avi')]
-
-        print(f"video_files: {self.video_files}")
-        print(f"video_descriptions: {self.video_descriptions}")
+        # Ottieni la lista dei file immagine nella cartella Images
+        self.image_files = [f for f in os.listdir(image_dir) if f.endswith('.jpg')]
 
     def __len__(self):
-        return len(self.video_files)
-
+        return len(self.image_files)
+    
     def __getitem__(self, idx):
-        video_file = self.video_files[idx]
-        video_path = os.path.join(self.video_dir, video_file)
+        image_file = self.image_files[idx]
+        image_path = os.path.join(self.image_dir, image_file)
 
-        # Carica il video utilizzando OpenCV
-        cap = cv2.VideoCapture(video_path)
-        frames = []
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-            frame = cv2.resize(frame, self.target_size)
-            frames.append(frame)
-        cap.release()
+        # Carica l'immagine utilizzando PIL
+        image = Image.open(image_path).convert('RGB')
 
-        # Estrarre un frame centrale
-        mid_frame = frames[len(frames) // 2]
-        mid_frame_np = np.array(mid_frame)
+        if self.transform:
+            image = self.transform(image)
 
-        # Converti il frame in formato PIL per il preprocessamento
-        mid_frame_pil = Image.fromarray(cv2.cvtColor(mid_frame_np, cv2.COLOR_BGR2RGB))
+        # Ottieni le descrizioni dell'immagine
+        descriptions = self.image_descriptions.get(image_file, [])
+        if descriptions:
+            # Seleziona una didascalia casualmente
+            description = random.choice(descriptions)
+        else:
+            description = ""
 
-        # Ottieni le descrizioni del video
-        video_id = os.path.splitext(video_file)[0]
-        description = self.video_descriptions.get(video_id, "")
+        return image, description
 
-        return mid_frame_pil, description
+
     
 class MappingNetwork(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, hidden_dim=512):
@@ -194,20 +191,18 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
             torch.save(mapping_network.state_dict(), '/content/drive/My Drive/checkpoints/mapping_network.pth')
 
 
-
 def custom_collate(batch):
-    batch = list(filter(lambda x: x[0] is not None and x[1] is not None, batch))
-    if len(batch) == 0:
-        return None, None
-    return torch.utils.data.dataloader.default_collate(batch)
+    batch = list(filter(lambda x: x[0] is not None and x[1] != "", batch))
+    images, descriptions = zip(*batch)
+    return images, descriptions
 
 
 if __name__ == "__main__":
-    dataset_path = '/content/drive/My Drive/msvd'
+    dataset_path = '/content/drive/My Drive/flick'
 
     # Percorsi dei file
-    video_folder = os.path.join(dataset_path, 'YouTubeClips')
-    data = os.path.join(dataset_path, 'annotations.txt')
+    image_folder = os.path.join(dataset_path, 'Images')
+    annotations_file = os.path.join(dataset_path, 'caption.txt')
 
     # Imposta il dispositivo
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -222,10 +217,16 @@ if __name__ == "__main__":
     clip_model.eval()
     sd_text_encoder.eval()
 
-    # Instanzia il dataset
+    transform = transforms.Compose([
+        transforms.Resize((320, 512)),
+        transforms.ToTensor(),
+    ])
+
+    # Passa il transform al dataset
     mapping_dataset = MappingDataset(
-        annotations_file=data,
-        video_dir=video_folder,
+        annotations_file=annotations_file,
+        image_dir=image_folder,
+        transform=transform,
     )
 
     # Crea il DataLoader con num_workers=0
@@ -233,8 +234,9 @@ if __name__ == "__main__":
         mapping_dataset,
         batch_size=32,
         shuffle=True,
-        collate_fn=lambda x: x
+        collate_fn=custom_collate
     )
 
     # Avvia il training
     training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device)
+
