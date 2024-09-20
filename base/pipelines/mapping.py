@@ -202,7 +202,7 @@ if __name__ == "__main__":
 
     # Percorsi dei file
     image_folder = os.path.join(dataset_path, 'Images')
-    annotations_file = os.path.join(dataset_path, 'caption.txt')
+    annotations_file = os.path.join(dataset_path, 'captions.txt')
 
     # Imposta il dispositivo
     device = "cuda" if torch.cuda.is_available() else "cpu"
