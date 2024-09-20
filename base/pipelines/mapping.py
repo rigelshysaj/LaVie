@@ -114,11 +114,8 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
         mapping_network.train()
         epoch_loss = 0.0
         epoch_cosine_sim = 0.0  # Per monitorare la similarità in questo epoch
-        for batch in mapping_dataloader:
-            # batch è una lista di tuple (mid_frame_pil, description)
-            images, descriptions = zip(*batch)
-
-            if(images is None or descriptions is None or len(descriptions) == 0):
+        for images, descriptions in mapping_dataloader:
+            if not images or not descriptions:
                 continue
 
             # Preprocessa le immagini
