@@ -198,7 +198,7 @@ def custom_collate(batch):
 
 
 if __name__ == "__main__":
-    dataset_path = '/content/drive/My Drive/flick'
+    dataset_path = '/content/drive/My Drive/flickr'
 
     # Percorsi dei file
     image_folder = os.path.join(dataset_path, 'Images')
