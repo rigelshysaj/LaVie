@@ -50,6 +50,7 @@ from inference import VideoGenPipeline
 from arguments import Details
 from msvd import VideoDatasetMsvd
 from mapping import MappingNetwork
+from mapping import CrossAttentionNetwork
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
@@ -398,7 +399,8 @@ def lora_model(data, video_folder, args, training=True):
     
     unet = get_peft_model(unet, lora_config)
 
-    attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device).to(weight_dtype)
+    attention_layer = CrossAttentionNetwork(embed_dim=768, num_heads=8)
+    attention_layer.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/cross_attention_network.pth'))
 
     if args.mixed_precision == "fp16":
         # only upcast trainable parameters (LoRA) into fp32
@@ -834,7 +836,7 @@ def model(args):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, args, training=False)
+    lora_model(data, video_folder, args, training=True)
 
 
 

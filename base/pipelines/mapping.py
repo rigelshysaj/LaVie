@@ -284,7 +284,7 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
         print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss/len(mapping_dataloader):.4f},'
           f' Mean Cosine Similarity: {avg_epoch_cosine_sim:.4f}')
         
-        if(epoch >= 1):
+        if(epoch >= 5):
             torch.save(mapping_network.state_dict(), '/content/drive/My Drive/checkpoints/mapping_network.pth')
 
 
