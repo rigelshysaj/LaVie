@@ -647,6 +647,22 @@ def lora_model(data, video_folder, args, training=True):
                     similarity = compute_cosine_similarity(text_features, mapped_image_features)
                     print(f"Cosine Similarity between text and image embeddings: {similarity}")
 
+                    img = load_and_transform_image(args.image_path)
+                    image_inputs1 = clip_processor(images=img, return_tensors="pt").pixel_values.to(unet.device)
+                    image_outputs1 = clip_model.vision_model(
+                        pixel_values=image_inputs1,
+                        output_hidden_states=True,
+                        return_dict=True
+                    )
+                    img_features = image_outputs1.last_hidden_state
+                    img_features=img_features.to(torch.float16)
+                    print(f"img_features shape: {img_features.shape}, dtype: {img_features.dtype}")
+                    mapped_img_features = mapper(img_features)
+
+
+
+                    similarity1 = compute_cosine_similarity(text_features, mapped_img_features)
+                    print(f"Cosine------ Similarity between text and image embeddings: {similarity1}")
                     
                     # Applica il cross-attention
                     encoder_hidden_states, attention_weights = attention_layer(text_features, mapped_image_features)
