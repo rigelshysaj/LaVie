@@ -308,7 +308,7 @@ def custom_collate(batch):
 
 if __name__ == "__main__":
     dataset_path = '/content/drive/My Drive/flickr'
-    train_cross_attention = True
+    train_cross_attention = False
     # Percorsi dei file
     image_folder = os.path.join(dataset_path, 'Images')
     annotations_file = os.path.join(dataset_path, 'captions.txt')
