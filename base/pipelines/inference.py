@@ -318,7 +318,9 @@ class VideoGenPipeline(DiffusionPipeline):
                 return_dict=True
             )
             image_features = image_outputs.last_hidden_state  # Shape: (batch_size, seq_len_img, hidden_size)
-            image_features=image_features.to(torch.float16)
+            image_features=image_features.to(torch.float32)
+            self.mapper = self.mapper.to(torch.float32)
+            
             #image_features = image_outputs.pooler_output.to(dtype=prompt_embeds.dtype)
             
             # Mappa le embedding di immagine nello spazio delle embedding del testo
