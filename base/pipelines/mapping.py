@@ -62,6 +62,105 @@ class MappingDataset(Dataset):
         return image, description
 
 
+class CrossAttentionNetwork(nn.Module):
+    def __init__(self, embed_dim=768, num_heads=8):
+        super(CrossAttentionNetwork, self).__init__()
+        self.attention_layer = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads)
+        self.feedforward = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim),
+            nn.ReLU(),
+            nn.Linear(embed_dim, embed_dim)
+        )
+
+    def forward(self, text_features, mapped_image_features):
+        # text_features: [batch_size, seq_len_text, embed_dim]
+        # mapped_image_features: [batch_size, seq_len_img, embed_dim]
+
+        # Transpose for multihead attention
+        text_features_t = text_features.transpose(0, 1)  # Shape: [seq_len_text, batch_size, embed_dim]
+        mapped_image_features_t = mapped_image_features.transpose(0, 1)  # Shape: [seq_len_img, batch_size, embed_dim]
+
+        # Apply cross-attention
+        attention_output, attention_weights = self.attention_layer(
+            query=text_features_t,
+            key=mapped_image_features_t,
+            value=mapped_image_features_t
+        )
+
+        # Transpose back
+        attention_output = attention_output.transpose(0, 1)  # Shape: [batch_size, seq_len_text, embed_dim]
+
+        # Apply feedforward network
+        output = self.feedforward(attention_output)  # Shape: [batch_size, seq_len_text, embed_dim]
+
+        return output
+    
+
+def training_cross_attention(mapping_dataloader, mapping_network, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device):
+    
+    # mapping_network is pre-trained, set to eval mode
+    mapping_network.eval()
+    
+    cross_attention_network = CrossAttentionNetwork(embed_dim=768, num_heads=8).to(device)
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(cross_attention_network.parameters(), lr=1e-4)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+    
+    num_epochs = 10  # Adjust as needed
+    
+    for epoch in range(num_epochs):
+        cross_attention_network.train()
+        epoch_loss = 0.0
+        for images, descriptions in mapping_dataloader:
+            if not images or not descriptions:
+                continue
+
+            # Preprocess images
+            image_inputs = clip_processor(images=list(images), return_tensors="pt").pixel_values.to(device)
+
+            # Tokenize and encode descriptions
+            text_inputs = sd_tokenizer(
+                list(descriptions),
+                max_length=sd_tokenizer.model_max_length,
+                padding="max_length",
+                truncation=True,
+                return_tensors="pt"
+            ).to(device)
+
+            with torch.no_grad():
+                text_embeddings = sd_text_encoder(
+                    input_ids=text_inputs.input_ids,
+                    attention_mask=text_inputs.attention_mask,
+                ).last_hidden_state  # Shape: [batch_size, max_length, 768]
+
+                image_embeddings = clip_model.vision_model(
+                    pixel_values=image_inputs
+                ).last_hidden_state  # Shape: [batch_size, num_patches, 1024]
+
+                # Map image embeddings using the pre-trained mapping network
+                mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, num_patches, 768]
+
+            # Forward pass through the cross-attention network
+            output = cross_attention_network(text_embeddings, mapped_image_embeddings)  # [batch_size, seq_len_text, 768]
+
+            # Compute loss between output and text_embeddings
+            loss = criterion(output, text_embeddings)
+
+            # Backpropagation
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(cross_attention_network.parameters(), max_norm=1.0)
+            optimizer.step()
+            optimizer.zero_grad()
+            
+            epoch_loss += loss.item()
+
+        scheduler.step()
+        
+        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss/len(mapping_dataloader):.4f}')
+        
+        # Optionally save the model
+        torch.save(cross_attention_network.state_dict(), '/content/drive/My Drive/checkpoints/cross_attention_network.pth')
+
     
 class MappingNetwork_(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, hidden_dim=512):
@@ -100,7 +199,7 @@ class MappingNetwork(nn.Module):
         return x
     
     
-def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device):
+def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device):
     
     mapping_network = MappingNetwork().to(device)
 
@@ -197,7 +296,7 @@ def custom_collate(batch):
 
 if __name__ == "__main__":
     dataset_path = '/content/drive/My Drive/flickr'
-
+    train_cross_attention = True
     # Percorsi dei file
     image_folder = os.path.join(dataset_path, 'Images')
     annotations_file = os.path.join(dataset_path, 'captions.txt')
@@ -235,6 +334,14 @@ if __name__ == "__main__":
         collate_fn=custom_collate
     )
 
-    # Avvia il training
-    training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device)
+    if(train_cross_attention):
+        # Load pre-trained mapping network
+        mapping_network = MappingNetwork().to(device)
+        mapping_network.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth', map_location=device))
+        mapping_network.eval()
+
+        training_cross_attention(mapping_dataloader, mapping_network, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device)
+    else:
+        training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device)
+
 

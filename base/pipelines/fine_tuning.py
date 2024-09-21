@@ -49,6 +49,7 @@ import plotly.graph_objects as go
 from inference import VideoGenPipeline
 from arguments import Details
 from msvd import VideoDatasetMsvd
+from mapping import MappingNetwork
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
@@ -71,27 +72,6 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
-class MappingNetwork(nn.Module):
-    def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
-        super(MappingNetwork, self).__init__()
-        layers = []
-        current_dim = input_dim
-        for hidden_dim in hidden_dims:
-            layers.append(nn.Linear(current_dim, hidden_dim))
-            layers.append(nn.ReLU())
-            layers.append(nn.BatchNorm1d(hidden_dim))
-            layers.append(nn.Dropout(0.1))
-            current_dim = hidden_dim
-        layers.append(nn.Linear(current_dim, output_dim))
-        self.mapping = nn.Sequential(*layers)
-    
-    def forward(self, x):
-        # x: [batch_size, num_patches, 1024]
-        batch_size, num_patches, _ = x.size()
-        x = x.view(batch_size * num_patches, -1)  # [batch_size * num_patches, 1024]
-        x = self.mapping(x)  # [batch_size * num_patches, 768]
-        x = x.view(batch_size, num_patches, -1)  # [batch_size, num_patches, 768]
-        return x
 
 def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
     # Unisci la lista di descrizioni in una singola stringa
