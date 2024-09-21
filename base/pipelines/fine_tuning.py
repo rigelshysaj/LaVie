@@ -559,7 +559,7 @@ def lora_model(data, video_folder, args, training=True):
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
             attention_layer.train()
-            mapper.train()
+            mapper.eval()
 
             batch_losses = []
             train_loss = 0.0
@@ -648,6 +648,42 @@ def lora_model(data, video_folder, args, training=True):
                     print(f"Cosine Similarity between text and image embeddings: {similarity}")
 
                     
+                    img = load_and_transform_image(args.image_path)
+                    image_inputs1 = clip_processor(images=img, return_tensors="pt").pixel_values.to(unet.device)
+                    image_outputs1 = clip_model.vision_model(
+                        pixel_values=image_inputs1,
+                        output_hidden_states=True,
+                        return_dict=True
+                    )
+                    img_features = image_outputs1.last_hidden_state
+                    img_features=img_features.to(torch.float16)
+                    print(f"img_features shape: {img_features.shape}, dtype: {img_features.dtype}")
+                    mapped_img_features = mapper(img_features)
+
+                    for prompt in args.text_prompt:
+                        print(f"prompt: {prompt}")
+                        testo_inputs = tokenizer(
+                            prompt,
+                            max_length=tokenizer.model_max_length,
+                            padding="max_length",
+                            truncation=True,
+                            return_tensors="pt"
+                        ).to(unet.device)
+
+                        # Estrai le caratteristiche di testo dal modello CLIP
+                        testo_features = text_encoder(
+                            input_ids=testo_inputs.input_ids,
+                            attention_mask=text_inputs.attention_mask,
+                            output_hidden_states=True,
+                            return_dict=True
+                        ).last_hidden_state
+
+                        testo_features=testo_features.to(torch.float16)
+
+                        similarity1 = compute_cosine_similarity(testo_features, mapped_img_features)
+                        print(f"Cosine------ Similarity between text and image embeddings: {similarity1}")
+
+
                     # Applica il cross-attention
                     encoder_hidden_states, attention_weights = attention_layer(text_features, mapped_image_features)
                     
