@@ -93,7 +93,7 @@ class CrossAttentionNetwork(nn.Module):
         # Apply feedforward network
         output = self.feedforward(attention_output)  # Shape: [batch_size, seq_len_text, embed_dim]
 
-        return output
+        return output, attention_weights
     
 
 def training_cross_attention(mapping_dataloader, mapping_network, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device):
@@ -141,7 +141,7 @@ def training_cross_attention(mapping_dataloader, mapping_network, clip_model, cl
                 mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, num_patches, 768]
 
             # Forward pass through the cross-attention network
-            output = cross_attention_network(text_embeddings, mapped_image_embeddings)  # [batch_size, seq_len_text, 768]
+            output, attention_weights = cross_attention_network(text_embeddings, mapped_image_embeddings)  # [batch_size, seq_len_text, 768]
 
             # Compute loss between output and text_embeddings
             loss = criterion(output, text_embeddings)
