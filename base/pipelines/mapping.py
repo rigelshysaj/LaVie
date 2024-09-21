@@ -103,6 +103,7 @@ class MappingNetwork(nn.Module):
 def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device):
     
     mapping_network = MappingNetwork().to(device)
+
     criterion = nn.CosineEmbeddingLoss()
     optimizer = optim.Adam(mapping_network.parameters(), lr=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
@@ -184,7 +185,7 @@ def training(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_te
         print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss/len(mapping_dataloader):.4f},'
           f' Mean Cosine Similarity: {avg_epoch_cosine_sim:.4f}')
         
-        if(epoch >= 5):
+        if(epoch >= 1):
             torch.save(mapping_network.state_dict(), '/content/drive/My Drive/checkpoints/mapping_network.pth')
 
 
