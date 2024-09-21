@@ -188,11 +188,28 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
             if(not is_original):
                 image_tensor = load_and_transform_image(args.image_path)
             
-            for prompt in args.text_prompt:
-                print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
-                videos = pipeline(
+            
+            print(f'Processing the ({list("a dog with a bucket")}) prompt for {"original" if is_original else "fine-tuned"} model')
+            videos = pipeline(
+                list("a dog with a bucket"),
+                image_tensor=image_tensor if not is_original else None,
+                video_length=args.video_length, 
+                height=args.image_size[0], 
+                width=args.image_size[1], 
+                num_inference_steps=args.num_sampling_steps,
+                guidance_scale=args.guidance_scale
+            ).video
+
+            suffix = "original" if is_original else "fine_tuned"
+            imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
+            del videos
+
+            '''
+            if(not is_original):
+                zero_tensor = torch.zeros_like(image_tensor)
+                test = pipeline(
                     prompt,
-                    image_tensor=image_tensor if not is_original else None,
+                    image_tensor=zero_tensor,
                     video_length=args.video_length, 
                     height=args.image_size[0], 
                     width=args.image_size[1], 
@@ -200,45 +217,28 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                     guidance_scale=args.guidance_scale
                 ).video
 
-                suffix = "original" if is_original else "fine_tuned"
-                imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
-                del videos
+                imageio.mimwrite(f"/content/drive/My Drive/test111111_fine_tuned.mp4", test[0], fps=8, quality=9)
+                del test
 
-                '''
-                if(not is_original):
-                    zero_tensor = torch.zeros_like(image_tensor)
-                    test = pipeline(
-                        prompt,
-                        image_tensor=zero_tensor,
-                        video_length=args.video_length, 
-                        height=args.image_size[0], 
-                        width=args.image_size[1], 
-                        num_inference_steps=args.num_sampling_steps,
-                        guidance_scale=args.guidance_scale
-                    ).video
+                image_2 = load_and_transform_image("/content/drive/My Drive/horse.jpeg")
 
-                    imageio.mimwrite(f"/content/drive/My Drive/test111111_fine_tuned.mp4", test[0], fps=8, quality=9)
-                    del test
-
-                    image_2 = load_and_transform_image("/content/drive/My Drive/horse.jpeg")
-
-                    test_2 = pipeline(
-                        prompt,
-                        image_tensor=image_2,
-                        video_length=args.video_length, 
-                        height=args.image_size[0], 
-                        width=args.image_size[1], 
-                        num_inference_steps=args.num_sampling_steps,
-                        guidance_scale=args.guidance_scale
-                    ).video
-                    
-                    imageio.mimwrite(f"/content/drive/My Drive/test2222222_fine_tuned.mp4", test_2[0], fps=8, quality=9)
-                    del test_2
-            
+                test_2 = pipeline(
+                    prompt,
+                    image_tensor=image_2,
+                    video_length=args.video_length, 
+                    height=args.image_size[0], 
+                    width=args.image_size[1], 
+                    num_inference_steps=args.num_sampling_steps,
+                    guidance_scale=args.guidance_scale
+                ).video
                 
-                del pipeline
-                torch.cuda.empty_cache()
-                '''
+                imageio.mimwrite(f"/content/drive/My Drive/test2222222_fine_tuned.mp4", test_2[0], fps=8, quality=9)
+                del test_2
+        
+            
+            del pipeline
+            torch.cuda.empty_cache()
+            '''
 
         # Genera video con il modello fine-tuned
         generate_video(unet, is_original=False)
@@ -840,7 +840,7 @@ def model(args):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, args, training=True)
+    lora_model(data, video_folder, args, training=False)
 
 
 
