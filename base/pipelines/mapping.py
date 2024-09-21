@@ -125,7 +125,8 @@ def training_cross_attention(mapping_dataloader, mapping_network, clip_model, cl
                 padding="max_length",
                 truncation=True,
                 return_tensors="pt"
-            )
+            ).to(device)
+
 
             text_input_ids = text_inputs.input_ids
 
@@ -149,6 +150,8 @@ def training_cross_attention(mapping_dataloader, mapping_network, clip_model, cl
                     pixel_values=image_inputs
                 )
                 image_embeddings = image_embeddings[0]
+
+                mapped_image_embeddings = mapping_network(image_embeddings)
 
                 print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
@@ -174,9 +177,9 @@ def training_cross_attention(mapping_dataloader, mapping_network, clip_model, cl
         torch.save(cross_attention_network.state_dict(), '/content/drive/My Drive/checkpoints/cross_attention_network.pth')
 
     
-class MappingNetwork_(nn.Module):
+class MappingNetwork(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, hidden_dim=512):
-        super(MappingNetwork_, self).__init__()
+        super(MappingNetwork, self).__init__()
         self.mapping = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
@@ -188,9 +191,9 @@ class MappingNetwork_(nn.Module):
     def forward(self, x):
         return self.mapping(x)
     
-class MappingNetwork(nn.Module):
+class MappingNetwork_(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
-        super(MappingNetwork, self).__init__()
+        super(MappingNetwork_, self).__init__()
         layers = []
         current_dim = input_dim
         for hidden_dim in hidden_dims:
