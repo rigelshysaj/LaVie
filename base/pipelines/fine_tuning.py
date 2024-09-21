@@ -660,9 +660,9 @@ def lora_model(data, video_folder, args, training=True):
                     mapped_img_features = mapper(img_features)
 
                     for prompt in args.text_prompt:
-
+                        print(f"prompt: {prompt}")
                         testo_inputs = tokenizer(
-                            args.prompt,
+                            prompt,
                             max_length=tokenizer.model_max_length,
                             padding="max_length",
                             truncation=True,
