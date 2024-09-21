@@ -187,11 +187,11 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
 
             if(not is_original):
                 image_tensor = load_and_transform_image(args.image_path)
+            prompt = ["a dog with a bucket"]
             
-            
-            print(f'Processing the ({list("a dog with a bucket")}) prompt for {"original" if is_original else "fine-tuned"} model')
+            print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
             videos = pipeline(
-                list("a dog with a bucket"),
+                prompt,
                 image_tensor=image_tensor if not is_original else None,
                 video_length=args.video_length, 
                 height=args.image_size[0], 
