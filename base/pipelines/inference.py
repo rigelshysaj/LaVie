@@ -15,6 +15,7 @@ import inspect
 from typing import Any, Callable, Dict, List, Optional, Union
 import einops
 import torch.nn.functional as F
+from mapping import CrossAttentionNetwork
 import torch
 from packaging import version
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
@@ -329,19 +330,11 @@ class VideoGenPipeline(DiffusionPipeline):
             print(f"Inference Cosine Similarity between text and image embeddings: {similarity}")
 
             
-            # Trasponi le embedding per l'attenzione
-            prompt_embeds_t = prompt_embeds.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
-            mapped_image_features_t = mapped_image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
             
             # Applica il cross-attention
-            encoder_hidden_states_t, _ = self.attention_layer(
-                query=prompt_embeds_t,
-                key=mapped_image_features_t,
-                value=mapped_image_features_t
-            )
+            prompt_embeds, _ = self.attention_layer(prompt_embeds, mapped_image_features)
+
             
-            # Trasponi di nuovo
-            prompt_embeds = encoder_hidden_states_t.transpose(0, 1)
 
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
