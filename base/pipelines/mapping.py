@@ -228,21 +228,33 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
                 padding="max_length",
                 truncation=True,
                 return_tensors="pt"
-            ).to(device)
+            )
+
+            text_input_ids = text_inputs.input_ids
+
+            if hasattr(sd_text_encoder.config, "use_attention_mask") and sd_text_encoder.config.use_attention_mask:
+                print("usa attention mask")
+                attention_mask = text_inputs.attention_mask.to(device)
+            else:
+                attention_mask = None
+
 
             with torch.no_grad():
                 text_embeddings = sd_text_encoder(
-                    input_ids=text_inputs.input_ids,
-                    attention_mask=text_inputs.attention_mask,
-                ).last_hidden_state  # Shape: [batch_size, max_length, 768]
+                    text_input_ids.to(device),
+                    attention_mask=attention_mask,
+                )
+                text_embeddings = text_embeddings[0]
+                text_embeddings.to(dtype=sd_text_encoder.dtype, device=device)
 
-                #print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+                print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
 
                 image_embeddings = clip_model.vision_model(
                     pixel_values=image_inputs
-                ).last_hidden_state  # Shape: [batch_size, num_patches, 1024]
+                )
+                image_embeddings = image_embeddings[0]
 
-                #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+                print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
