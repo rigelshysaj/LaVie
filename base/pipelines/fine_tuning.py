@@ -621,7 +621,7 @@ def lora_model(data, video_folder, args, training=True):
                     ).last_hidden_state
 
 
-                    print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #[1, 10, 768] torch.float16
+                    print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
 
                     image_inputs = clip_processor(images=frame_tensor, return_tensors="pt").pixel_values.to(unet.device)
