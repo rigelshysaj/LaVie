@@ -419,9 +419,9 @@ def lora_model(data, video_folder, args, training=True):
 
     lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
 
-    #trainable_params = list(lora_layers) + list(attention_layer.parameters()) + list(mapper.parameters())
+    trainable_params = list(lora_layers) + list(attention_layer.parameters()) + list(mapper.parameters())
 
-    trainable_params = list(lora_layers) + list(attention_layer.parameters())
+    #trainable_params = list(lora_layers) + list(attention_layer.parameters())
 
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
@@ -560,6 +560,7 @@ def lora_model(data, video_folder, args, training=True):
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
             attention_layer.train()
+            mapper.train()
 
             batch_losses = []
             train_loss = 0.0
@@ -647,19 +648,10 @@ def lora_model(data, video_folder, args, training=True):
                     similarity = compute_cosine_similarity(text_features, mapped_image_features)
                     print(f"Cosine Similarity between text and image embeddings: {similarity}")
 
-                    # Trasponi per adattare le dimensioni attese dall'attenzione
-                    text_features_t = text_features.transpose(0, 1)  # Shape: (seq_len_text, batch_size, hidden_size)
-                    mapped_image_features_t = mapped_image_features.transpose(0, 1)  # Shape: (seq_len_img, batch_size, hidden_size)
-
+                    
                     # Applica il cross-attention
-                    encoder_hidden_states_t, attention_weights = attention_layer(
-                        query=text_features_t,          # Query: testo
-                        key=mapped_image_features_t,    # Key: immagini
-                        value=mapped_image_features_t   # Value: immagini
-                    )
-
-                    # Trasponi per ottenere la forma originale
-                    encoder_hidden_states = encoder_hidden_states_t.transpose(0, 1)  # Shape: (batch_size, seq_len_text, hidden_size)
+                    encoder_hidden_states, attention_weights = attention_layer(text_features, mapped_image_features)
+                    
                     
                     print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
                     print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
