@@ -145,12 +145,11 @@ def compute_cosine_similarity(text_features, image_features):
 
 
 def load_and_transform_image(path):
-    image = Image.open(path)
+    image = Image.open(path).convert('RGB')
 
-    # Definisci la trasformazione
     transform = transforms.Compose([
         transforms.Resize((320, 512)),
-        transforms.ToTensor()  # Converte l'immagine in un tensore
+        transforms.ToTensor(),
     ])
 
     # Applica la trasformazione all'immagine
