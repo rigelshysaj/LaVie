@@ -149,6 +149,24 @@ class VideoGenPipeline(DiffusionPipeline):
         
         # self.register_to_config(requires_safety_checker=requires_safety_checker)
 
+    @property
+    def _execution_device(self):
+        r"""
+        Returns the device on which the pipeline's models will be executed. After calling
+        `pipeline.enable_sequential_cpu_offload()` the execution device can only be inferred from Accelerate's module
+        hooks.
+        """
+        if not hasattr(self.unet, "_hf_hook"):
+            return self.device
+        for module in self.unet.modules():
+            if (
+                hasattr(module, "_hf_hook")
+                and hasattr(module._hf_hook, "execution_device")
+                and module._hf_hook.execution_device is not None
+            ):
+                return torch.device(module._hf_hook.execution_device)
+        return self.device
+
     def enable_vae_slicing(self):
         r"""
         Enable sliced VAE decoding.
@@ -230,24 +248,6 @@ class VideoGenPipeline(DiffusionPipeline):
 
         self.final_offload_hook = hook
 
-    @property
-    def _execution_device(self):
-        r"""
-        Returns the device on which the pipeline's models will be executed. After calling
-        `pipeline.enable_sequential_cpu_offload()` the execution device can only be inferred from Accelerate's module
-        hooks.
-        """
-        if not hasattr(self.unet, "_hf_hook"):
-            return self.device
-        for module in self.unet.modules():
-            if (
-                hasattr(module, "_hf_hook")
-                and hasattr(module._hf_hook, "execution_device")
-                and module._hf_hook.execution_device is not None
-            ):
-                return torch.device(module._hf_hook.execution_device)
-        return self.device
-
     def _encode_prompt(
         self,
         prompt,
@@ -320,7 +320,7 @@ class VideoGenPipeline(DiffusionPipeline):
             image_features = image_outputs.last_hidden_state  # Shape: (batch_size, seq_len_img, hidden_size)
             image_features=image_features.to(torch.float32)
             self.mapper = self.mapper.to(torch.float32)
-            
+
             #image_features = image_outputs.pooler_output.to(dtype=prompt_embeds.dtype)
             
             # Mappa le embedding di immagine nello spazio delle embedding del testo
