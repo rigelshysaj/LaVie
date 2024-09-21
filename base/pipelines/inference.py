@@ -267,22 +267,31 @@ class VideoGenPipeline(DiffusionPipeline):
         else:
             batch_size = prompt_embeds.shape[0]
 
+
         text_inputs = self.tokenizer(
             prompt,
             max_length=self.tokenizer.model_max_length,
             padding="max_length",
             truncation=True,
             return_tensors="pt"
-        ).to(self.unet.device)
+        )
+
+        text_input_ids = text_inputs.input_ids
+
+        if hasattr(self.text_encoder.config, "use_attention_mask") and self.text_encoder.config.use_attention_mask:
+            print("usa attention mask")
+            attention_mask = text_inputs.attention_mask.to(device)
+        else:
+            attention_mask = None
 
         # Estrai le caratteristiche di testo dal modello CLIP
         prompt_embeds = self.text_encoder(
-            input_ids=text_inputs.input_ids,
-            attention_mask=text_inputs.attention_mask,
-            output_hidden_states=True,
-            return_dict=True
-        ).last_hidden_state
+            text_input_ids.to(device),
+            attention_mask=attention_mask,
+        )
+        prompt_embeds = prompt_embeds[0]
 
+        prompt_embeds = prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
         prompt_embeds = prompt_embeds.to(torch.float32)
 
         print(f"prompt_embeds1 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
