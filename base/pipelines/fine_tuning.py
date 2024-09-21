@@ -187,29 +187,12 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
 
             if(not is_original):
                 image_tensor = load_and_transform_image(args.image_path)
-            prompt = ["a dog with a bucket"]
             
-            print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
-            videos = pipeline(
-                prompt,
-                image_tensor=image_tensor if not is_original else None,
-                video_length=args.video_length, 
-                height=args.image_size[0], 
-                width=args.image_size[1], 
-                num_inference_steps=args.num_sampling_steps,
-                guidance_scale=args.guidance_scale
-            ).video
-
-            suffix = "original" if is_original else "fine_tuned"
-            imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
-            del videos
-
-            '''
-            if(not is_original):
-                zero_tensor = torch.zeros_like(image_tensor)
-                test = pipeline(
+            for prompt in args.text_prompt:
+                print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
+                videos = pipeline(
                     prompt,
-                    image_tensor=zero_tensor,
+                    image_tensor=image_tensor if not is_original else None,
                     video_length=args.video_length, 
                     height=args.image_size[0], 
                     width=args.image_size[1], 
@@ -217,28 +200,45 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                     guidance_scale=args.guidance_scale
                 ).video
 
-                imageio.mimwrite(f"/content/drive/My Drive/test111111_fine_tuned.mp4", test[0], fps=8, quality=9)
-                del test
+                suffix = "original" if is_original else "fine_tuned"
+                imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
+                del videos
 
-                image_2 = load_and_transform_image("/content/drive/My Drive/horse.jpeg")
+                '''
+                if(not is_original):
+                    zero_tensor = torch.zeros_like(image_tensor)
+                    test = pipeline(
+                        prompt,
+                        image_tensor=zero_tensor,
+                        video_length=args.video_length, 
+                        height=args.image_size[0], 
+                        width=args.image_size[1], 
+                        num_inference_steps=args.num_sampling_steps,
+                        guidance_scale=args.guidance_scale
+                    ).video
 
-                test_2 = pipeline(
-                    prompt,
-                    image_tensor=image_2,
-                    video_length=args.video_length, 
-                    height=args.image_size[0], 
-                    width=args.image_size[1], 
-                    num_inference_steps=args.num_sampling_steps,
-                    guidance_scale=args.guidance_scale
-                ).video
+                    imageio.mimwrite(f"/content/drive/My Drive/test111111_fine_tuned.mp4", test[0], fps=8, quality=9)
+                    del test
+
+                    image_2 = load_and_transform_image("/content/drive/My Drive/horse.jpeg")
+
+                    test_2 = pipeline(
+                        prompt,
+                        image_tensor=image_2,
+                        video_length=args.video_length, 
+                        height=args.image_size[0], 
+                        width=args.image_size[1], 
+                        num_inference_steps=args.num_sampling_steps,
+                        guidance_scale=args.guidance_scale
+                    ).video
+                    
+                    imageio.mimwrite(f"/content/drive/My Drive/test2222222_fine_tuned.mp4", test_2[0], fps=8, quality=9)
+                    del test_2
+            
                 
-                imageio.mimwrite(f"/content/drive/My Drive/test2222222_fine_tuned.mp4", test_2[0], fps=8, quality=9)
-                del test_2
-        
-            
-            del pipeline
-            torch.cuda.empty_cache()
-            '''
+                del pipeline
+                torch.cuda.empty_cache()
+                '''
 
         # Genera video con il modello fine-tuned
         generate_video(unet, is_original=False)
@@ -647,40 +647,6 @@ def lora_model(data, video_folder, args, training=True):
                     similarity = compute_cosine_similarity(text_features, mapped_image_features)
                     print(f"Cosine Similarity between text and image embeddings: {similarity}")
 
-                    img = load_and_transform_image(args.image_path)
-                    image_inputs1 = clip_processor(images=img, return_tensors="pt").pixel_values.to(unet.device)
-                    image_outputs1 = clip_model.vision_model(
-                        pixel_values=image_inputs1,
-                        output_hidden_states=True,
-                        return_dict=True
-                    )
-                    img_features = image_outputs1.last_hidden_state
-                    img_features=img_features.to(torch.float16)
-                    print(f"img_features shape: {img_features.shape}, dtype: {img_features.dtype}")
-                    mapped_img_features = mapper(img_features)
-
-                    for prompt in args.text_prompt:
-                        print(f"prompt: {prompt}")
-                        testo_inputs = tokenizer(
-                            prompt,
-                            max_length=tokenizer.model_max_length,
-                            padding="max_length",
-                            truncation=True,
-                            return_tensors="pt"
-                        ).to(unet.device)
-
-                        # Estrai le caratteristiche di testo dal modello CLIP
-                        testo_features = text_encoder(
-                            input_ids=testo_inputs.input_ids,
-                            attention_mask=text_inputs.attention_mask,
-                            output_hidden_states=True,
-                            return_dict=True
-                        ).last_hidden_state
-
-                        testo_features=testo_features.to(torch.float16)
-
-                        similarity1 = compute_cosine_similarity(testo_features, mapped_img_features)
-                        print(f"Cosine------ Similarity between text and image embeddings: {similarity1}")
                     
                     # Applica il cross-attention
                     encoder_hidden_states, attention_weights = attention_layer(text_features, mapped_image_features)
@@ -702,12 +668,12 @@ def lora_model(data, video_folder, args, training=True):
                         raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
                     
                     # Visualizza le mappe di attenzione
-                    #visualize_attention_maps(
-                    #    attention_weights,
-                    #    tokenizer,
-                    #    description,
-                    #    save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png"
-                    #)
+                    visualize_attention_maps(
+                        attention_weights,
+                        tokenizer,
+                        description,
+                        save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png"
+                    )
 
                     # Predict the noise residual and compute loss
                     model_pred = unet(noisy_latents, timesteps, encoder_hidden_states, return_dict=False)[0]
@@ -858,7 +824,7 @@ def model(args):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, args, training=True)
+    lora_model(data, video_folder, args, training=False)
 
 
 
