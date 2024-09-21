@@ -577,6 +577,7 @@ def lora_model(data, video_folder, args, training=True):
                     
 
                     print(f"epoca {epoch}, iterazione {step}, global_step {global_step}")
+                    print(list(description))
 
                     latents = encode_latents(video, vae)
                     #print(f"train_lora_model latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
@@ -672,7 +673,7 @@ def lora_model(data, video_folder, args, training=True):
                     visualize_attention_maps(
                         attention_weights,
                         tokenizer,
-                        description[0],
+                        description,
                         save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png"
                     )
 
