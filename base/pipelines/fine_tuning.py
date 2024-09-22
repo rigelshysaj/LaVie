@@ -399,7 +399,7 @@ def lora_model(data, video_folder, args, training=True):
     unet = get_peft_model(unet, lora_config)
 
     attention_layer = CrossAttentionNetwork(embed_dim=768, num_heads=8)
-    attention_layer.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/cross_attention_network.pth'))
+    #attention_layer.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/cross_attention_network.pth'))
 
     if args.mixed_precision == "fp16":
         # only upcast trainable parameters (LoRA) into fp32
