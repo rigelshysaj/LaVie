@@ -253,7 +253,7 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
             else:
                 attention_mask = None
 
-            print(f"attention mask: {attention_mask}")
+            #print(f"attention mask: {attention_mask}")
 
 
             with torch.no_grad():
