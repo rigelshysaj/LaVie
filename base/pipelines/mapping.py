@@ -258,26 +258,50 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
 
                 #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
-            # Mappa le embedding delle immagini
-            mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
+            # Ottieni l'attention_mask dai text_inputs
+            attention_mask = text_inputs.attention_mask  # [batch_size, sequence_length]
 
-            #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
+            print(f"attention_mask shape: {attention_mask.shape}, dtype: {attention_mask.dtype}")
 
-            # Aggrega le embedding per campione (es. media)
-            mapped_image_embeddings_pooled = mapped_image_embeddings.max(dim=1)  # [batch_size, 768]
-            text_embeddings_pooled = text_embeddings.max(dim=1)  
-            
-            #print(f"mapped_image_embeddings_pooled shape: {mapped_image_embeddings_pooled.shape}, dtype: {mapped_image_embeddings_pooled.dtype}")
-            #print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
+            # Espandi l'attention_mask per corrispondere alle dimensioni di text_embeddings
+            attention_mask_expanded = attention_mask.unsqueeze(-1).expand_as(text_embeddings)  # [batch_size, sequence_length, embedding_dim]
+            print(f"attention_mask_expanded shape: {attention_mask_expanded.shape}, dtype: {attention_mask_expanded.dtype}")
+            # Applica l'attention_mask ai text_embeddings per mascherare i token di padding
+            masked_text_embeddings = text_embeddings * attention_mask_expanded  # Zera gli embeddings dei token di padding
+            print(f"masked_text_embeddings shape: {masked_text_embeddings.shape}, dtype: {masked_text_embeddings.dtype}")
 
-            # Normalizzazione
+            # Somma lungo la dimensione della sequenza (dim=1)
+            sum_embeddings = masked_text_embeddings.sum(dim=1)  # [batch_size, embedding_dim]
+            print(f"sum_embeddings shape: {sum_embeddings.shape}, dtype: {sum_embeddings.dtype}")
+
+
+            # Calcola il numero di token validi per ciascuna sequenza
+            lengths = attention_mask.sum(dim=1).unsqueeze(-1)  # [batch_size, 1]
+            print(f"lengths1 shape: {lengths.shape}, dtype: {lengths.dtype}")
+
+
+            # Evita divisioni per zero
+            lengths = lengths.clamp(min=1)
+            print(f"lengths2 shape: {lengths.shape}, dtype: {lengths.dtype}")
+
+            # Calcola la media tenendo conto solo dei token validi
+            text_embeddings_pooled = sum_embeddings / lengths  # [batch_size, embedding_dim]
+            print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
+
+            mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, sequence_length, embedding_dim]
+            print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
+
+
+            # Pooling degli embeddings delle immagini (ad esempio, mean pooling)
+            mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)  # [batch_size, embedding_dim]
+
+            # Normalizzazione degli embeddings
             mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
             text_embeddings_pooled = F.normalize(text_embeddings_pooled, dim=-1)
 
             # Calcolo della loss
             target = torch.ones(text_embeddings_pooled.size(0)).to(device)
             loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
-
             cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
             mean_cosine_sim = cosine_sim.mean().item()
             epoch_cosine_sim += mean_cosine_sim
