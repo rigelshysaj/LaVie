@@ -287,10 +287,10 @@ class VideoGenPipeline(DiffusionPipeline):
 
         if input_image is not None:
             image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
-            image_outputs = self.clip_model.vision_model(
+            image_features = self.clip_model.vision_model(
                 pixel_values=image_inputs,
-            )
-            image_features = image_outputs.last_hidden_state  # Shape: (batch_size, seq_len_img, hidden_size)
+            ).last_hidden_state
+            
             image_features=image_features.to(torch.float16)
 
             mapped_image_features = self.mapper(image_features)  # Shape: (batch_size, seq_len_img, hidden_size)

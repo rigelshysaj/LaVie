@@ -600,48 +600,32 @@ def lora_model(data, video_folder, args, training=True):
                     # (this is the forward diffusion process)
                     noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
                     #print(f"train_lora_model noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
-
-                    #print(f"description: {list(description)}")
-                    # Get the text embedding for conditioning
                    
+                    
                     text_inputs = tokenizer(
                         list(description),
                         max_length=tokenizer.model_max_length,
                         padding="max_length",
                         truncation=True,
                         return_tensors="pt"
-                    )
+                    ).to(unet.device)
 
-                    text_input_ids = text_inputs.input_ids
-
-                    if hasattr(text_encoder.config, "use_attention_mask") and text_encoder.config.use_attention_mask:
-                        print("usa attention mask")
-                        attention_mask = text_inputs.attention_mask.to(device)
-                    else:
-                        attention_mask = None
 
                     text_features = text_encoder(
-                        text_input_ids.to(device),
-                        attention_mask=attention_mask,
-                    )
-                    text_features = text_features[0]
-                    text_features.to(dtype=text_encoder.dtype, device=device)
+                        input_ids=text_inputs.input_ids,
+                    ).last_hidden_state
+                    
                     text_features=text_features.to(torch.float16)
-
 
                     print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
-
                     image_inputs = clip_processor(images=list(frame_tensor), return_tensors="pt").pixel_values.to(unet.device)
-                    image_outputs = clip_model.vision_model(
+                    image_features = clip_model.vision_model(
                         pixel_values=image_inputs,
-                        output_hidden_states=True,
-                        return_dict=True
-                    )
+                    ).last_hidden_state
 
                     #print(f"image_outputs shape: {image_outputs.shape}, dtype: {image_outputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
 
-                    image_features = image_outputs.last_hidden_state
                     image_features=image_features.to(torch.float16)
                     #image_features = image_outputs.pooler_output
                     #print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")

@@ -243,47 +243,32 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
                 padding="max_length",
                 truncation=True,
                 return_tensors="pt"
-            )
-
-            text_input_ids = text_inputs.input_ids
-
-            if hasattr(sd_text_encoder.config, "use_attention_mask") and sd_text_encoder.config.use_attention_mask:
-                print("usa attention mask")
-                attention_mask = text_inputs.attention_mask.to(device)
-            else:
-                attention_mask = None
-
-            #print(f"attention mask: {attention_mask}")
+            ).to(device)
 
 
-            with torch.no_grad():
-                text_embeddings = sd_text_encoder(
-                    text_input_ids.to(device),
-                    attention_mask=attention_mask,
-                )
-                text_embeddings = text_embeddings[0]
-                text_embeddings.to(dtype=sd_text_encoder.dtype, device=device)
+            text_embeddings = sd_text_encoder(
+                input_ids=text_inputs.input_ids,
+            ).last_hidden_state
 
-                #print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+            print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
 
-                image_embeddings = clip_model.vision_model(
-                    pixel_values=image_inputs,
-                )
-                image_embeddings = image_embeddings.last_hidden_state
+            image_embeddings = clip_model.vision_model(
+                pixel_values=image_inputs,
+            ).last_hidden_state
 
-                #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+            print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
 
-            #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
+            print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
 
             # Aggrega le embedding per campione (es. media)
             mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)  # [batch_size, 768]
             text_embeddings_pooled = text_embeddings.mean(dim=1)  
             
-            #print(f"mapped_image_embeddings_pooled shape: {mapped_image_embeddings_pooled.shape}, dtype: {mapped_image_embeddings_pooled.dtype}")
-            #print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
+            print(f"mapped_image_embeddings_pooled shape: {mapped_image_embeddings_pooled.shape}, dtype: {mapped_image_embeddings_pooled.dtype}")
+            print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
 
             # Normalizzazione
             mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
