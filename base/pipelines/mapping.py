@@ -214,7 +214,7 @@ class MappingNetwork(nn.Module):
         return x
     
     
-def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device):
+def training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, text_encoder, device):
     
     mapping_network = MappingNetwork().to(device)
 
@@ -237,16 +237,16 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
             image_inputs = clip_processor(images=list(images), return_tensors="pt").pixel_values.to(device)
 
             # Tokenizza e codifica le descrizioni
-            text_inputs = sd_tokenizer(
+            text_inputs = tokenizer(
                 list(descriptions),
-                max_length=sd_tokenizer.model_max_length,
+                max_length=tokenizer.model_max_length,
                 padding="max_length",
                 truncation=True,
                 return_tensors="pt"
             ).to(device)
 
             with torch.no_grad():
-                text_embeddings = sd_text_encoder(
+                text_embeddings = text_encoder(
                     input_ids=text_inputs.input_ids,
                 ).last_hidden_state
 
@@ -258,50 +258,26 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
 
                 #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
-            # Ottieni l'attention_mask dai text_inputs
-            attention_mask = text_inputs.attention_mask  # [batch_size, sequence_length]
+            # Mappa le embedding delle immagini
+            mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
 
-            #print(f"attention_mask shape: {attention_mask.shape}, dtype: {attention_mask.dtype}")
-
-            # Espandi l'attention_mask per corrispondere alle dimensioni di text_embeddings
-            attention_mask_expanded = attention_mask.unsqueeze(-1).expand_as(text_embeddings)  # [batch_size, sequence_length, embedding_dim]
-            #print(f"attention_mask_expanded shape: {attention_mask_expanded.shape}, dtype: {attention_mask_expanded.dtype}")
-            # Applica l'attention_mask ai text_embeddings per mascherare i token di padding
-            masked_text_embeddings = text_embeddings * attention_mask_expanded  # Zera gli embeddings dei token di padding
-            #print(f"masked_text_embeddings shape: {masked_text_embeddings.shape}, dtype: {masked_text_embeddings.dtype}")
-
-            # Somma lungo la dimensione della sequenza (dim=1)
-            sum_embeddings = masked_text_embeddings.sum(dim=1)  # [batch_size, embedding_dim]
-            #print(f"sum_embeddings shape: {sum_embeddings.shape}, dtype: {sum_embeddings.dtype}")
-
-
-            # Calcola il numero di token validi per ciascuna sequenza
-            lengths = attention_mask.sum(dim=1).unsqueeze(-1)  # [batch_size, 1]
-            #print(f"lengths1 shape: {lengths.shape}, dtype: {lengths.dtype}")
-
-
-            # Evita divisioni per zero
-            lengths = lengths.clamp(min=1)
-            #print(f"lengths2 shape: {lengths.shape}, dtype: {lengths.dtype}")
-
-            # Calcola la media tenendo conto solo dei token validi
-            text_embeddings_pooled = sum_embeddings / lengths  # [batch_size, embedding_dim]
-            #print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
-
-            mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, sequence_length, embedding_dim]
             #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
 
+            # Aggrega le embedding per campione (es. media)
+            mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)  # [batch_size, 768]
+            text_embeddings_pooled = text_embeddings.mean(dim=1)  
+            
+            #print(f"mapped_image_embeddings_pooled shape: {mapped_image_embeddings_pooled.shape}, dtype: {mapped_image_embeddings_pooled.dtype}")
+            #print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
 
-            # Pooling degli embeddings delle immagini (ad esempio, mean pooling)
-            mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)  # [batch_size, embedding_dim]
-
-            # Normalizzazione degli embeddings
+            # Normalizzazione
             mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
             text_embeddings_pooled = F.normalize(text_embeddings_pooled, dim=-1)
 
             # Calcolo della loss
             target = torch.ones(text_embeddings_pooled.size(0)).to(device)
             loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
+
             cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
             mean_cosine_sim = cosine_sim.mean().item()
             epoch_cosine_sim += mean_cosine_sim
@@ -345,12 +321,12 @@ if __name__ == "__main__":
     # Carica i modelli
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
     clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
-    sd_tokenizer = CLIPTokenizer.from_pretrained("CompVis/stable-diffusion-v1-4", subfolder="tokenizer")
-    sd_text_encoder = CLIPTextModel.from_pretrained("CompVis/stable-diffusion-v1-4", subfolder="text_encoder").to(device)
+    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
+    text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
 
     # Imposta i modelli in modalità eval
     clip_model.eval()
-    sd_text_encoder.eval()
+    text_encoder.eval()
 
     transform = transforms.Compose([
         transforms.Resize((320, 512)),
@@ -378,8 +354,8 @@ if __name__ == "__main__":
         mapping_network.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth', map_location=device))
         mapping_network.eval()
 
-        training_cross_attention(mapping_dataloader, mapping_network, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device)
+        training_cross_attention(mapping_dataloader, mapping_network, clip_model, clip_processor, tokenizer, text_encoder, device)
     else:
-        training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenizer, sd_text_encoder, device)
+        training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, text_encoder, device)
 
 
