@@ -267,9 +267,11 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
                 #print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
 
                 image_embeddings = clip_model.vision_model(
-                    pixel_values=image_inputs
+                    pixel_values=image_inputs,
+                    output_hidden_states=True,
+                    return_dict=True
                 )
-                image_embeddings = image_embeddings[0]
+                image_embeddings = image_embeddings.last_hidden_state
 
                 #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
