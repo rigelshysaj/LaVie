@@ -143,6 +143,12 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, 
 
                 #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
+            # Verifica dei token speciali nel tokenizer
+            special_tokens = tokenizer.special_tokens_map
+            print("Token speciali del tokenizer:")
+            print(special_tokens)
+
+
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
 
