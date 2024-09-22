@@ -177,9 +177,9 @@ def training_cross_attention(mapping_dataloader, mapping_network, clip_model, cl
         torch.save(cross_attention_network.state_dict(), '/content/drive/My Drive/checkpoints/cross_attention_network.pth')
 
     
-class MappingNetwork(nn.Module):
+class MappingNetwork_(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, hidden_dim=512):
-        super(MappingNetwork, self).__init__()
+        super(MappingNetwork_, self).__init__()
         self.mapping = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
@@ -191,9 +191,9 @@ class MappingNetwork(nn.Module):
     def forward(self, x):
         return self.mapping(x)
     
-class MappingNetwork_(nn.Module):
+class MappingNetwork(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
-        super(MappingNetwork_, self).__init__()
+        super(MappingNetwork, self).__init__()
         layers = []
         current_dim = input_dim
         for hidden_dim in hidden_dims:
@@ -253,6 +253,8 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
             else:
                 attention_mask = None
 
+            print(f"attention mask: {attention_mask}")
+
 
             with torch.no_grad():
                 text_embeddings = sd_text_encoder(
@@ -262,19 +264,19 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
                 text_embeddings = text_embeddings[0]
                 text_embeddings.to(dtype=sd_text_encoder.dtype, device=device)
 
-                #print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+                print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
 
                 image_embeddings = clip_model.vision_model(
                     pixel_values=image_inputs
                 )
                 image_embeddings = image_embeddings[0]
 
-                #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+                print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
 
-            #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
+            print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
 
             # Aggrega le embedding per campione (es. media)
             mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)  # [batch_size, 768]
