@@ -276,18 +276,9 @@ class VideoGenPipeline(DiffusionPipeline):
             return_tensors="pt"
         )
 
-        text_input_ids = text_inputs.input_ids
-
-        if hasattr(self.text_encoder.config, "use_attention_mask") and self.text_encoder.config.use_attention_mask:
-            print("usa attention mask")
-            attention_mask = text_inputs.attention_mask.to(device)
-        else:
-            attention_mask = None
-
         # Estrai le caratteristiche di testo dal modello CLIP
         prompt_embeds = self.text_encoder(
-            text_input_ids.to(device),
-            attention_mask=attention_mask,
+            text_inputs.input_ids,
         ).last_hidden_state
 
         prompt_embeds = prompt_embeds.to(torch.float32)
