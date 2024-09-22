@@ -274,11 +274,11 @@ class VideoGenPipeline(DiffusionPipeline):
             padding="max_length",
             truncation=True,
             return_tensors="pt"
-        )
+        ).to(self.unet.device)
 
         # Estrai le caratteristiche di testo dal modello CLIP
         prompt_embeds = self.text_encoder(
-            text_inputs.input_ids,
+            input_ids=text_inputs.input_ids,
         ).last_hidden_state
 
         prompt_embeds = prompt_embeds.to(torch.float32)
