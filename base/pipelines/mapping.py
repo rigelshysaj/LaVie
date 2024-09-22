@@ -223,7 +223,7 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
 
-    num_epochs = 10  # Regola secondo necessità
+    num_epochs = 15  # Regola secondo necessità
 
     for epoch in range(num_epochs):
         mapping_network.train()
@@ -264,19 +264,19 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
                 text_embeddings = text_embeddings[0]
                 text_embeddings.to(dtype=sd_text_encoder.dtype, device=device)
 
-                print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+                #print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
 
                 image_embeddings = clip_model.vision_model(
                     pixel_values=image_inputs
                 )
                 image_embeddings = image_embeddings[0]
 
-                print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+                #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
 
-            print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
+            #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
 
             # Aggrega le embedding per campione (es. media)
             mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)  # [batch_size, 768]
