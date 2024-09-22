@@ -248,7 +248,6 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
             with torch.no_grad():
                 text_embeddings = sd_text_encoder(
                     input_ids=text_inputs.input_ids,
-                    attention_mask=text_inputs.attention_mask,
                 ).last_hidden_state
 
                 #print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
