@@ -148,6 +148,24 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, 
             print("Token speciali del tokenizer:")
             print(special_tokens)
 
+            # Accedi al numero di patch dal modello di visione
+            num_patches = clip_model.vision_model.embeddings.num_patches
+            print(f"Numero di patch: {num_patches}")
+
+            # Ottieni la dimensione dell'immagine e delle patch
+            image_size = clip_model.vision_model.config.image_size  # Dimensione dell'immagine (es. 224)
+            patch_size = clip_model.vision_model.config.patch_size  # Dimensione della patch (es. 14 o 16)
+
+            # Calcola il numero di patch per lato
+            num_patches_per_side = image_size // patch_size
+
+            # Calcola il numero totale di patch
+            num_patches = num_patches_per_side ** 2
+
+            print(f"Numero di patch calcolato: {num_patches}")
+
+
+
 
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
