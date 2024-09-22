@@ -143,6 +143,14 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, 
 
                 #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
+            # Per il testo
+            print(text_embeddings[0, 0, :10])  # Prime 10 dimensioni del primo token
+            print(text_embeddings[0, -1, :10])  # Prime 10 dimensioni dell'ultimo token
+
+            # Per l'immagine
+            print(image_embeddings[0, 0, :10])  # Prime 10 dimensioni del primo patch
+            print(image_embeddings[0, -1, :10])  # Prime 10 dimensioni dell'ultimo patch
+
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
 
