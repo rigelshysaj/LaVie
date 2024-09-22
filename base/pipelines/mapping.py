@@ -127,33 +127,18 @@ def training_cross_attention(mapping_dataloader, mapping_network, clip_model, cl
                 return_tensors="pt"
             ).to(device)
 
-
-            text_input_ids = text_inputs.input_ids
-
-            if hasattr(sd_text_encoder.config, "use_attention_mask") and sd_text_encoder.config.use_attention_mask:
-                print("usa attention mask")
-                attention_mask = text_inputs.attention_mask.to(device)
-            else:
-                attention_mask = None
-
             with torch.no_grad():
                 text_embeddings = sd_text_encoder(
-                    text_input_ids.to(device),
-                    attention_mask=attention_mask,
-                )
-                text_embeddings = text_embeddings[0]
-                text_embeddings.to(dtype=sd_text_encoder.dtype, device=device)
-
-                print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+                    input_ids=text_inputs.input_ids,
+                    attention_mask=text_inputs.attention_mask,
+                ).last_hidden_state  # Shape: [batch_size, max_length, 768]
 
                 image_embeddings = clip_model.vision_model(
                     pixel_values=image_inputs
-                )
-                image_embeddings = image_embeddings[0]
+                ).last_hidden_state  # Shape: [batch_size, num_patches, 1024]
 
-                mapped_image_embeddings = mapping_network(image_embeddings)
-
-                print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+                # Map image embeddings using the pre-trained mapping network
+                mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, num_patches, 768]
 
             # Forward pass through the cross-attention network
             output, attention_weights = cross_attention_network(text_embeddings, mapped_image_embeddings)  # [batch_size, seq_len_text, 768]
@@ -223,7 +208,7 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
 
-    num_epochs = 15  # Regola secondo necessità
+    num_epochs = 10  # Regola secondo necessità
 
     for epoch in range(num_epochs):
         mapping_network.train()
@@ -243,32 +228,45 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
                 padding="max_length",
                 truncation=True,
                 return_tensors="pt"
-            ).to(device)
+            )
+
+            text_input_ids = text_inputs.input_ids
+
+            if hasattr(sd_text_encoder.config, "use_attention_mask") and sd_text_encoder.config.use_attention_mask:
+                print("usa attention mask")
+                attention_mask = text_inputs.attention_mask.to(device)
+            else:
+                attention_mask = None
 
 
-            text_embeddings = sd_text_encoder(
-                input_ids=text_inputs.input_ids,
-            ).last_hidden_state
+            with torch.no_grad():
+                text_embeddings = sd_text_encoder(
+                    text_input_ids.to(device),
+                    attention_mask=attention_mask,
+                )
+                text_embeddings = text_embeddings[0]
+                text_embeddings.to(dtype=sd_text_encoder.dtype, device=device)
 
-            print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+                print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
 
-            image_embeddings = clip_model.vision_model(
-                pixel_values=image_inputs,
-            ).last_hidden_state
+                image_embeddings = clip_model.vision_model(
+                    pixel_values=image_inputs
+                )
+                image_embeddings = image_embeddings[0]
 
-            print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+                print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
 
-            print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
+            #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
 
             # Aggrega le embedding per campione (es. media)
             mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)  # [batch_size, 768]
             text_embeddings_pooled = text_embeddings.mean(dim=1)  
             
-            print(f"mapped_image_embeddings_pooled shape: {mapped_image_embeddings_pooled.shape}, dtype: {mapped_image_embeddings_pooled.dtype}")
-            print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
+            #print(f"mapped_image_embeddings_pooled shape: {mapped_image_embeddings_pooled.shape}, dtype: {mapped_image_embeddings_pooled.dtype}")
+            #print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
 
             # Normalizzazione
             mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
@@ -310,7 +308,7 @@ def custom_collate(batch):
 
 if __name__ == "__main__":
     dataset_path = '/content/drive/My Drive/flickr'
-    train_cross_attention = False
+    train_cross_attention = True
     # Percorsi dei file
     image_folder = os.path.join(dataset_path, 'Images')
     annotations_file = os.path.join(dataset_path, 'captions.txt')
