@@ -288,10 +288,8 @@ class VideoGenPipeline(DiffusionPipeline):
         prompt_embeds = self.text_encoder(
             text_input_ids.to(device),
             attention_mask=attention_mask,
-        )
-        prompt_embeds = prompt_embeds[0]
+        ).last_hidden_state
 
-        prompt_embeds = prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
         prompt_embeds = prompt_embeds.to(torch.float32)
 
         print(f"prompt_embeds1 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
@@ -300,8 +298,6 @@ class VideoGenPipeline(DiffusionPipeline):
             image_inputs = self.clip_processor(images=input_image, return_tensors="pt").pixel_values.to(device)
             image_outputs = self.clip_model.vision_model(
                 pixel_values=image_inputs,
-                output_hidden_states=True,
-                return_dict=True
             )
             image_features = image_outputs.last_hidden_state  # Shape: (batch_size, seq_len_img, hidden_size)
             image_features=image_features.to(torch.float16)
