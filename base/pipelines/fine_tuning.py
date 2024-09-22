@@ -241,7 +241,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 '''
 
         # Genera video con il modello fine-tuned
-        generate_video(unet, is_original=False)
+        #generate_video(unet, is_original=False)
 
         generate_video(original_unet, is_original=True)
 
@@ -359,7 +359,7 @@ def lora_model(data, video_folder, args, training=True):
 
     # Instantiate the mapping network
     mapper = MappingNetwork().to(unet.device)
-    mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
+    #mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     #tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
