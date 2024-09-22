@@ -264,8 +264,8 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, sd_tokenize
             #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
 
             # Aggrega le embedding per campione (es. media)
-            mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)  # [batch_size, 768]
-            text_embeddings_pooled = text_embeddings.mean(dim=1)  
+            mapped_image_embeddings_pooled = mapped_image_embeddings.max(dim=1)  # [batch_size, 768]
+            text_embeddings_pooled = text_embeddings.max(dim=1)  
             
             #print(f"mapped_image_embeddings_pooled shape: {mapped_image_embeddings_pooled.shape}, dtype: {mapped_image_embeddings_pooled.dtype}")
             #print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
