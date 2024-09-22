@@ -143,14 +143,6 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, 
 
                 #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
-            # Per il testo
-            print(text_embeddings[0, 0, :10])  # Prime 10 dimensioni del primo token
-            print(text_embeddings[0, -1, :10])  # Prime 10 dimensioni dell'ultimo token
-
-            # Per l'immagine
-            print(image_embeddings[0, 0, :10])  # Prime 10 dimensioni del primo patch
-            print(image_embeddings[0, -1, :10])  # Prime 10 dimensioni dell'ultimo patch
-
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
 
@@ -160,8 +152,8 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, 
             mapped_image_embeddings_pooled = mapped_image_embeddings[:, 0, :]  # [batch_size, 768]
             text_embeddings_pooled = text_embeddings[:, 0, :]
             
-            print(f"mapped_image_embeddings_pooled shape: {mapped_image_embeddings_pooled.shape}, dtype: {mapped_image_embeddings_pooled.dtype}")
-            print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
+            #print(f"mapped_image_embeddings_pooled shape: {mapped_image_embeddings_pooled.shape}, dtype: {mapped_image_embeddings_pooled.dtype}")
+            #print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
 
             # Normalizzazione
             mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
