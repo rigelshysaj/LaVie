@@ -128,8 +128,8 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
 
             # Usa le embedding del token [CLS]
-            mapped_image_embeddings_pooled = mapped_image_embeddings[:, 0, :]  # [batch_size, 768]
-            text_embeddings_pooled = text_embeddings[:, 0, :]
+            mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)
+            text_embeddings_pooled = text_embeddings.mean(dim=1)
             
             # Normalizzazione
             mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
@@ -191,9 +191,8 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
                 # Mappa le embedding delle immagini
                 mapped_image_embeddings = mapping_network(image_embeddings)
 
-                # Usa le embedding del token [CLS]
-                mapped_image_embeddings_pooled = mapped_image_embeddings[:, 0, :]
-                text_embeddings_pooled = text_embeddings[:, 0, :]
+                mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)
+                text_embeddings_pooled = text_embeddings.mean(dim=1)
 
                 # Normalizzazione
                 mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
