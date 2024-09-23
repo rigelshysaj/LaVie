@@ -128,13 +128,10 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
             #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
             
-            # Normalizzazione
-            mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
-            text_embeddings_pooled = F.normalize(text_embeddings_pooled, dim=-1)
 
             # Calcolo della loss
-            target = torch.ones(text_embeddings_pooled.size(0)).to(device)
-            loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
+            target = torch.ones(text_embeddings.size(0)).to(device)
+            loss = criterion(mapped_image_embeddings, text_embeddings, target)
 
             cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
             mean_cosine_sim = cosine_sim.mean().item()
