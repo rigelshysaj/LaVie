@@ -358,7 +358,7 @@ def lora_model(data, video_folder, args, training=True):
 
     # Instantiate the mapping network
     mapper = MappingNetwork().to(unet.device)
-    #mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
+    mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     #tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
@@ -626,21 +626,21 @@ def lora_model(data, video_folder, args, training=True):
 
                     image_features=image_features.to(torch.float16)
                     #image_features = image_outputs.pooler_output
-                    #print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
+                    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
 
                     # Map image embeddings to text embedding space using the mapping network
                     mapped_image_features = mapper(image_features)  # Shape: (batch_size, hidden_size)
-                    #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
+                    print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
-                    #similarity = compute_cosine_similarity(text_features, mapped_image_features)
-                    #print(f"Cosine Similarity between text and image embeddings: {similarity}")
+                    similarity = compute_cosine_similarity(text_features, mapped_image_features)
+                    print(f"Cosine Similarity between text and image embeddings: {similarity}")
 
                     # Applica il cross-attention
                     encoder_hidden_states, attention_weights = attention_layer(text_features, mapped_image_features)
                     
                     
-                    #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
-                    #print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
+                    print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
+                    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
 
                     # Get the target for loss depending on the prediction type
                     if args.prediction_type is not None:
@@ -811,7 +811,7 @@ def model(args):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, args, training=False)
+    lora_model(data, video_folder, args, training=True)
 
 
 
