@@ -84,8 +84,8 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
     #optimizer = optim.Adam(mapping_network.parameters(), lr=1e-4)
     #scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
-    optimizer = optim.AdamW(mapping_network.parameters(), lr=5e-5, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=20)
+    optimizer = optim.AdamW(mapping_network.parameters(), lr=1e-4)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
     num_epochs = 20  # Puoi regolare secondo necessità
     patience = 5  # Numero di epoche da attendere prima di fermare l'addestramento
@@ -127,9 +127,6 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
             #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
-
-            mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)
-            text_embeddings_pooled = text_embeddings.mean(dim=1)
             
             # Normalizzazione
             mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
@@ -146,7 +143,7 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             # Backpropagation
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(mapping_network.parameters(), max_norm=1.0)
+            torch.nn.utils.clip_grad_norm_(mapping_network.parameters(), max_norm=5.0)
             optimizer.step()
 
             epoch_loss += loss.item()
@@ -280,14 +277,14 @@ if __name__ == "__main__":
     # Crea DataLoader per training e validazione
     train_dataloader = DataLoader(
         train_dataset,
-        batch_size=32,
+        batch_size=64,
         shuffle=True,
         collate_fn=custom_collate
     )
 
     val_dataloader = DataLoader(
         val_dataset,
-        batch_size=32,
+        batch_size=64,
         shuffle=False,
         collate_fn=custom_collate
     )
