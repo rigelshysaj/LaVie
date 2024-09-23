@@ -7,7 +7,6 @@ import plotly.graph_objs as go
 import shutil
 from transformers import CLIPProcessor, CLIPModel
 from peft import LoraConfig, get_peft_model
-import torchvision.transforms as T
 import argparse
 from diffusers.utils.torch_utils import is_compiled_module
 from peft.utils import get_peft_model_state_dict
@@ -38,8 +37,8 @@ from peft import LoraConfig
 from PIL import Image
 from torchvision import transforms
 import plotly.graph_objects as go
-from inference import VideoGenPipeline
 from msvd import VideoDatasetMsvd
+from mapping import MappingNetwork
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
@@ -55,28 +54,6 @@ logger = logging.get_logger(__name__)
 @dataclass
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
-
-class MappingNetwork(nn.Module):
-    def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
-        super(MappingNetwork, self).__init__()
-        layers = []
-        current_dim = input_dim
-        for hidden_dim in hidden_dims:
-            layers.append(nn.Linear(current_dim, hidden_dim))
-            layers.append(nn.ReLU())
-            layers.append(nn.BatchNorm1d(hidden_dim))
-            layers.append(nn.Dropout(0.1))
-            current_dim = hidden_dim
-        layers.append(nn.Linear(current_dim, output_dim))
-        self.mapping = nn.Sequential(*layers)
-    
-    def forward(self, x):
-        # x: [batch_size, num_patches, 1024]
-        batch_size, num_patches, _ = x.size()
-        x = x.view(batch_size * num_patches, -1)  # [batch_size * num_patches, 1024]
-        x = self.mapping(x)  # [batch_size * num_patches, 768]
-        x = x.view(batch_size, num_patches, -1)  # [batch_size, num_patches, 768]
-        return x
 
 
 def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
@@ -167,93 +144,7 @@ def load_and_transform_image(path):
     return image_tensor
 
 
-def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer, mapper):
-        
-    attention_layer.dtype = next(attention_layer.parameters()).dtype
-    mapper.dtype = next(mapper.parameters()).dtype
 
-    with torch.no_grad():
-        # Funzione per generare video
-        def generate_video(unet, is_original):
-            pipeline = VideoGenPipeline(
-                vae=vae, 
-                text_encoder=text_encoder, 
-                tokenizer=tokenizer, 
-                scheduler=noise_scheduler, 
-                unet=unet,
-                clip_processor=clip_processor,
-                clip_model=clip_model,
-                attention_layer=attention_layer,
-                mapper=mapper
-            ).to(device)
-
-            pipeline.enable_xformers_memory_efficient_attention()
-
-
-            if(not is_original):
-                image_tensor = load_and_transform_image(args.image_path)
-            
-            for prompt in args.text_prompt:
-                print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
-                videos = pipeline(
-                    prompt,
-                    image_tensor=image_tensor if not is_original else None,
-                    video_length=args.video_length, 
-                    height=args.image_size[0], 
-                    width=args.image_size[1], 
-                    num_inference_steps=args.num_sampling_steps,
-                    guidance_scale=args.guidance_scale
-                ).video
-
-                suffix = "original" if is_original else "fine_tuned"
-                imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
-                del videos
-
-                '''
-                if(not is_original):
-                    zero_tensor = torch.zeros_like(image_tensor)
-                    test = pipeline(
-                        prompt,
-                        image_tensor=zero_tensor,
-                        video_length=args.video_length, 
-                        height=args.image_size[0], 
-                        width=args.image_size[1], 
-                        num_inference_steps=args.num_sampling_steps,
-                        guidance_scale=args.guidance_scale
-                    ).video
-
-                    imageio.mimwrite(f"/content/drive/My Drive/test111111_fine_tuned.mp4", test[0], fps=8, quality=9)
-                    del test
-
-                    image_2 = load_and_transform_image("/content/drive/My Drive/horse.jpeg")
-
-                    test_2 = pipeline(
-                        prompt,
-                        image_tensor=image_2,
-                        video_length=args.video_length, 
-                        height=args.image_size[0], 
-                        width=args.image_size[1], 
-                        num_inference_steps=args.num_sampling_steps,
-                        guidance_scale=args.guidance_scale
-                    ).video
-                    
-                    imageio.mimwrite(f"/content/drive/My Drive/test2222222_fine_tuned.mp4", test_2[0], fps=8, quality=9)
-                    del test_2
-            
-                
-                del pipeline
-                torch.cuda.empty_cache()
-                '''
-
-        # Genera video con il modello fine-tuned
-        #generate_video(unet, is_original=False)
-
-        generate_video(original_unet, is_original=True)
-
-        #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
-        torch.cuda.empty_cache()
-
-        print('save path {}'.format("/content/drive/My Drive/"))
     
 
 
@@ -760,7 +651,7 @@ def lora_model(data, video_folder, args, training=True):
                             logger.info(f"Saved state to {save_path}")
                     
 
-                        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer, mapper)
+                        #inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer, mapper)
 
 
                 logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
@@ -796,10 +687,7 @@ def lora_model(data, video_folder, args, training=True):
 
         # Opzionale: visualizza il grafico interattivo in Colab
         fig.show()
-    else:
-        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer, mapper)
-
-
+    
 
 def model(args):
     
