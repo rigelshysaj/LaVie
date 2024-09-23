@@ -123,10 +123,10 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
                     pixel_values=image_inputs,
                 ).last_hidden_state
 
-            print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+            #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
-            print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
+            #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
 
             mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)
             text_embeddings_pooled = text_embeddings.mean(dim=1)
