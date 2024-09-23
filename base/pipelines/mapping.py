@@ -135,14 +135,15 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, 
                     input_ids=text_inputs.input_ids,
                 ).last_hidden_state
 
-                print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+                #print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
 
                 image_embeddings = clip_model.vision_model(
                     pixel_values=image_inputs,
                 ).last_hidden_state
 
-                print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+                #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
+            '''
             # Verifica dei token speciali nel tokenizer
             special_tokens = tokenizer.special_tokens_map
             print("Token speciali del tokenizer:")
@@ -163,6 +164,7 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, 
             num_patches = num_patches_per_side ** 2
 
             print(f"Numero di patch calcolato: {num_patches}")
+            '''
 
 
             # Mappa le embedding delle immagini
