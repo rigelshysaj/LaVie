@@ -15,7 +15,6 @@ import inspect
 from typing import Any, Callable, Dict, List, Optional, Union
 import einops
 import torch.nn.functional as F
-from mapping import CrossAttentionNetwork
 import torch
 from packaging import version
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
