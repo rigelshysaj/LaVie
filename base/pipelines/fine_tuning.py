@@ -39,20 +39,14 @@ from PIL import Image
 from torchvision import transforms
 import plotly.graph_objects as go
 from inference import VideoGenPipeline
-from arguments import Details
 from msvd import VideoDatasetMsvd
-from mapping import MappingNetwork
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
 import seaborn as sns
 
 from diffusers.utils import (
-    deprecate,
-    is_accelerate_available,
-    is_accelerate_version,
     logging,
-    #randn_tensor,
-    replace_example_docstring,
     BaseOutput,
 )
 
@@ -61,6 +55,87 @@ logger = logging.get_logger(__name__)
 @dataclass
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
+
+class MappingNetwork(nn.Module):
+    def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
+        super(MappingNetwork, self).__init__()
+        layers = []
+        current_dim = input_dim
+        for hidden_dim in hidden_dims:
+            layers.append(nn.Linear(current_dim, hidden_dim))
+            layers.append(nn.ReLU())
+            layers.append(nn.BatchNorm1d(hidden_dim))
+            layers.append(nn.Dropout(0.1))
+            current_dim = hidden_dim
+        layers.append(nn.Linear(current_dim, output_dim))
+        self.mapping = nn.Sequential(*layers)
+    
+    def forward(self, x):
+        # x: [batch_size, num_patches, 1024]
+        batch_size, num_patches, _ = x.size()
+        x = x.view(batch_size * num_patches, -1)  # [batch_size * num_patches, 1024]
+        x = self.mapping(x)  # [batch_size * num_patches, 768]
+        x = x.view(batch_size, num_patches, -1)  # [batch_size, num_patches, 768]
+        return x
+
+
+def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
+    # Unisci la lista di descrizioni in una singola stringa
+    description = description_list[0]
+
+    # Tokenizza la descrizione
+    tokens = tokenizer.tokenize(description)
+    
+    # Estrai i pesi di attenzione e calcola la media per ogni token
+    attention_weights = attention_weights.squeeze(0)  # Rimuovi la dimensione del batch
+    
+    # Sposta il tensor sulla CPU se è su CUDA e staccalo dal grafo computazionale
+    attention_weights = attention_weights.detach().cpu()
+    
+    token_importance = attention_weights.mean(dim=1)  # Media su tutte le patch dell'immagine
+    
+    # Converti in numpy array
+    token_importance = token_importance.numpy()
+
+    print(f"token_importance len: {len(token_importance)}")
+    print(f"tokens len: {len(tokens)}")
+
+    # Taglia o estendi la lista dei token per corrispondere alla lunghezza di token_importance
+    tokens = tokens[:len(token_importance)] + [''] * (len(token_importance) - len(tokens))
+
+    # Funzione per salvare o mostrare il plot
+    def save_or_show_plot(plt, name):
+        if save_path:
+            # Create 'Images' folder if it doesn't exist
+            images_folder = os.path.join(os.path.dirname(save_path), 'Images')
+            os.makedirs(images_folder, exist_ok=True)
+            # Update save_path to use the 'Images' folder
+            file_name = f"{os.path.splitext(os.path.basename(save_path))[0]}_{name}.png"
+            new_save_path = os.path.join(images_folder, file_name)
+            plt.savefig(new_save_path)
+            print(f"Visualization saved to {new_save_path}")
+        else:
+            plt.show()
+
+    # Crea una heatmap
+    plt.figure(figsize=(12, 8))
+    sns.heatmap(token_importance.reshape(1, -1), annot=False, cmap='viridis', xticklabels=tokens)
+    plt.title('Token Importance Heatmap')
+    plt.xlabel('Tokens')
+    plt.ylabel('Importance')
+    save_or_show_plot(plt, "heatmap")
+    plt.close()
+
+    # Crea un grafico a barre
+    plt.figure(figsize=(12, 8))
+    plt.bar(range(len(token_importance)), token_importance)
+    plt.title('Token Importance Bar Chart')
+    plt.xlabel('Tokens')
+    plt.ylabel('Importance')
+    plt.xticks(range(len(token_importance)), tokens, rotation=90)
+    plt.tight_layout()
+    save_or_show_plot(plt, "barchart")
+    plt.close()
 
 
 

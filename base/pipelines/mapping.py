@@ -2,14 +2,10 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import CLIPProcessor, CLIPModel, CLIPTokenizer
 from transformers import CLIPTextModel
-from diffusers import AutoencoderKL
 from PIL import Image
 import os
 import torch.nn as nn
 from torchvision import transforms
-import cv2
-import numpy as np
-import imageio
 import torch.optim as optim
 import torch.nn.functional as F
 import random

@@ -17,7 +17,7 @@ import einops
 import torch.nn.functional as F
 import torch
 from packaging import version
-from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
+from transformers import CLIPTextModel, CLIPTokenizer
 import torch.nn as nn
 from transformers import CLIPProcessor, CLIPModel
 from diffusers.configuration_utils import FrozenDict
