@@ -61,20 +61,6 @@ class MappingDataset(Dataset):
 
         return image, description
 
-
-class MappingNetwork_(nn.Module):
-    def __init__(self, input_dim=1024, output_dim=768, hidden_dim=512):
-        super(MappingNetwork_, self).__init__()
-        self.mapping = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, output_dim)
-        )
-
-    def forward(self, x):
-        return self.mapping(x)
     
 class MappingNetwork(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
@@ -99,22 +85,25 @@ class MappingNetwork(nn.Module):
         return x
     
     
-def training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, text_encoder, device):
-    
+def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processor, tokenizer, text_encoder, device):
     mapping_network = MappingNetwork().to(device)
 
     criterion = nn.CosineEmbeddingLoss()
     optimizer = optim.Adam(mapping_network.parameters(), lr=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
-
-    num_epochs = 10  # Regola secondo necessità
+    num_epochs = 20  # Puoi regolare secondo necessità
+    patience = 5  # Numero di epoche da attendere prima di fermare l'addestramento
+    best_val_loss = float('inf')
+    epochs_no_improve = 0
 
     for epoch in range(num_epochs):
         mapping_network.train()
         epoch_loss = 0.0
         epoch_cosine_sim = 0.0  # Per monitorare la similarità in questo epoch
-        for images, descriptions in mapping_dataloader:
+
+        # Ciclo di addestramento
+        for images, descriptions in train_dataloader:
             if not images or not descriptions:
                 continue
 
@@ -135,50 +124,17 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, 
                     input_ids=text_inputs.input_ids,
                 ).last_hidden_state
 
-                #print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
-
                 image_embeddings = clip_model.vision_model(
                     pixel_values=image_inputs,
                 ).last_hidden_state
 
-                #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
-
-            '''
-            # Verifica dei token speciali nel tokenizer
-            special_tokens = tokenizer.special_tokens_map
-            print("Token speciali del tokenizer:")
-            print(special_tokens)
-
-            # Accedi al numero di patch dal modello di visione
-            num_patches = clip_model.vision_model.embeddings.num_patches
-            print(f"Numero di patch: {num_patches}")
-
-            # Ottieni la dimensione dell'immagine e delle patch
-            image_size = clip_model.vision_model.config.image_size  # Dimensione dell'immagine (es. 224)
-            patch_size = clip_model.vision_model.config.patch_size  # Dimensione della patch (es. 14 o 16)
-
-            # Calcola il numero di patch per lato
-            num_patches_per_side = image_size // patch_size
-
-            # Calcola il numero totale di patch
-            num_patches = num_patches_per_side ** 2
-
-            print(f"Numero di patch calcolato: {num_patches}")
-            '''
-
-
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
 
-            #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
-
-            # Use the [CLS] token embeddings
+            # Usa le embedding del token [CLS]
             mapped_image_embeddings_pooled = mapped_image_embeddings[:, 0, :]  # [batch_size, 768]
             text_embeddings_pooled = text_embeddings[:, 0, :]
             
-            #print(f"mapped_image_embeddings_pooled shape: {mapped_image_embeddings_pooled.shape}, dtype: {mapped_image_embeddings_pooled.dtype}")
-            #print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
-
             # Normalizzazione
             mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
             text_embeddings_pooled = F.normalize(text_embeddings_pooled, dim=-1)
@@ -191,27 +147,90 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, 
             mean_cosine_sim = cosine_sim.mean().item()
             epoch_cosine_sim += mean_cosine_sim
 
-            
             # Backpropagation
+            optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(mapping_network.parameters(), max_norm=1.0)
             optimizer.step()
-            optimizer.zero_grad()
 
-            print(f'Epoch {epoch+1}/{num_epochs},'
-                  f'Loss: {loss.item():.4f}, Mean Cosine Similarity: {mean_cosine_sim:.4f}')
-            
             epoch_loss += loss.item()
 
         scheduler.step()
         
-        # Calcolo della similarità media per l'epoch
-        avg_epoch_cosine_sim = epoch_cosine_sim / len(mapping_dataloader)
-        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss/len(mapping_dataloader):.4f},'
-          f' Mean Cosine Similarity: {avg_epoch_cosine_sim:.4f}')
-        
-        if(epoch >= 5):
-            torch.save(mapping_network.state_dict(), '/content/drive/My Drive/checkpoints/mapping_network.pth')
+        # Calcolo della loss e della similarità media di training
+        avg_epoch_loss = epoch_loss / len(train_dataloader)
+        avg_epoch_cosine_sim = epoch_cosine_sim / len(train_dataloader)
+        print(f'Epoch {epoch+1}/{num_epochs}, Training Loss: {avg_epoch_loss:.4f},'
+              f' Training Mean Cosine Similarity: {avg_epoch_cosine_sim:.4f}')
+
+        # Fase di validazione
+        mapping_network.eval()
+        val_loss = 0.0
+        val_cosine_sim = 0.0
+        with torch.no_grad():
+            for images, descriptions in val_dataloader:
+                if not images or not descriptions:
+                    continue
+
+                # Preprocessa le immagini
+                image_inputs = clip_processor(images=list(images), return_tensors="pt").pixel_values.to(device)
+
+                # Tokenizza e codifica le descrizioni
+                text_inputs = tokenizer(
+                    list(descriptions),
+                    max_length=tokenizer.model_max_length,
+                    padding="max_length",
+                    truncation=True,
+                    return_tensors="pt"
+                ).to(device)
+
+                text_embeddings = text_encoder(
+                    input_ids=text_inputs.input_ids,
+                ).last_hidden_state
+
+                image_embeddings = clip_model.vision_model(
+                    pixel_values=image_inputs,
+                ).last_hidden_state
+
+                # Mappa le embedding delle immagini
+                mapped_image_embeddings = mapping_network(image_embeddings)
+
+                # Usa le embedding del token [CLS]
+                mapped_image_embeddings_pooled = mapped_image_embeddings[:, 0, :]
+                text_embeddings_pooled = text_embeddings[:, 0, :]
+
+                # Normalizzazione
+                mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
+                text_embeddings_pooled = F.normalize(text_embeddings_pooled, dim=-1)
+
+                # Calcolo della loss
+                target = torch.ones(text_embeddings_pooled.size(0)).to(device)
+                loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
+
+                cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
+                mean_cosine_sim = cosine_sim.mean().item()
+                val_cosine_sim += mean_cosine_sim
+
+                val_loss += loss.item()
+
+        # Calcolo della loss e della similarità media di validazione
+        avg_val_loss = val_loss / len(val_dataloader)
+        avg_val_cosine_sim = val_cosine_sim / len(val_dataloader)
+        print(f'Epoch {epoch+1}/{num_epochs}, Validation Loss: {avg_val_loss:.4f},'
+              f' Validation Mean Cosine Similarity: {avg_val_cosine_sim:.4f}')
+
+        # Early Stopping
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            epochs_no_improve = 0
+            # Salva il miglior modello
+            torch.save(mapping_network.state_dict(), '/content/drive/My Drive/checkpoints/mapping_network_best.pth')
+        else:
+            epochs_no_improve += 1
+            if epochs_no_improve >= patience:
+                print(f'Early stopping on epoch {epoch+1}')
+                break
+
 
 
 def custom_collate(batch):
@@ -222,7 +241,6 @@ def custom_collate(batch):
 
 if __name__ == "__main__":
     dataset_path = '/content/drive/My Drive/flickr'
-    train_cross_attention = False
     # Percorsi dei file
     image_folder = os.path.join(dataset_path, 'Images')
     annotations_file = os.path.join(dataset_path, 'captions.txt')
@@ -240,27 +258,44 @@ if __name__ == "__main__":
     clip_model.eval()
     text_encoder.eval()
 
+    # Definisci le trasformazioni
     transform = transforms.Compose([
         transforms.Resize((320, 512)),
         transforms.ToTensor(),
     ])
 
-    # Passa il transform al dataset
-    mapping_dataset = MappingDataset(
+    # Crea il dataset completo
+    full_dataset = MappingDataset(
         annotations_file=annotations_file,
         image_dir=image_folder,
         transform=transform,
     )
 
-    # Crea il DataLoader con num_workers=0
-    mapping_dataloader = DataLoader(
-        mapping_dataset,
+    # Dividi il dataset
+    from torch.utils.data import random_split
+
+    train_ratio = 0.8
+    val_ratio = 0.2
+    dataset_size = len(full_dataset)
+    train_size = int(train_ratio * dataset_size)
+    val_size = dataset_size - train_size
+
+    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+
+    # Crea DataLoader per training e validazione
+    train_dataloader = DataLoader(
+        train_dataset,
         batch_size=32,
         shuffle=True,
         collate_fn=custom_collate
     )
 
-    
-    training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, text_encoder, device)
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=32,
+        shuffle=False,
+        collate_fn=custom_collate
+    )
 
-
+    # Inizia l'addestramento
+    training_mapping(train_dataloader, val_dataloader, clip_model, clip_processor, tokenizer, text_encoder, device)

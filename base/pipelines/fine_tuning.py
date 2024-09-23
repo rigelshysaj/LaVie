@@ -397,8 +397,7 @@ def lora_model(data, video_folder, args, training=True):
     
     unet = get_peft_model(unet, lora_config)
 
-    attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8)
-
+    attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device).to(weight_dtype)
 
     if args.mixed_precision == "fp16":
         # only upcast trainable parameters (LoRA) into fp32
