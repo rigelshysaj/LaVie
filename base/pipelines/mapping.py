@@ -128,8 +128,8 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             
             # Appiattisci le dimensioni batch e sequenza
             batch_size, seq_len, embedding_dim = mapped_image_embeddings.size()
-            mapped_image_embeddings_flat = mapped_image_embeddings.view(-1, embedding_dim)  # [batch_size * seq_len, embedding_dim]
-            text_embeddings_flat = text_embeddings.view(-1, embedding_dim)
+            mapped_image_embeddings_flat = mapped_image_embeddings.reshape(-1, embedding_dim)  # [batch_size * seq_len, embedding_dim]
+            text_embeddings_flat = text_embeddings.reshape(-1, embedding_dim)
             
             
             # Calcolo della loss
@@ -190,8 +190,8 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
                 mapped_image_embeddings = mapping_network(image_embeddings)
 
                 batch_size, seq_len, embedding_dim = mapped_image_embeddings.size()
-                mapped_image_embeddings_flat = mapped_image_embeddings.view(-1, embedding_dim)
-                text_embeddings_flat = text_embeddings.view(-1, embedding_dim)
+                mapped_image_embeddings_flat = mapped_image_embeddings.reshape(-1, embedding_dim)
+                text_embeddings_flat = text_embeddings.reshape(-1, embedding_dim)
 
                 target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)
                 loss = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
