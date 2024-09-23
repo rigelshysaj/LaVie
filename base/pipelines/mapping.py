@@ -197,6 +197,9 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, 
             torch.nn.utils.clip_grad_norm_(mapping_network.parameters(), max_norm=1.0)
             optimizer.step()
             optimizer.zero_grad()
+
+            print(f'Epoch {epoch+1}/{num_epochs},'
+                  f'Loss: {loss.item():.4f}, Mean Cosine Similarity: {mean_cosine_sim:.4f}')
             
             epoch_loss += loss.item()
 
