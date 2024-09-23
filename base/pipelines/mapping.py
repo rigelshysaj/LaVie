@@ -58,25 +58,22 @@ class MappingDataset(Dataset):
         return image, description
 
 
+    
 class MappingNetwork(nn.Module):
-    def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[1024, 896, 832]):
+    def __init__(self, input_dim=1024, output_dim=768, num_layers=6, num_heads=8, seq_len_in=257, seq_len_out=77):
         super(MappingNetwork, self).__init__()
-        layers = []
-        current_dim = input_dim
-        for hidden_dim in hidden_dims:
-            layers.append(nn.Linear(current_dim, hidden_dim))
-            layers.append(nn.LeakyReLU(0.2))
-            layers.append(nn.LayerNorm(hidden_dim))
-            layers.append(nn.Dropout(0.1))
-            current_dim = hidden_dim
-        layers.append(nn.Linear(current_dim, output_dim))
-        self.mapping = nn.Sequential(*layers)
+        self.input_proj = nn.Linear(input_dim, output_dim)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=output_dim, nhead=num_heads)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.seq_proj = nn.Linear(seq_len_in, seq_len_out)
     
     def forward(self, x):
-        batch_size, num_patches, _ = x.size()
-        x = x.view(batch_size * num_patches, -1)
-        x = self.mapping(x)
-        x = x.view(batch_size, num_patches, -1)
+        # x: [batch_size, seq_len_in, input_dim]
+        x = self.input_proj(x)  # [batch_size, seq_len_in, output_dim]
+        x = x.permute(1, 0, 2)  # [seq_len_in, batch_size, output_dim]
+        x = self.transformer_encoder(x)  # [seq_len_in, batch_size, output_dim]
+        x = x.permute(1, 0, 2)  # [batch_size, seq_len_in, output_dim]
+        x = self.seq_proj(x.transpose(1, 2)).transpose(1, 2)  # [batch_size, seq_len_out, output_dim]
         return x
     
     
@@ -126,10 +123,11 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
                     pixel_values=image_inputs,
                 ).last_hidden_state
 
+            print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
+            print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
 
-            # Usa le embedding del token [CLS]
             mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)
             text_embeddings_pooled = text_embeddings.mean(dim=1)
             
