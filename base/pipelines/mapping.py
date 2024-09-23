@@ -108,7 +108,7 @@ def training_mapping(mapping_dataloader, clip_model, clip_processor, tokenizer, 
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
 
-    num_epochs = 15  # Regola secondo necessità
+    num_epochs = 10  # Regola secondo necessità
 
     for epoch in range(num_epochs):
         mapping_network.train()
