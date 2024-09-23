@@ -57,27 +57,26 @@ class MappingDataset(Dataset):
 
         return image, description
 
-    
+
 class MappingNetwork(nn.Module):
-    def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
+    def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[1024, 896, 832]):
         super(MappingNetwork, self).__init__()
         layers = []
         current_dim = input_dim
         for hidden_dim in hidden_dims:
             layers.append(nn.Linear(current_dim, hidden_dim))
-            layers.append(nn.ReLU())
-            layers.append(nn.BatchNorm1d(hidden_dim))
+            layers.append(nn.LeakyReLU(0.2))
+            layers.append(nn.LayerNorm(hidden_dim))
             layers.append(nn.Dropout(0.1))
             current_dim = hidden_dim
         layers.append(nn.Linear(current_dim, output_dim))
         self.mapping = nn.Sequential(*layers)
     
     def forward(self, x):
-        # x: [batch_size, num_patches, 1024]
         batch_size, num_patches, _ = x.size()
-        x = x.view(batch_size * num_patches, -1)  # [batch_size * num_patches, 1024]
-        x = self.mapping(x)  # [batch_size * num_patches, 768]
-        x = x.view(batch_size, num_patches, -1)  # [batch_size, num_patches, 768]
+        x = x.view(batch_size * num_patches, -1)
+        x = self.mapping(x)
+        x = x.view(batch_size, num_patches, -1)
         return x
     
     
@@ -85,8 +84,11 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
     mapping_network = MappingNetwork().to(device)
 
     criterion = nn.CosineEmbeddingLoss()
-    optimizer = optim.Adam(mapping_network.parameters(), lr=1e-4)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+    #optimizer = optim.Adam(mapping_network.parameters(), lr=1e-4)
+    #scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+
+    optimizer = optim.AdamW(mapping_network.parameters(), lr=5e-5, weight_decay=1e-4)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=20)
 
     num_epochs = 20  # Puoi regolare secondo necessità
     patience = 5  # Numero di epoche da attendere prima di fermare l'addestramento
