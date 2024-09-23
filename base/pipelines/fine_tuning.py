@@ -1,13 +1,8 @@
 from torch.utils.data import Dataset, DataLoader
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import List, Union
 import torch
-import cv2
 import os
-import json
 from tqdm import tqdm
-from plotly.subplots import make_subplots
-import plotly.io as pio
-from torchvision.transforms.functional import resize
 import plotly.graph_objs as go
 import shutil
 from transformers import CLIPProcessor, CLIPModel
@@ -33,16 +28,13 @@ from download import find_model
 from transformers import CLIPTokenizer, CLIPTextModel
 import torch.nn as nn
 import numpy as np
-import torchvision.models as models
 import torch.nn.functional as F
-from diffusers.utils import check_min_version, convert_state_dict_to_diffusers, is_wandb_available
+from diffusers.utils import convert_state_dict_to_diffusers
 import einops
-from diffusers import AutoencoderKL, DiffusionPipeline, StableDiffusionPipeline
-from torch.utils.checkpoint import checkpoint
-from diffusers.schedulers import DDIMScheduler, DDPMScheduler, PNDMScheduler, EulerDiscreteScheduler
-from transformers import get_cosine_schedule_with_warmup
+from diffusers import AutoencoderKL, StableDiffusionPipeline
+from diffusers.schedulers import DDPMScheduler
 from dataclasses import dataclass
-from peft import PeftModel, LoraConfig
+from peft import LoraConfig
 from PIL import Image
 from torchvision import transforms
 import plotly.graph_objects as go
@@ -52,8 +44,6 @@ from msvd import VideoDatasetMsvd
 from mapping import MappingNetwork
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
-import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
 import seaborn as sns
 
 from diffusers.utils import (
@@ -71,65 +61,6 @@ logger = logging.get_logger(__name__)
 @dataclass
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
-
-
-def visualize_attention_maps(attention_weights, tokenizer, description_list, save_path=None):
-    # Unisci la lista di descrizioni in una singola stringa
-    description = description_list[0]
-
-    # Tokenizza la descrizione
-    tokens = tokenizer.tokenize(description)
-    
-    # Estrai i pesi di attenzione e calcola la media per ogni token
-    attention_weights = attention_weights.squeeze(0)  # Rimuovi la dimensione del batch
-    
-    # Sposta il tensor sulla CPU se è su CUDA e staccalo dal grafo computazionale
-    attention_weights = attention_weights.detach().cpu()
-    
-    token_importance = attention_weights.mean(dim=1)  # Media su tutte le patch dell'immagine
-    
-    # Converti in numpy array
-    token_importance = token_importance.numpy()
-
-    print(f"token_importance len: {len(token_importance)}")
-    print(f"tokens len: {len(tokens)}")
-
-    # Taglia o estendi la lista dei token per corrispondere alla lunghezza di token_importance
-    tokens = tokens[:len(token_importance)] + [''] * (len(token_importance) - len(tokens))
-
-    # Funzione per salvare o mostrare il plot
-    def save_or_show_plot(plt, name):
-        if save_path:
-            # Create 'Images' folder if it doesn't exist
-            images_folder = os.path.join(os.path.dirname(save_path), 'Images')
-            os.makedirs(images_folder, exist_ok=True)
-            # Update save_path to use the 'Images' folder
-            file_name = f"{os.path.splitext(os.path.basename(save_path))[0]}_{name}.png"
-            new_save_path = os.path.join(images_folder, file_name)
-            plt.savefig(new_save_path)
-            print(f"Visualization saved to {new_save_path}")
-        else:
-            plt.show()
-
-    # Crea una heatmap
-    plt.figure(figsize=(12, 8))
-    sns.heatmap(token_importance.reshape(1, -1), annot=False, cmap='viridis', xticklabels=tokens)
-    plt.title('Token Importance Heatmap')
-    plt.xlabel('Tokens')
-    plt.ylabel('Importance')
-    save_or_show_plot(plt, "heatmap")
-    plt.close()
-
-    # Crea un grafico a barre
-    plt.figure(figsize=(12, 8))
-    plt.bar(range(len(token_importance)), token_importance)
-    plt.title('Token Importance Bar Chart')
-    plt.xlabel('Tokens')
-    plt.ylabel('Importance')
-    plt.xticks(range(len(token_importance)), tokens, rotation=90)
-    plt.tight_layout()
-    save_or_show_plot(plt, "barchart")
-    plt.close()
 
 
 
