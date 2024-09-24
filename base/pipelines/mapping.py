@@ -151,7 +151,7 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
                     pixel_values=image_inputs,
                 ).last_hidden_state  # [batch_size, num_patches, 1024]
 
-            print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+            #print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
 
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, num_patches, 768]
@@ -168,7 +168,7 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             token_counts = token_counts.clamp(min=1e-9)  # Evita divisione per zero
             text_embeddings_pooled = sum_embeddings / token_counts  # [batch_size, hidden_dim]
 
-            print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
+            #print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
 
             # Normalizzazione
             mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
