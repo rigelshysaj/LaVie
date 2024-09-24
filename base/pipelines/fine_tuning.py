@@ -617,7 +617,7 @@ def lora_model(data, video_folder, args, training=True):
                     #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
                     similarity = compute_cosine_similarity(text_features, mapped_image_features)
-                    #print(f"Cosine Similarity between text and image embeddings: {similarity}")
+                    print(f"Cosine Similarity between text and image embeddings: {similarity}")
 
                      # Transpose for multihead attention
                     text_features = text_features.transpose(0, 1)  # Shape: [seq_len_text, batch_size, embed_dim]
