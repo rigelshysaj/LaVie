@@ -599,7 +599,7 @@ def lora_model(data, video_folder, args, training=True):
                     
                     text_features=text_features.to(torch.float16)
 
-                    print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
+                    #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
                     image_inputs = clip_processor(images=list(frame_tensor), return_tensors="pt").pixel_values.to(unet.device)
                     image_features = clip_model.vision_model(
@@ -610,14 +610,14 @@ def lora_model(data, video_folder, args, training=True):
 
                     image_features=image_features.to(torch.float16)
                     #image_features = image_outputs.pooler_output
-                    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
+                    #print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
 
                     # Map image embeddings to text embedding space using the mapping network
                     mapped_image_features = mapper(image_features)  # Shape: (batch_size, hidden_size)
-                    print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
+                    #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
                     similarity = compute_cosine_similarity(text_features, mapped_image_features)
-                    print(f"Cosine Similarity between text and image embeddings: {similarity}")
+                    #print(f"Cosine Similarity between text and image embeddings: {similarity}")
 
                      # Transpose for multihead attention
                     text_features = text_features.transpose(0, 1)  # Shape: [seq_len_text, batch_size, embed_dim]
@@ -629,8 +629,8 @@ def lora_model(data, video_folder, args, training=True):
                     encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
                     
                     
-                    print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
-                    print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
+                    #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
+                    #print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
 
                     # Get the target for loss depending on the prediction type
                     if args.prediction_type is not None:

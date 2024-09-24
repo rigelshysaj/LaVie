@@ -86,16 +86,17 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
+
 class MappingNetwork(nn.Module):
-    def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
+    def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[1024, 512, 512, 256]):
         super(MappingNetwork, self).__init__()
         layers = []
         current_dim = input_dim
         for hidden_dim in hidden_dims:
             layers.append(nn.Linear(current_dim, hidden_dim))
-            layers.append(nn.ReLU())
+            layers.append(nn.LeakyReLU(0.2))
             layers.append(nn.BatchNorm1d(hidden_dim))
-            layers.append(nn.Dropout(0.1))
+            layers.append(nn.Dropout(0.2))
             current_dim = hidden_dim
         layers.append(nn.Linear(current_dim, output_dim))
         self.mapping = nn.Sequential(*layers)
@@ -103,10 +104,11 @@ class MappingNetwork(nn.Module):
     def forward(self, x):
         # x: [batch_size, num_patches, 1024]
         batch_size, num_patches, _ = x.size()
-        x = x.view(batch_size * num_patches, -1)  # [batch_size * num_patches, 1024]
-        x = self.mapping(x)  # [batch_size * num_patches, 768]
-        x = x.view(batch_size, num_patches, -1)  # [batch_size, num_patches, 768]
+        x = x.view(batch_size * num_patches, -1)
+        x = self.mapping(x)
+        x = x.view(batch_size, num_patches, -1)
         return x
+
 
 def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processor, tokenizer, text_encoder, device):
     mapping_network = MappingNetwork().to(device)
