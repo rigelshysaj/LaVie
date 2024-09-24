@@ -9,6 +9,7 @@ from torchvision import transforms
 import torch.optim as optim
 import torch.nn.functional as F
 import random
+import math
 
 
 class MappingDataset(Dataset):
@@ -57,11 +58,29 @@ class MappingDataset(Dataset):
 
         return image, description
 
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:x.size(0), :]
+        return x
+
 class MappingNetwork(nn.Module):
-    def __init__(self, input_dim=1024, output_dim=768, num_layers=6, num_heads=8):
+    def __init__(self, input_dim=1024, output_dim=768, num_layers=8, num_heads=16):
         super(MappingNetwork, self).__init__()
         self.input_proj = nn.Linear(input_dim, output_dim)
-        self.output_dim = output_dim  # Salva output_dim come attributo dell'istanza
+        self.output_dim = output_dim
+
+        self.positional_encoding = PositionalEncoding(d_model=output_dim)
 
         self.encoder_layer = nn.TransformerEncoderLayer(d_model=output_dim, nhead=num_heads)
         self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=num_layers)
@@ -69,15 +88,16 @@ class MappingNetwork(nn.Module):
         self.decoder_layer = nn.TransformerDecoderLayer(d_model=output_dim, nhead=num_heads)
         self.decoder = nn.TransformerDecoder(self.decoder_layer, num_layers=num_layers)
 
-        self.output_proj = nn.Linear(output_dim, output_dim)  # Facoltativo
+        self.output_proj = nn.Linear(output_dim, output_dim)
 
     def forward(self, src):
-        # src: [batch_size, seq_len_in, input_dim]
         src = self.input_proj(src).permute(1, 0, 2)  # [seq_len_in, batch_size, output_dim]
+        src = self.positional_encoding(src * math.sqrt(self.output_dim))
+
         memory = self.encoder(src)
 
-        # Usa self.output_dim invece di self.decoder_layer.d_model
-        tgt = torch.zeros(77, src.size(1), self.output_dim).to(src.device)  # [seq_len_out, batch_size, output_dim]
+        tgt = torch.zeros(77, src.size(1), self.output_dim).to(src.device)
+        tgt = self.positional_encoding(tgt * math.sqrt(self.output_dim))
 
         output = self.decoder(tgt, memory)
         output = self.output_proj(output.permute(1, 0, 2))  # [batch_size, seq_len_out, output_dim]
@@ -269,14 +289,14 @@ if __name__ == "__main__":
     # Crea DataLoader per training e validazione
     train_dataloader = DataLoader(
         train_dataset,
-        batch_size=64,
+        batch_size=32,
         shuffle=True,
         collate_fn=custom_collate
     )
 
     val_dataloader = DataLoader(
         val_dataset,
-        batch_size=64,
+        batch_size=32,
         shuffle=False,
         collate_fn=custom_collate
     )
