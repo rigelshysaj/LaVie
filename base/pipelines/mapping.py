@@ -155,8 +155,8 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
 
             # Calcolo della similarità coseno media
             cosine_sim = F.cosine_similarity(
-                mapped_image_embeddings_norm.view(-1, 768),
-                text_embeddings_norm.view(-1, 768),
+                mapped_image_embeddings_norm.reshape(-1, 768),
+                text_embeddings_norm.reshape(-1, 768),
                 dim=-1
             )
             mean_cosine_sim = cosine_sim.mean().item()
@@ -210,8 +210,8 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
                 loss = criterion(mapped_image_embeddings_norm, text_embeddings_norm)
 
                 cosine_sim = F.cosine_similarity(
-                    mapped_image_embeddings_norm.view(-1, 768),
-                    text_embeddings_norm.view(-1, 768),
+                    mapped_image_embeddings_norm.reshape(-1, 768),
+                    text_embeddings_norm.reshape(-1, 768),
                     dim=-1
                 )
                 mean_cosine_sim = cosine_sim.mean().item()
