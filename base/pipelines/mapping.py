@@ -59,54 +59,70 @@ class MappingDataset(Dataset):
 
     
 class MappingNetwork(nn.Module):
-    def __init__(self, input_dim=768, output_dim=768, hidden_dims=[512, 256, 256]):
+    def __init__(self, input_dim=768, output_dim=768, num_layers=6, num_heads=8, seq_len_in=50, seq_len_out=77):
         super(MappingNetwork, self).__init__()
-        layers = []
-        current_dim = input_dim
-        for hidden_dim in hidden_dims:
-            layers.append(nn.Linear(current_dim, hidden_dim))
-            layers.append(nn.ReLU())
-            layers.append(nn.BatchNorm1d(hidden_dim))
-            layers.append(nn.Dropout(0.1))
-            current_dim = hidden_dim
-        layers.append(nn.Linear(current_dim, output_dim))
-        self.mapping = nn.Sequential(*layers)
+        # Layer di proiezione opzionale (puoi rimuoverla se input_dim == output_dim)
+        # self.input_proj = nn.Linear(input_dim, output_dim)
+        
+        # Transformer Encoder
+        encoder_layer = nn.TransformerEncoderLayer(d_model=output_dim, nhead=num_heads)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        
+        # Layer per proiettare la sequenza da seq_len_in a seq_len_out
+        self.seq_proj = nn.Linear(seq_len_in, seq_len_out)
     
     def forward(self, x):
-        # x: [batch_size, num_patches, 1024]
-        batch_size, num_patches, _ = x.size()
-        x = x.view(batch_size * num_patches, -1)  # [batch_size * num_patches, 1024]
-        x = self.mapping(x)  # [batch_size * num_patches, 768]
-        x = x.view(batch_size, num_patches, -1)  # [batch_size, num_patches, 768]
+        # x: [batch_size, seq_len_in, input_dim]
+        # Se input_dim == output_dim, puoi saltare la proiezione iniziale
+        # x = self.input_proj(x)  # [batch_size, seq_len_in, output_dim]
+        
+        # Trasponi per adattare alla forma richiesta dal Transformer
+        x = x.permute(1, 0, 2)  # [seq_len_in, batch_size, output_dim]
+        
+        # Applica il Transformer Encoder
+        x = self.transformer_encoder(x)  # [seq_len_in, batch_size, output_dim]
+        
+        # Ritorna alla forma originale
+        x = x.permute(1, 0, 2)  # [batch_size, seq_len_in, output_dim]
+        
+        # Proietta la sequenza da seq_len_in a seq_len_out
+        x = x.transpose(1, 2)  # [batch_size, output_dim, seq_len_in]
+        x = self.seq_proj(x)   # [batch_size, output_dim, seq_len_out]
+        x = x.transpose(1, 2)  # [batch_size, seq_len_out, output_dim]
+        
         return x
     
     
 def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processor, tokenizer, text_encoder, device):
-    mapping_network = MappingNetwork().to(device)
+    mapping_network = MappingNetwork(
+        input_dim=768,
+        output_dim=768,
+        num_layers=6,
+        num_heads=8,
+        seq_len_in=50,
+        seq_len_out=77
+    ).to(device)
 
-    criterion = nn.CosineEmbeddingLoss()
-    optimizer = optim.Adam(mapping_network.parameters(), lr=1e-4)
+    criterion = nn.MSELoss()
+    optimizer = optim.AdamW(mapping_network.parameters(), lr=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
-    num_epochs = 20  # Puoi regolare secondo necessità
-    patience = 5  # Numero di epoche da attendere prima di fermare l'addestramento
+    num_epochs = 20
+    patience = 5
     best_val_loss = float('inf')
     epochs_no_improve = 0
 
     for epoch in range(num_epochs):
         mapping_network.train()
         epoch_loss = 0.0
-        epoch_cosine_sim = 0.0  # Per monitorare la similarità in questo epoch
+        epoch_cosine_sim = 0.0
 
-        # Ciclo di addestramento
         for images, descriptions in train_dataloader:
             if not images or not descriptions:
                 continue
 
-            # Preprocessa le immagini
             image_inputs = clip_processor(images=list(images), return_tensors="pt").pixel_values.to(device)
 
-            # Tokenizza e codifica le descrizioni
             text_inputs = tokenizer(
                 list(descriptions),
                 max_length=tokenizer.model_max_length,
@@ -118,46 +134,42 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             with torch.no_grad():
                 text_embeddings = text_encoder(
                     input_ids=text_inputs.input_ids,
-                ).last_hidden_state
+                ).last_hidden_state  # [batch_size, 77, 768]
 
                 image_embeddings = clip_model.vision_model(
                     pixel_values=image_inputs,
-                ).last_hidden_state
+                ).last_hidden_state  # [batch_size, 50, 768]
 
+            print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
-            #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
             # Mappa le embedding delle immagini
-            mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
+            mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 77, 768]
+            print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
 
-            #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
-
-            # Usa le embedding del token [CLS]
-            mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)
-            text_embeddings_pooled = text_embeddings.mean(dim=1)
-            
-            # Normalizzazione
-            mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
-            text_embeddings_pooled = F.normalize(text_embeddings_pooled, dim=-1)
+            # Normalizza le embedding
+            mapped_image_embeddings_norm = F.normalize(mapped_image_embeddings, p=2, dim=-1)
+            text_embeddings_norm = F.normalize(text_embeddings, p=2, dim=-1)
 
             # Calcolo della loss
-            target = torch.ones(text_embeddings_pooled.size(0)).to(device)
-            loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
+            loss = criterion(mapped_image_embeddings_norm, text_embeddings_norm)
 
-            cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
+            # Calcolo della similarità coseno media
+            cosine_sim = F.cosine_similarity(
+                mapped_image_embeddings_norm.view(-1, 768),
+                text_embeddings_norm.view(-1, 768),
+                dim=-1
+            )
             mean_cosine_sim = cosine_sim.mean().item()
             epoch_cosine_sim += mean_cosine_sim
 
-            # Backpropagation
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(mapping_network.parameters(), max_norm=1.0)
+            torch.nn.utils.clip_grad_norm_(mapping_network.parameters(), max_norm=5.0)
             optimizer.step()
 
             epoch_loss += loss.item()
 
         scheduler.step()
-        
-        # Calcolo della loss e della similarità media di training
         avg_epoch_loss = epoch_loss / len(train_dataloader)
         avg_epoch_cosine_sim = epoch_cosine_sim / len(train_dataloader)
         print(f'Epoch {epoch+1}/{num_epochs}, Training Loss: {avg_epoch_loss:.4f},'
@@ -172,10 +184,8 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
                 if not images or not descriptions:
                     continue
 
-                # Preprocessa le immagini
                 image_inputs = clip_processor(images=list(images), return_tensors="pt").pixel_values.to(device)
 
-                # Tokenizza e codifica le descrizioni
                 text_inputs = tokenizer(
                     list(descriptions),
                     max_length=tokenizer.model_max_length,
@@ -192,43 +202,38 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
                     pixel_values=image_inputs,
                 ).last_hidden_state
 
-                # Mappa le embedding delle immagini
                 mapped_image_embeddings = mapping_network(image_embeddings)
 
-                mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)
-                text_embeddings_pooled = text_embeddings.mean(dim=1)
+                mapped_image_embeddings_norm = F.normalize(mapped_image_embeddings, p=2, dim=-1)
+                text_embeddings_norm = F.normalize(text_embeddings, p=2, dim=-1)
 
-                # Normalizzazione
-                mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
-                text_embeddings_pooled = F.normalize(text_embeddings_pooled, dim=-1)
+                loss = criterion(mapped_image_embeddings_norm, text_embeddings_norm)
 
-                # Calcolo della loss
-                target = torch.ones(text_embeddings_pooled.size(0)).to(device)
-                loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
-
-                cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
+                cosine_sim = F.cosine_similarity(
+                    mapped_image_embeddings_norm.view(-1, 768),
+                    text_embeddings_norm.view(-1, 768),
+                    dim=-1
+                )
                 mean_cosine_sim = cosine_sim.mean().item()
                 val_cosine_sim += mean_cosine_sim
 
                 val_loss += loss.item()
 
-        # Calcolo della loss e della similarità media di validazione
         avg_val_loss = val_loss / len(val_dataloader)
         avg_val_cosine_sim = val_cosine_sim / len(val_dataloader)
         print(f'Epoch {epoch+1}/{num_epochs}, Validation Loss: {avg_val_loss:.4f},'
               f' Validation Mean Cosine Similarity: {avg_val_cosine_sim:.4f}')
 
-        # Early Stopping
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             epochs_no_improve = 0
-            # Salva il miglior modello
             torch.save(mapping_network.state_dict(), '/content/drive/My Drive/checkpoints/mapping_network_best.pth')
         else:
             epochs_no_improve += 1
             if epochs_no_improve >= patience:
                 print(f'Early stopping on epoch {epoch+1}')
                 break
+
 
 
 
