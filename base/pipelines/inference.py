@@ -333,18 +333,12 @@ class VideoGenPipeline(DiffusionPipeline):
                 max_length=max_length,
                 truncation=True,
                 return_tensors="pt",
-            )
+            ).to(self.unet.device)
 
-            if hasattr(self.text_encoder.config, "use_attention_mask") and self.text_encoder.config.use_attention_mask:
-                attention_mask = uncond_input.attention_mask.to(device)
-            else:
-                attention_mask = None
 
             negative_prompt_embeds = self.text_encoder(
-                uncond_input.input_ids.to(device),
-                attention_mask=attention_mask,
-            )
-            negative_prompt_embeds = negative_prompt_embeds[0]
+                input_ids=uncond_input.input_ids,
+            ).last_hidden_state
 
             print(f"negative_prompt_embeds1 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
 

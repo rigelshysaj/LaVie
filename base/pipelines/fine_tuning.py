@@ -224,7 +224,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 '''
 
         # Genera video con il modello fine-tuned
-        #generate_video(unet, is_original=False)
+        generate_video(unet, is_original=False)
 
         generate_video(original_unet, is_original=True)
 
