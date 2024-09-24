@@ -57,31 +57,35 @@ class MappingDataset(Dataset):
 
         return image, description
 
-
-    
 class MappingNetwork(nn.Module):
     def __init__(self, input_dim=1024, output_dim=768, num_layers=6, num_heads=8):
         super(MappingNetwork, self).__init__()
-        self.encoder_layer = nn.TransformerEncoderLayer(d_model=input_dim, nhead=num_heads)
+        # Proietta l'input da 1024 a 768
+        self.input_proj = nn.Linear(input_dim, output_dim)
+        
+        # Ora l'encoder ha d_model=output_dim
+        self.encoder_layer = nn.TransformerEncoderLayer(d_model=output_dim, nhead=num_heads)
         self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=num_layers)
         
+        # Il decoder rimane invariato
         self.decoder_layer = nn.TransformerDecoderLayer(d_model=output_dim, nhead=num_heads)
         self.decoder = nn.TransformerDecoder(self.decoder_layer, num_layers=num_layers)
         
-        self.input_proj = nn.Linear(input_dim, input_dim)
+        # Proiezione finale (opzionale)
         self.output_proj = nn.Linear(output_dim, output_dim)
-        
-        self.fc = nn.Linear(input_dim, output_dim)
         
     def forward(self, src):
         # src: [batch_size, seq_len_in, input_dim]
-        src = self.input_proj(src).permute(1, 0, 2)  # [seq_len_in, batch_size, input_dim]
+        src = self.input_proj(src).permute(1, 0, 2)  # Ora src ha dimensione [seq_len_in, batch_size, output_dim]
         memory = self.encoder(src)
         
-        tgt = torch.zeros(77, src.size(1), memory.size(2)).to(src.device)  # [seq_len_out, batch_size, output_dim]
+        # Inizializza tgt con la dimensione corretta
+        tgt = torch.zeros(77, src.size(1), self.decoder_layer.d_model).to(src.device)  # [seq_len_out, batch_size, output_dim]
+        
         output = self.decoder(tgt, memory)
         output = self.output_proj(output.permute(1, 0, 2))  # [batch_size, seq_len_out, output_dim]
         return output
+
 
     
     
