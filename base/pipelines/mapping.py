@@ -60,21 +60,29 @@ class MappingDataset(Dataset):
 
     
 class MappingNetwork(nn.Module):
-    def __init__(self, input_dim=1024, output_dim=768, num_layers=6, num_heads=8, seq_len_in=257, seq_len_out=77):
+    def __init__(self, input_dim=1024, output_dim=768, num_layers=6, num_heads=8):
         super(MappingNetwork, self).__init__()
-        self.input_proj = nn.Linear(input_dim, output_dim)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=output_dim, nhead=num_heads)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.seq_proj = nn.Linear(seq_len_in, seq_len_out)
-    
-    def forward(self, x):
-        # x: [batch_size, seq_len_in, input_dim]
-        x = self.input_proj(x)  # [batch_size, seq_len_in, output_dim]
-        x = x.permute(1, 0, 2)  # [seq_len_in, batch_size, output_dim]
-        x = self.transformer_encoder(x)  # [seq_len_in, batch_size, output_dim]
-        x = x.permute(1, 0, 2)  # [batch_size, seq_len_in, output_dim]
-        x = self.seq_proj(x.transpose(1, 2)).transpose(1, 2)  # [batch_size, seq_len_out, output_dim]
-        return x
+        self.encoder_layer = nn.TransformerEncoderLayer(d_model=input_dim, nhead=num_heads)
+        self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=num_layers)
+        
+        self.decoder_layer = nn.TransformerDecoderLayer(d_model=output_dim, nhead=num_heads)
+        self.decoder = nn.TransformerDecoder(self.decoder_layer, num_layers=num_layers)
+        
+        self.input_proj = nn.Linear(input_dim, input_dim)
+        self.output_proj = nn.Linear(output_dim, output_dim)
+        
+        self.fc = nn.Linear(input_dim, output_dim)
+        
+    def forward(self, src):
+        # src: [batch_size, seq_len_in, input_dim]
+        src = self.input_proj(src).permute(1, 0, 2)  # [seq_len_in, batch_size, input_dim]
+        memory = self.encoder(src)
+        
+        tgt = torch.zeros(77, src.size(1), memory.size(2)).to(src.device)  # [seq_len_out, batch_size, output_dim]
+        output = self.decoder(tgt, memory)
+        output = self.output_proj(output.permute(1, 0, 2))  # [batch_size, seq_len_out, output_dim]
+        return output
+
     
     
 def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processor, tokenizer, text_encoder, device):
@@ -121,23 +129,15 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
                     pixel_values=image_inputs,
                 ).last_hidden_state
 
-            #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+            print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
             # Mappa le embedding delle immagini
             mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
-            #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
+            print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
             
-            # Appiattisci le dimensioni batch e sequenza
-            batch_size, seq_len, embedding_dim = mapped_image_embeddings.size()
-            mapped_image_embeddings_flat = mapped_image_embeddings.reshape(-1, embedding_dim)  # [batch_size * seq_len, embedding_dim]
-            text_embeddings_flat = text_embeddings.reshape(-1, embedding_dim)
+            cosine_sim = F.cosine_similarity(mapped_image_embeddings, text_embeddings, dim=-1)  # [batch_size, seq_len]
+            loss = (1 - cosine_sim).mean()
             
-            
-            # Calcolo della loss
-            target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
-            loss = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
-
-            # Calcolo della similarità coseno media
-            cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
+            # Calcolo della similarità coseno media per il monitoraggio
             mean_cosine_sim = cosine_sim.mean().item()
             epoch_cosine_sim += mean_cosine_sim
 
@@ -189,14 +189,9 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
                 # Mappa le embedding delle immagini
                 mapped_image_embeddings = mapping_network(image_embeddings)
 
-                batch_size, seq_len, embedding_dim = mapped_image_embeddings.size()
-                mapped_image_embeddings_flat = mapped_image_embeddings.reshape(-1, embedding_dim)
-                text_embeddings_flat = text_embeddings.reshape(-1, embedding_dim)
+                cosine_sim = F.cosine_similarity(mapped_image_embeddings, text_embeddings, dim=-1)  # [batch_size, seq_len]
+                loss = (1 - cosine_sim).mean()
 
-                target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)
-                loss = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
-
-                cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
                 mean_cosine_sim = cosine_sim.mean().item()
                 val_cosine_sim += mean_cosine_sim
 
