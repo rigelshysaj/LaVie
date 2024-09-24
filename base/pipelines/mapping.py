@@ -150,6 +150,9 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             mapped_image_embeddings_norm = F.normalize(mapped_image_embeddings, p=2, dim=-1)
             text_embeddings_norm = F.normalize(text_embeddings, p=2, dim=-1)
 
+            print(f"mapped_image_embeddings_norm shape: {mapped_image_embeddings_norm.shape}, dtype: {mapped_image_embeddings_norm.dtype}")
+            print(f"text_embeddings_norm shape: {text_embeddings_norm.shape}, dtype: {text_embeddings_norm.dtype}")
+
             # Calcolo della loss
             loss = criterion(mapped_image_embeddings_norm, text_embeddings_norm)
 
