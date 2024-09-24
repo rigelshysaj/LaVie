@@ -57,32 +57,62 @@ class MappingDataset(Dataset):
 
         return image, description
 
-
     
 class MappingNetwork(nn.Module):
-    def __init__(self, input_dim=1024, output_dim=768, num_layers=6, num_heads=8, seq_len_in=257, seq_len_out=77):
+    def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
         super(MappingNetwork, self).__init__()
-        self.input_proj = nn.Linear(input_dim, output_dim)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=output_dim, nhead=num_heads)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.seq_proj = nn.Linear(seq_len_in, seq_len_out)
+        layers = []
+        current_dim = input_dim
+        for hidden_dim in hidden_dims:
+            layers.append(nn.Linear(current_dim, hidden_dim))
+            layers.append(nn.ReLU())
+            layers.append(nn.BatchNorm1d(hidden_dim))
+            layers.append(nn.Dropout(0.1))
+            current_dim = hidden_dim
+        layers.append(nn.Linear(current_dim, output_dim))
+        self.mapping = nn.Sequential(*layers)
     
     def forward(self, x):
-        # x: [batch_size, seq_len_in, input_dim]
-        x = self.input_proj(x)  # [batch_size, seq_len_in, output_dim]
-        x = x.permute(1, 0, 2)  # [seq_len_in, batch_size, output_dim]
-        x = self.transformer_encoder(x)  # [seq_len_in, batch_size, output_dim]
-        x = x.permute(1, 0, 2)  # [batch_size, seq_len_in, output_dim]
-        x = self.seq_proj(x.transpose(1, 2)).transpose(1, 2)  # [batch_size, seq_len_out, output_dim]
+        # x: [batch_size, num_patches, 1024]
+        batch_size, num_patches, _ = x.size()
+        x = x.view(batch_size * num_patches, -1)  # [batch_size * num_patches, 1024]
+        x = self.mapping(x)  # [batch_size * num_patches, 768]
+        x = x.view(batch_size, num_patches, -1)  # [batch_size, num_patches, 768]
         return x
     
     
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+
+class MappingNetwork(nn.Module):
+    def __init__(self, input_dim=1024, output_dim=768, hidden_dims=[512, 256, 256]):
+        super(MappingNetwork, self).__init__()
+        layers = []
+        current_dim = input_dim
+        for hidden_dim in hidden_dims:
+            layers.append(nn.Linear(current_dim, hidden_dim))
+            layers.append(nn.ReLU())
+            layers.append(nn.BatchNorm1d(hidden_dim))
+            layers.append(nn.Dropout(0.1))
+            current_dim = hidden_dim
+        layers.append(nn.Linear(current_dim, output_dim))
+        self.mapping = nn.Sequential(*layers)
+        
+    def forward(self, x):
+        # x: [batch_size, num_patches, 1024]
+        batch_size, num_patches, _ = x.size()
+        x = x.view(batch_size * num_patches, -1)  # [batch_size * num_patches, 1024]
+        x = self.mapping(x)  # [batch_size * num_patches, 768]
+        x = x.view(batch_size, num_patches, -1)  # [batch_size, num_patches, 768]
+        return x
+
 def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processor, tokenizer, text_encoder, device):
     mapping_network = MappingNetwork().to(device)
 
     criterion = nn.CosineEmbeddingLoss()
-
-    optimizer = optim.AdamW(mapping_network.parameters(), lr=1e-4)
+    optimizer = optim.Adam(mapping_network.parameters(), lr=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
     num_epochs = 20  # Puoi regolare secondo necessità
@@ -115,36 +145,47 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             with torch.no_grad():
                 text_embeddings = text_encoder(
                     input_ids=text_inputs.input_ids,
-                ).last_hidden_state
+                ).last_hidden_state  # [batch_size, seq_len, hidden_dim]
 
                 image_embeddings = clip_model.vision_model(
                     pixel_values=image_inputs,
-                ).last_hidden_state
+                ).last_hidden_state  # [batch_size, num_patches, 1024]
 
-            #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+            print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+
             # Mappa le embedding delle immagini
-            mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
-            #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
-            
-            # Appiattisci le dimensioni batch e sequenza
-            batch_size, seq_len, embedding_dim = mapped_image_embeddings.size()
-            mapped_image_embeddings_flat = mapped_image_embeddings.reshape(-1, embedding_dim)  # [batch_size * seq_len, embedding_dim]
-            text_embeddings_flat = text_embeddings.reshape(-1, embedding_dim)
-            
-            
-            # Calcolo della loss
-            target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
-            loss = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
+            mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, num_patches, 768]
 
-            # Calcolo della similarità coseno media
-            cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
+            # Pooling delle embedding delle immagini
+            mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)  # [batch_size, 768]
+
+            # Mascheramento manuale dei token di padding durante il pooling delle embedding testuali
+            attention_mask = text_inputs.attention_mask.to(device)  # [batch_size, seq_len]
+            attention_mask_expanded = attention_mask.unsqueeze(-1)  # [batch_size, seq_len, 1]
+            text_embeddings_masked = text_embeddings * attention_mask_expanded  # Zero out embeddings of padding tokens
+            sum_embeddings = text_embeddings_masked.sum(dim=1)  # [batch_size, hidden_dim]
+            token_counts = attention_mask.sum(dim=1).unsqueeze(-1)  # [batch_size, 1]
+            token_counts = token_counts.clamp(min=1e-9)  # Evita divisione per zero
+            text_embeddings_pooled = sum_embeddings / token_counts  # [batch_size, hidden_dim]
+
+            print(f"text_embeddings_pooled shape: {text_embeddings_pooled.shape}, dtype: {text_embeddings_pooled.dtype}")
+
+            # Normalizzazione
+            mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
+            text_embeddings_pooled = F.normalize(text_embeddings_pooled, dim=-1)
+
+            # Calcolo della loss
+            target = torch.ones(text_embeddings_pooled.size(0)).to(device)
+            loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
+
+            cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
             mean_cosine_sim = cosine_sim.mean().item()
             epoch_cosine_sim += mean_cosine_sim
 
             # Backpropagation
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(mapping_network.parameters(), max_norm=5.0)
+            torch.nn.utils.clip_grad_norm_(mapping_network.parameters(), max_norm=1.0)
             optimizer.step()
 
             epoch_loss += loss.item()
@@ -180,23 +221,36 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
 
                 text_embeddings = text_encoder(
                     input_ids=text_inputs.input_ids,
-                ).last_hidden_state
+                ).last_hidden_state  # [batch_size, seq_len, hidden_dim]
 
                 image_embeddings = clip_model.vision_model(
                     pixel_values=image_inputs,
-                ).last_hidden_state
+                ).last_hidden_state  # [batch_size, num_patches, 1024]
 
                 # Mappa le embedding delle immagini
-                mapped_image_embeddings = mapping_network(image_embeddings)
+                mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, num_patches, 768]
 
-                batch_size, seq_len, embedding_dim = mapped_image_embeddings.size()
-                mapped_image_embeddings_flat = mapped_image_embeddings.reshape(-1, embedding_dim)
-                text_embeddings_flat = text_embeddings.reshape(-1, embedding_dim)
+                # Pooling delle embedding delle immagini
+                mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)  # [batch_size, 768]
 
-                target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)
-                loss = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
+                # Mascheramento manuale dei token di padding durante il pooling delle embedding testuali
+                attention_mask = text_inputs.attention_mask.to(device)  # [batch_size, seq_len]
+                attention_mask_expanded = attention_mask.unsqueeze(-1)  # [batch_size, seq_len, 1]
+                text_embeddings_masked = text_embeddings * attention_mask_expanded  # Zero out embeddings of padding tokens
+                sum_embeddings = text_embeddings_masked.sum(dim=1)  # [batch_size, hidden_dim]
+                token_counts = attention_mask.sum(dim=1).unsqueeze(-1)  # [batch_size, 1]
+                token_counts = token_counts.clamp(min=1e-9)  # Evita divisione per zero
+                text_embeddings_pooled = sum_embeddings / token_counts  # [batch_size, hidden_dim]
 
-                cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
+                # Normalizzazione
+                mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
+                text_embeddings_pooled = F.normalize(text_embeddings_pooled, dim=-1)
+
+                # Calcolo della loss
+                target = torch.ones(text_embeddings_pooled.size(0)).to(device)
+                loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
+
+                cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
                 mean_cosine_sim = cosine_sim.mean().item()
                 val_cosine_sim += mean_cosine_sim
 
@@ -219,7 +273,6 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             if epochs_no_improve >= patience:
                 print(f'Early stopping on epoch {epoch+1}')
                 break
-
 
 
 def custom_collate(batch):
@@ -274,14 +327,14 @@ if __name__ == "__main__":
     # Crea DataLoader per training e validazione
     train_dataloader = DataLoader(
         train_dataset,
-        batch_size=64,
+        batch_size=32,
         shuffle=True,
         collate_fn=custom_collate
     )
 
     val_dataloader = DataLoader(
         val_dataset,
-        batch_size=64,
+        batch_size=32,
         shuffle=False,
         collate_fn=custom_collate
     )
