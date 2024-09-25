@@ -610,7 +610,7 @@ def lora_model(data, video_folder, args, training=True):
                     #print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
 
                     # Map image embeddings to text embedding space using the mapping network
-                    mapped_image_features = mapper(image_features)  # Shape: (batch_size, hidden_size)
+                    mapped_image_features = mapper(image_features, text_features)  # Shape: (batch_size, hidden_size)
                     #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
                     similarity = compute_cosine_similarity(text_features, mapped_image_features)
