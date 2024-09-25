@@ -166,7 +166,9 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
             cosine_similarities = F.cosine_similarity(text_embeddings, image_embeddings, dim=1)
-            print(cosine_similarities)
+            # Calcola la media delle similarità
+            average_cosine_similarity = cosine_similarities.mean()
+            print(average_cosine_similarity)
         
 
 
