@@ -56,6 +56,25 @@ class MappingDataset(Dataset):
             description = ""
 
         return image, description
+    
+def contrastive_loss(mapped_image_embeddings, text_embeddings, temperature=0.07):
+    # Normalizza le embeddings
+    mapped_image_embeddings = F.normalize(mapped_image_embeddings, dim=-1)
+    text_embeddings = F.normalize(text_embeddings, dim=-1)
+    
+    # Calcola la similarità coseno
+    logits = torch.matmul(mapped_image_embeddings, text_embeddings.transpose(-1, -2)) / temperature
+    batch_size = logits.size(0)
+    
+    # Creare etichette per matching corretto
+    labels = torch.arange(batch_size).to(logits.device)
+    
+    # Calcolo della loss per image-to-text e text-to-image
+    loss_i2t = F.cross_entropy(logits, labels)
+    loss_t2i = F.cross_entropy(logits.transpose(0, 1), labels)
+    
+    loss = (loss_i2t + loss_t2i) / 2
+    return loss
 
     
 class MappingNetwork(nn.Module):
@@ -154,7 +173,7 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             
             # Calcolo della loss
             target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
-            loss = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
+            loss = contrastive_loss(mapped_image_embeddings_flat, text_embeddings_flat)
 
             # Calcolo della similarità coseno media
             cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
@@ -208,7 +227,7 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
                 text_embeddings_flat = text_embeddings.reshape(-1, embedding_dim)
 
                 target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)
-                loss = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
+                loss = contrastive_loss(mapped_image_embeddings_flat, text_embeddings_flat)
 
                 cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
                 mean_cosine_sim = cosine_sim.mean().item()
