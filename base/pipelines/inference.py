@@ -300,7 +300,7 @@ class VideoGenPipeline(DiffusionPipeline):
             
             
             # Applica il cross-attention
-            prompt_embeds, _ = self.attention_layer(prompt_embeds, mapped_image_features, mapped_image_features)
+            prompt_embeds, _ = self.attention_layer(prompt_embeds, prompt_embeds, prompt_embeds)
 
             
 
