@@ -59,10 +59,10 @@ class MappingDataset(Dataset):
 
     
 class MappingNetwork(nn.Module):
-    def __init__(self, input_dim=768, output_dim=768, num_layers=6, num_heads=8, seq_len_in=50, seq_len_out=77):
+    def __init__(self, input_dim=1024, output_dim=768, num_layers=6, num_heads=8, seq_len_in=50, seq_len_out=77):
         super(MappingNetwork, self).__init__()
         # Layer di proiezione opzionale (puoi rimuoverla se input_dim == output_dim)
-        # self.input_proj = nn.Linear(input_dim, output_dim)
+        self.input_proj = nn.Linear(input_dim, output_dim)
         
         # Transformer Encoder
         encoder_layer = nn.TransformerEncoderLayer(d_model=output_dim, nhead=num_heads)
