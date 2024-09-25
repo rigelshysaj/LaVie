@@ -208,7 +208,7 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
                 ).last_hidden_state
 
                 # Mappa le embedding delle immagini
-                mapped_image_embeddings = mapping_network(image_embeddings)
+                mapped_image_embeddings = mapping_network(image_embeddings, text_embeddings)
 
                 mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)
                 text_embeddings_pooled = text_embeddings.mean(dim=1)
