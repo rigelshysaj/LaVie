@@ -394,15 +394,12 @@ def lora_model(data, video_folder, args, training=True):
 
     for param in attention_layer.parameters():
         param.requires_grad = True
-    for param in mapper.parameters():
-        param.requires_grad = True
-
 
     lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
 
-    trainable_params = list(lora_layers) + list(attention_layer.parameters()) + list(mapper.parameters())
+    #trainable_params = list(lora_layers) + list(attention_layer.parameters()) + list(mapper.parameters())
 
-    #trainable_params = list(lora_layers) + list(attention_layer.parameters())
+    trainable_params = list(lora_layers) + list(attention_layer.parameters())
 
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()

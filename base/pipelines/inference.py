@@ -297,8 +297,6 @@ class VideoGenPipeline(DiffusionPipeline):
             similarity = compute_cosine_similarity(prompt_embeds, mapped_image_features)
             print(f"Inference Cosine Similarity between text and image embeddings: {similarity}")
 
-            
-            
             # Applica il cross-attention
             prompt_embeds, _ = self.attention_layer(prompt_embeds, mapped_image_features, mapped_image_features)
 
