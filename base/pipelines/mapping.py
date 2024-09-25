@@ -56,93 +56,74 @@ class MappingDataset(Dataset):
             description = ""
 
         return image, description
-    
-def contrastive_loss(mapped_image_embeddings, text_embeddings, temperature=0.07):
-    # Normalizza le embeddings
-    mapped_image_embeddings = F.normalize(mapped_image_embeddings, dim=-1)
-    text_embeddings = F.normalize(text_embeddings, dim=-1)
-    
-    # Calcola la similarità coseno
-    logits = torch.matmul(mapped_image_embeddings, text_embeddings.transpose(-1, -2)) / temperature
-    batch_size = logits.size(0)
-    
-    # Creare etichette per matching corretto
-    labels = torch.arange(batch_size).to(logits.device)
-    
-    # Calcolo della loss per image-to-text e text-to-image
-    loss_i2t = F.cross_entropy(logits, labels)
-    loss_t2i = F.cross_entropy(logits.transpose(0, 1), labels)
-    
-    loss = (loss_i2t + loss_t2i) / 2
-    return loss
 
     
 class MappingNetwork(nn.Module):
-    def __init__(self, input_dim=768, output_dim=768, num_layers=6, num_heads=8, seq_len_in=50, seq_len_out=77):
+    def __init__(self, input_dim=1024, output_dim=768, num_layers=6, num_heads=8, seq_len_in=257, seq_len_out=77):
         super(MappingNetwork, self).__init__()
-        # Layer di proiezione opzionale (puoi rimuoverla se input_dim == output_dim)
-        # self.input_proj = nn.Linear(input_dim, output_dim)
-        
-        # Transformer Encoder
-        encoder_layer = nn.TransformerEncoderLayer(d_model=output_dim, nhead=num_heads)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        
-        # Layer per proiettare la sequenza da seq_len_in a seq_len_out
-        self.seq_proj = nn.Linear(seq_len_in, seq_len_out)
-    
-    def forward(self, x):
-        # x: [batch_size, seq_len_in, input_dim]
-        # Se input_dim == output_dim, puoi saltare la proiezione iniziale
-        # x = self.input_proj(x)  # [batch_size, seq_len_in, output_dim]
-        
-        # Trasponi per adattare alla forma richiesta dal Transformer
-        x = x.permute(1, 0, 2)  # [seq_len_in, batch_size, output_dim]
-        
-        # Applica il Transformer Encoder
-        x = self.transformer_encoder(x)  # [seq_len_in, batch_size, output_dim]
-        
-        # Ritorna alla forma originale
-        x = x.permute(1, 0, 2)  # [batch_size, seq_len_in, output_dim]
-        
-        # Proietta la sequenza da seq_len_in a seq_len_out
-        x = x.transpose(1, 2)  # [batch_size, output_dim, seq_len_in]
-        x = self.seq_proj(x)   # [batch_size, output_dim, seq_len_out]
-        x = x.transpose(1, 2)  # [batch_size, seq_len_out, output_dim]
-        
-        return x
+
+        # Project dimensions
+        self.image_proj = nn.Linear(input_dim, output_dim)
+        self.text_proj = nn.Linear(output_dim, output_dim)
+
+        # Positional embeddings
+        self.image_pos_embedding = nn.Parameter(torch.randn(1, seq_len_in, output_dim))
+        self.text_pos_embedding = nn.Parameter(torch.randn(1, seq_len_out, output_dim))
+
+        # Transformer Decoder
+        decoder_layer = nn.TransformerDecoderLayer(d_model=output_dim, nhead=num_heads)
+        self.transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_layers)
+
+    def forward(self, image_embeds, text_embeds):
+        # image_embeds: [batch_size, seq_len_in, input_dim]
+        # text_embeds: [batch_size, seq_len_out, output_dim]
+
+        # Project image embeddings
+        image_embeds = self.image_proj(image_embeds) + self.image_pos_embedding  # [batch_size, seq_len_in, output_dim]
+
+        # Add positional embeddings to text embeddings
+        text_embeds = text_embeds + self.text_pos_embedding
+
+        # Transpose for Transformer [seq_len, batch_size, output_dim]
+        image_embeds = image_embeds.permute(1, 0, 2)
+        text_embeds = text_embeds.permute(1, 0, 2)
+
+        # Apply Transformer Decoder
+        output = self.transformer_decoder(tgt=text_embeds, memory=image_embeds)  # [seq_len_out, batch_size, output_dim]
+
+        # Transpose back
+        output = output.permute(1, 0, 2)  # [batch_size, seq_len_out, output_dim]
+
+        return output
+
     
     
 def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processor, tokenizer, text_encoder, device):
-    mapping_network = MappingNetwork(
-        input_dim=768,
-        output_dim=768,
-        num_layers=6,
-        num_heads=8,
-        seq_len_in=50,
-        seq_len_out=77
-    ).to(device)
+    mapping_network = MappingNetwork().to(device)
 
     criterion = nn.CosineEmbeddingLoss()
-    optimizer = optim.AdamW(mapping_network.parameters(), lr=1e-4)
+    optimizer = optim.Adam(mapping_network.parameters(), lr=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
-    num_epochs = 20
-    patience = 5
+    num_epochs = 20  # Puoi regolare secondo necessità
+    patience = 5  # Numero di epoche da attendere prima di fermare l'addestramento
     best_val_loss = float('inf')
     epochs_no_improve = 0
-    linear_layer = nn.Linear(1024, 768).to(device)
 
     for epoch in range(num_epochs):
         mapping_network.train()
         epoch_loss = 0.0
-        epoch_cosine_sim = 0.0
+        epoch_cosine_sim = 0.0  # Per monitorare la similarità in questo epoch
 
+        # Ciclo di addestramento
         for images, descriptions in train_dataloader:
             if not images or not descriptions:
                 continue
 
+            # Preprocessa le immagini
             image_inputs = clip_processor(images=list(images), return_tensors="pt").pixel_values.to(device)
 
+            # Tokenizza e codifica le descrizioni
             text_inputs = tokenizer(
                 list(descriptions),
                 max_length=tokenizer.model_max_length,
@@ -154,22 +135,115 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             with torch.no_grad():
                 text_embeddings = text_encoder(
                     input_ids=text_inputs.input_ids,
-                ).pooler_output  # [batch_size, 77, 768]
+                ).last_hidden_state
 
                 image_embeddings = clip_model.vision_model(
                     pixel_values=image_inputs,
-                ).pooler_output  # [batch_size, 50, 768]
+                ).last_hidden_state
 
-            image_embeddings = linear_layer(image_embeddings)
-
-            print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
             print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
+            # Mappa le embedding delle immagini
+            mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 257, 768]
+            print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
 
-            cosine_similarities = F.cosine_similarity(text_embeddings, image_embeddings, dim=1)
-            # Calcola la media delle similarità
-            average_cosine_similarity = cosine_similarities.mean()
-            print(average_cosine_similarity)
+            # Usa le embedding del token [CLS]
+            mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)
+            text_embeddings_pooled = text_embeddings.mean(dim=1)
+            
+            # Normalizzazione
+            mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
+            text_embeddings_pooled = F.normalize(text_embeddings_pooled, dim=-1)
+
+            # Calcolo della loss
+            target = torch.ones(text_embeddings_pooled.size(0)).to(device)
+            loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
+
+            cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
+            mean_cosine_sim = cosine_sim.mean().item()
+            epoch_cosine_sim += mean_cosine_sim
+
+            # Backpropagation
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(mapping_network.parameters(), max_norm=1.0)
+            optimizer.step()
+
+            epoch_loss += loss.item()
+
+        scheduler.step()
         
+        # Calcolo della loss e della similarità media di training
+        avg_epoch_loss = epoch_loss / len(train_dataloader)
+        avg_epoch_cosine_sim = epoch_cosine_sim / len(train_dataloader)
+        print(f'Epoch {epoch+1}/{num_epochs}, Training Loss: {avg_epoch_loss:.4f},'
+              f' Training Mean Cosine Similarity: {avg_epoch_cosine_sim:.4f}')
+
+        # Fase di validazione
+        mapping_network.eval()
+        val_loss = 0.0
+        val_cosine_sim = 0.0
+        with torch.no_grad():
+            for images, descriptions in val_dataloader:
+                if not images or not descriptions:
+                    continue
+
+                # Preprocessa le immagini
+                image_inputs = clip_processor(images=list(images), return_tensors="pt").pixel_values.to(device)
+
+                # Tokenizza e codifica le descrizioni
+                text_inputs = tokenizer(
+                    list(descriptions),
+                    max_length=tokenizer.model_max_length,
+                    padding="max_length",
+                    truncation=True,
+                    return_tensors="pt"
+                ).to(device)
+
+                text_embeddings = text_encoder(
+                    input_ids=text_inputs.input_ids,
+                ).last_hidden_state
+
+                image_embeddings = clip_model.vision_model(
+                    pixel_values=image_inputs,
+                ).last_hidden_state
+
+                # Mappa le embedding delle immagini
+                mapped_image_embeddings = mapping_network(image_embeddings)
+
+                mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)
+                text_embeddings_pooled = text_embeddings.mean(dim=1)
+
+                # Normalizzazione
+                mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
+                text_embeddings_pooled = F.normalize(text_embeddings_pooled, dim=-1)
+
+                # Calcolo della loss
+                target = torch.ones(text_embeddings_pooled.size(0)).to(device)
+                loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
+
+                cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
+                mean_cosine_sim = cosine_sim.mean().item()
+                val_cosine_sim += mean_cosine_sim
+
+                val_loss += loss.item()
+
+        # Calcolo della loss e della similarità media di validazione
+        avg_val_loss = val_loss / len(val_dataloader)
+        avg_val_cosine_sim = val_cosine_sim / len(val_dataloader)
+        print(f'Epoch {epoch+1}/{num_epochs}, Validation Loss: {avg_val_loss:.4f},'
+              f' Validation Mean Cosine Similarity: {avg_val_cosine_sim:.4f}')
+
+        # Early Stopping
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            epochs_no_improve = 0
+            # Salva il miglior modello
+            torch.save(mapping_network.state_dict(), '/content/drive/My Drive/checkpoints/mapping_network_best.pth')
+        else:
+            epochs_no_improve += 1
+            if epochs_no_improve >= patience:
+                print(f'Early stopping on epoch {epoch+1}')
+                break
 
 
 
