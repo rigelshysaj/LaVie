@@ -167,7 +167,7 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
 
             # Calcolo della similarità coseno media
             cosine_sim = F.cosine_similarity(text_embeddings, image_embeddings)
-            print(f"Cosine Similarity between text and image embeddings: {cosine_sim}")
+            print(f"Cosine Similarity between text and image embeddings: {cosine_sim.item()}")
         
 
 
