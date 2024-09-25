@@ -294,7 +294,7 @@ class VideoGenPipeline(DiffusionPipeline):
 
             mapped_image_features = self.mapper(image_features)  # Shape: (batch_size, seq_len_img, hidden_size)
 
-            similarity = compute_cosine_similarity(prompt_embeds, mapped_image_features)
+            similarity = compute_cosine_similarity(prompt_embeds, prompt_embeds)
             print(f"Inference Cosine Similarity between text and image embeddings: {similarity}")
 
             
