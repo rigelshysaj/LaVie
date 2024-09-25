@@ -153,103 +153,19 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             with torch.no_grad():
                 text_embeddings = text_encoder(
                     input_ids=text_inputs.input_ids,
-                ).last_hidden_state  # [batch_size, 77, 768]
+                ).pooler_output  # [batch_size, 77, 768]
 
                 image_embeddings = clip_model.vision_model(
                     pixel_values=image_inputs,
-                ).last_hidden_state  # [batch_size, 50, 768]
+                ).pooler_output  # [batch_size, 50, 768]
 
-            #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
-
-            # Mappa le embedding delle immagini
-            mapped_image_embeddings = mapping_network(image_embeddings)  # [batch_size, 77, 768]
-            #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
-
-            # Appiattisci le dimensioni batch e sequenza
-            batch_size, seq_len, embedding_dim = mapped_image_embeddings.size()
-            mapped_image_embeddings_flat = mapped_image_embeddings.reshape(-1, embedding_dim)  # [batch_size * seq_len, embedding_dim]
-            text_embeddings_flat = text_embeddings.reshape(-1, embedding_dim)
-            
-            
-            # Calcolo della loss
-            target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
-            loss = contrastive_loss(mapped_image_embeddings_flat, text_embeddings_flat)
+            print(f"text_embeddings shape: {text_embeddings.shape}, dtype: {text_embeddings.dtype}")
+            print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
 
             # Calcolo della similarità coseno media
-            cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
-            mean_cosine_sim = cosine_sim.mean().item()
-            epoch_cosine_sim += mean_cosine_sim
-
-            optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(mapping_network.parameters(), max_norm=5.0)
-            optimizer.step()
-
-            epoch_loss += loss.item()
-
-        scheduler.step()
-        avg_epoch_loss = epoch_loss / len(train_dataloader)
-        avg_epoch_cosine_sim = epoch_cosine_sim / len(train_dataloader)
-        print(f'Epoch {epoch+1}/{num_epochs}, Training Loss: {avg_epoch_loss:.4f},'
-              f' Training Mean Cosine Similarity: {avg_epoch_cosine_sim:.4f}')
-
-        # Fase di validazione
-        mapping_network.eval()
-        val_loss = 0.0
-        val_cosine_sim = 0.0
-        with torch.no_grad():
-            for images, descriptions in val_dataloader:
-                if not images or not descriptions:
-                    continue
-
-                image_inputs = clip_processor(images=list(images), return_tensors="pt").pixel_values.to(device)
-
-                text_inputs = tokenizer(
-                    list(descriptions),
-                    max_length=tokenizer.model_max_length,
-                    padding="max_length",
-                    truncation=True,
-                    return_tensors="pt"
-                ).to(device)
-
-                text_embeddings = text_encoder(
-                    input_ids=text_inputs.input_ids,
-                ).last_hidden_state
-
-                image_embeddings = clip_model.vision_model(
-                    pixel_values=image_inputs,
-                ).last_hidden_state
-
-                mapped_image_embeddings = mapping_network(image_embeddings)
-
-                batch_size, seq_len, embedding_dim = mapped_image_embeddings.size()
-                mapped_image_embeddings_flat = mapped_image_embeddings.reshape(-1, embedding_dim)
-                text_embeddings_flat = text_embeddings.reshape(-1, embedding_dim)
-
-                target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)
-                loss = contrastive_loss(mapped_image_embeddings_flat, text_embeddings_flat)
-
-                cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
-                mean_cosine_sim = cosine_sim.mean().item()
-                val_cosine_sim += mean_cosine_sim
-
-                val_loss += loss.item()
-
-        avg_val_loss = val_loss / len(val_dataloader)
-        avg_val_cosine_sim = val_cosine_sim / len(val_dataloader)
-        print(f'Epoch {epoch+1}/{num_epochs}, Validation Loss: {avg_val_loss:.4f},'
-              f' Validation Mean Cosine Similarity: {avg_val_cosine_sim:.4f}')
-
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
-            epochs_no_improve = 0
-            torch.save(mapping_network.state_dict(), '/content/drive/My Drive/checkpoints/mapping_network_best.pth')
-        else:
-            epochs_no_improve += 1
-            if epochs_no_improve >= patience:
-                print(f'Early stopping on epoch {epoch+1}')
-                break
-
+            cosine_sim = F.cosine_similarity(text_embeddings, image_embeddings)
+            print(f"Cosine Similarity between text and image embeddings: {cosine_sim}")
+        
 
 
 
@@ -269,8 +185,8 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Carica i modelli
-    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
-    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
+    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
 
