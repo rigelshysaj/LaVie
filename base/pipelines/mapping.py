@@ -130,7 +130,7 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
     patience = 5
     best_val_loss = float('inf')
     epochs_no_improve = 0
-    linear_layer = nn.Linear(1024, 768)
+    linear_layer = nn.Linear(1024, 768).to(device)
 
     for epoch in range(num_epochs):
         mapping_network.train()
