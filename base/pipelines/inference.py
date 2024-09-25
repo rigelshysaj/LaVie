@@ -266,7 +266,6 @@ class VideoGenPipeline(DiffusionPipeline):
         else:
             batch_size = prompt_embeds.shape[0]
 
-        print(f"prompt: {prompt}")
 
         text_inputs = self.tokenizer(
             prompt,
@@ -293,30 +292,15 @@ class VideoGenPipeline(DiffusionPipeline):
             
             image_features=image_features.to(torch.float16)
 
-            mapped_image_features = image_features  # Shape: (batch_size, seq_len_img, hidden_size)
+            mapped_image_features = self.mapper(image_features)  # Shape: (batch_size, seq_len_img, hidden_size)
 
-            similarity = compute_cosine_similarity(prompt_embeds, prompt_embeds)
+            similarity = compute_cosine_similarity(prompt_embeds, mapped_image_features)
             print(f"Inference Cosine Similarity between text and image embeddings: {similarity}")
 
-            testo = "Another self explaning text"
-            text_probe = self.tokenizer(
-                testo,
-                max_length=self.tokenizer.model_max_length,
-                padding="max_length",
-                truncation=True,
-                return_tensors="pt"
-            ).to(self.unet.device)
-            
-            prompt_probe = self.text_encoder(
-                input_ids=text_probe.input_ids,
-            ).last_hidden_state
-
-            similarity1 = compute_cosine_similarity(prompt_embeds, prompt_probe)
-            print(f"Inference111 Cosine Similarity between text and image embeddings: {similarity}")
             
             
             # Applica il cross-attention
-            prompt_embeds, _ = self.attention_layer(prompt_embeds, prompt_embeds, prompt_embeds)
+            prompt_embeds, _ = self.attention_layer(prompt_embeds, mapped_image_features, mapped_image_features)
 
             
 
