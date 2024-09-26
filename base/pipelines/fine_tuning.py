@@ -613,8 +613,8 @@ def lora_model(data, video_folder, args, training=True):
                     mapped_image_features = mapper(image_features, text_features)  # Shape: (batch_size, hidden_size)
                     #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
-                    similarity = compute_cosine_similarity(text_features, mapped_image_features)
-                    print(f"Cosine Similarity between text and image embeddings: {similarity}")
+                    #similarity = compute_cosine_similarity(text_features, mapped_image_features)
+                    #print(f"Cosine Similarity between text and image embeddings: {similarity}")
 
                      # Transpose for multihead attention
                     text_features = text_features.transpose(0, 1)  # Shape: [seq_len_text, batch_size, embed_dim]
@@ -642,12 +642,12 @@ def lora_model(data, video_folder, args, training=True):
                         raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
                     
                     # Visualizza le mappe di attenzione
-                    #visualize_attention_maps(
-                    #    attention_weights,
-                    #    tokenizer,
-                    #    description,
-                    #    save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png"
-                    #)
+                    visualize_attention_maps(
+                        attention_weights,
+                        tokenizer,
+                        description,
+                        save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png"
+                    )
 
                     # Predict the noise residual and compute loss
                     model_pred = unet(noisy_latents, timesteps, encoder_hidden_states, return_dict=False)[0]
