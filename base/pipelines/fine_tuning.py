@@ -641,13 +641,6 @@ def lora_model(data, video_folder, args, training=True):
                     else:
                         raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
                     
-                    # Visualizza le mappe di attenzione
-                    visualize_attention_maps(
-                        attention_weights,
-                        tokenizer,
-                        description,
-                        save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png"
-                    )
 
                     # Predict the noise residual and compute loss
                     model_pred = unet(noisy_latents, timesteps, encoder_hidden_states, return_dict=False)[0]
@@ -739,6 +732,14 @@ def lora_model(data, video_folder, args, training=True):
                             print("modello salvatooooooooooo")
 
                             logger.info(f"Saved state to {save_path}")
+
+                             # Visualizza le mappe di attenzione
+                            visualize_attention_maps(
+                                attention_weights,
+                                tokenizer,
+                                description,
+                                save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png"
+                            )
                     
 
                         inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer, mapper)
