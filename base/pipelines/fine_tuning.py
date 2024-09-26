@@ -240,7 +240,10 @@ def encode_latents(video, vae):
     b, c, f, h, w = video.shape
     video = einops.rearrange(video, "b f h w c -> (b f) c h w")
     
+    vae.enable_slicing()
     latents = vae.encode(video).latent_dist.sample()
+    vae.disable_slicing()
+    
     latents = einops.rearrange(latents, "(b f) c h w -> b c f h w", b=b)
     
     return latents
@@ -798,7 +801,7 @@ def model(args):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, args, training=False)
+    lora_model(data, video_folder, args, training=True)
 
 
 
