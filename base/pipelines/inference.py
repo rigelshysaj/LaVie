@@ -539,6 +539,23 @@ class VideoGenPipeline(DiffusionPipeline):
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
     ):
         
+
+        def determine_execution_device():
+            print("Determinazione del dispositivo di esecuzione")
+            if not hasattr(self.unet, "_hf_hook"):
+                print("Unet non ha _hf_hook, uso self.device")
+                return self.device
+            for module in self.unet.modules():
+                if (
+                    hasattr(module, "_hf_hook")
+                    and hasattr(module._hf_hook, "execution_device")
+                    and module._hf_hook.execution_device is not None
+                ):
+                    print(f"Trovato execution_device: {module._hf_hook.execution_device}")
+                    return torch.device(module._hf_hook.execution_device)
+            print("Non trovato execution_device, uso self.device")
+            return self.device
+
         # 0. Default height and width to unet
         height = height or self.unet.config.sample_size * self.vae_scale_factor
         width = width or self.unet.config.sample_size * self.vae_scale_factor
@@ -556,7 +573,7 @@ class VideoGenPipeline(DiffusionPipeline):
         else:
             batch_size = prompt_embeds.shape[0]
 
-        device = self._execution_device
+        device = determine_execution_device
         # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
         # corresponds to doing no classifier free guidance.
