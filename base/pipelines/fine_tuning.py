@@ -15,6 +15,7 @@ import imageio
 import logging
 import math
 import transformers
+import torch.optim as optim
 from diffusers.optimization import get_scheduler
 import diffusers
 import sys
@@ -145,9 +146,8 @@ def load_and_transform_image(path):
     return image_tensor
 
 
-def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer, mapper):
+def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper):
         
-    attention_layer.dtype = next(attention_layer.parameters()).dtype
     mapper.dtype = next(mapper.parameters()).dtype
 
     with torch.no_grad():
@@ -161,7 +161,6 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 unet=unet,
                 clip_processor=clip_processor,
                 clip_model=clip_model,
-                attention_layer=attention_layer,
                 mapper=mapper
             ).to(device)
 
@@ -345,8 +344,6 @@ def lora_model(data, video_folder, args, training=True):
     mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
-    #tokenizer = CLIPTokenizer.from_pretrained(sd_path, subfolder="tokenizer")
-    #text_encoder = CLIPTextModel.from_pretrained(sd_path, subfolder="text_encoder").to(device)
     text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
     # Load CLIP model and processor for image conditioning
@@ -381,25 +378,24 @@ def lora_model(data, video_folder, args, training=True):
     
     unet = get_peft_model(unet, lora_config)
 
-    attention_layer = nn.MultiheadAttention(embed_dim=768, num_heads=8).to(unet.device).to(weight_dtype)
 
     if args.mixed_precision == "fp16":
         # only upcast trainable parameters (LoRA) into fp32
-        cast_training_params([unet, attention_layer], dtype=torch.float32)
+        cast_training_params([unet, mapper], dtype=torch.float32)
 
     #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
     train_dataloader = DataLoader(dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=custom_collate)
     print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
 
-    for param in attention_layer.parameters():
+    for param in mapper.parameters():
         param.requires_grad = True
 
     lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
 
-    #trainable_params = list(lora_layers) + list(attention_layer.parameters()) + list(mapper.parameters())
+    trainable_params = list(lora_layers) + list(attention_layer.parameters()) + list(mapper.parameters())
 
-    trainable_params = list(lora_layers) + list(attention_layer.parameters())
+    trainable_params = list(lora_layers) + list(mapper.parameters())
 
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
@@ -452,9 +448,15 @@ def lora_model(data, video_folder, args, training=True):
         num_training_steps=num_training_steps_for_scheduler,
     )
 
+
+    optimizer_mapper = optim.AdamW(mapper.parameters(), lr=1e-4)
+    scheduler_mapper = optim.lr_scheduler.StepLR(optimizer_mapper, step_size=10, gamma=0.1)
+
+    criterion = nn.CosineEmbeddingLoss()
+
     # Prepare everything with our `accelerator`.
-    unet, mapper, attention_layer, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        unet, mapper, attention_layer, optimizer, train_dataloader, lr_scheduler
+    unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper = accelerator.prepare(
+        unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper
     )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
@@ -510,7 +512,6 @@ def lora_model(data, video_folder, args, training=True):
             accelerator.load_state(os.path.join(args.output_dir, path))
             # Load the mapper state dict
             #mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
-            attention_layer.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'attention_layer.pt')))
             global_step = int(path.split("-")[1])
 
             initial_global_step = global_step
@@ -537,8 +538,7 @@ def lora_model(data, video_folder, args, training=True):
 
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
-            attention_layer.train()
-            mapper.eval()
+            mapper.train()
 
             batch_losses = []
             train_loss = 0.0
@@ -613,17 +613,22 @@ def lora_model(data, video_folder, args, training=True):
                     mapped_image_features = mapper(image_features, text_features)  # Shape: (batch_size, hidden_size)
                     #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
-                    #similarity = compute_cosine_similarity(text_features, mapped_image_features)
-                    #print(f"Cosine Similarity between text and image embeddings: {similarity}")
+                    mapped_image_embeddings_flat = mapped_image_features.reshape(-1, 768)
+                    text_embeddings_flat = text_features.reshape(-1, 768)
+
+                    # Normalize embeddings
+                    mapped_image_embeddings_flat = F.normalize(mapped_image_embeddings_flat, p=2, dim=1)
+                    text_embeddings_flat = F.normalize(text_embeddings_flat, p=2, dim=1)
+
+                    target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
+                    loss_mapper = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
+
+                    similarity = compute_cosine_similarity(text_features, mapped_image_features)
+                    print(f"Cosine Similarity between text and image embeddings: {similarity}")
 
                      # Transpose for multihead attention
-                    text_features = text_features.transpose(0, 1)  # Shape: [seq_len_text, batch_size, embed_dim]
-                    mapped_image_features = mapped_image_features.transpose(0, 1)  # Shape: [seq_len_img, batch_size, embed_dim]
-
-                    # Applica il cross-attention
-                    encoder_hidden_states, attention_weights = attention_layer(text_features, mapped_image_features, mapped_image_features)
-
-                    encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
+                    
+                    encoder_hidden_states = mapped_image_features
                     
                     
                     #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
@@ -664,6 +669,9 @@ def lora_model(data, video_folder, args, training=True):
                         loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
                         loss = loss.mean()
 
+                    lambda_alignment = 0.1
+                    loss = loss + lambda_alignment * loss_mapper
+
                     # Gather the losses across all processes for logging (if we use distributed training).
                     avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
                     train_loss += avg_loss.item() / args.gradient_accumulation_steps
@@ -675,7 +683,11 @@ def lora_model(data, video_folder, args, training=True):
                         params_to_clip = trainable_params
                         accelerator.clip_grad_norm_(params_to_clip, args.max_grad_norm)
                     optimizer.step()
+                    optimizer_mapper.step()
                     lr_scheduler.step()
+                    scheduler_mapper.step()
+
+                    optimizer_mapper.zero_grad()
                     optimizer.zero_grad()
                 # Checks if the accelerator has performed an optimization step behind the scenes
                 if accelerator.sync_gradients:
@@ -725,24 +737,13 @@ def lora_model(data, video_folder, args, training=True):
                             )
 
                             # Save the mapper state dict
-                            #torch.save(mapper.state_dict(), os.path.join(save_path, 'mapper.pt'))
-                            torch.save(attention_layer.state_dict(), os.path.join(save_path, 'attention_layer.pt'))
-
+                            torch.save(mapper.state_dict(), os.path.join(save_path, 'mapper.pt'))
 
                             print("modello salvatooooooooooo")
 
                             logger.info(f"Saved state to {save_path}")
 
-                             # Visualizza le mappe di attenzione
-                            visualize_attention_maps(
-                                attention_weights,
-                                tokenizer,
-                                description,
-                                save_path=f"/content/drive/My Drive/visualization_{step}_{global_step}.png"
-                            )
-                    
-
-                        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer, mapper)
+                        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper)
 
 
                 logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
@@ -779,7 +780,7 @@ def lora_model(data, video_folder, args, training=True):
         # Opzionale: visualizza il grafico interattivo in Colab
         fig.show()
     else:
-        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, attention_layer, mapper)
+        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper)
 
 
 

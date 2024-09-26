@@ -77,7 +77,6 @@ class VideoGenPipeline(DiffusionPipeline):
         scheduler: KarrasDiffusionSchedulers,
         clip_processor: CLIPProcessor,
         clip_model: CLIPModel,
-        attention_layer: nn.MultiheadAttention,
         mapper,
     ):
         super().__init__()
@@ -140,7 +139,6 @@ class VideoGenPipeline(DiffusionPipeline):
             scheduler=scheduler,
             clip_processor=clip_processor,
             clip_model=clip_model,
-            attention_layer=attention_layer,
             mapper=mapper
         )
 
@@ -301,7 +299,7 @@ class VideoGenPipeline(DiffusionPipeline):
             interpolated_features = alpha * prompt_embeds + (1 - alpha) * mapped_image_features
 
             # Applica il cross-attention
-            prompt_embeds = interpolated_features
+            prompt_embeds = mapped_image_features
 
             
 
