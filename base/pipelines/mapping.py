@@ -99,10 +99,17 @@ class MappingNetwork(nn.Module):
     
     
 def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processor, tokenizer, text_encoder, device):
-    mapping_network = MappingNetwork().to(device)
+    mapping_network = MappingNetwork(
+        input_dim=1024,
+        output_dim=768,
+        num_layers=12,  # Aumentato
+        num_heads=12,   # Aumentato
+        seq_len_in=257,
+        seq_len_out=77
+    ).to(device)
 
     criterion = nn.CosineEmbeddingLoss()
-    optimizer = optim.Adam(mapping_network.parameters(), lr=1e-4)
+    optimizer = optim.AdamW(mapping_network.parameters(), lr=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
     num_epochs = 20  # Puoi regolare secondo necessità
@@ -133,39 +140,40 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             ).to(device)
 
             with torch.no_grad():
+                # Get text embeddings
                 text_embeddings = text_encoder(
                     input_ids=text_inputs.input_ids,
-                ).last_hidden_state
+                ).last_hidden_state  # [batch_size, 77, 768]
 
-                image_embeddings = clip_model.vision_model(
+                # Get image embeddings
+                image_outputs = clip_model.vision_model(
                     pixel_values=image_inputs,
-                ).last_hidden_state
+                )
+                image_embeddings = image_outputs.last_hidden_state
 
-            #print(f"image_embeddings shape: {image_embeddings.shape}, dtype: {image_embeddings.dtype}")
-            # Mappa le embedding delle immagini
-            mapped_image_embeddings = mapping_network(image_embeddings, text_embeddings)  # [batch_size, 257, 768]
-            #print(f"mapped_image_embeddings shape: {mapped_image_embeddings.shape}, dtype: {mapped_image_embeddings.dtype}")
+            # Map image embeddings to text embedding space
+            mapped_image_embeddings = mapping_network(image_embeddings, text_embeddings)
 
-            # Usa le embedding del token [CLS]
-            mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)
-            text_embeddings_pooled = text_embeddings.mean(dim=1)
-            
-            # Normalizzazione
-            mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
-            text_embeddings_pooled = F.normalize(text_embeddings_pooled, dim=-1)
+            # Compute loss
+            # Reshape to [batch_size * seq_len, embedding_dim]
+            mapped_image_embeddings_flat = mapped_image_embeddings.reshape(-1, 768)
+            text_embeddings_flat = text_embeddings.reshape(-1, 768)
 
-            # Calcolo della loss
-            target = torch.ones(text_embeddings_pooled.size(0)).to(device)
-            loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
+            # Normalize embeddings
+            mapped_image_embeddings_flat = F.normalize(mapped_image_embeddings_flat, p=2, dim=1)
+            text_embeddings_flat = F.normalize(text_embeddings_flat, p=2, dim=1)
 
-            cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
+            target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
+            loss = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
+
+            # Calculate mean cosine similarity
+            cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
             mean_cosine_sim = cosine_sim.mean().item()
             epoch_cosine_sim += mean_cosine_sim
 
-            # Backpropagation
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(mapping_network.parameters(), max_norm=1.0)
+            torch.nn.utils.clip_grad_norm_(mapping_network.parameters(), max_norm=5.0)
             optimizer.step()
 
             epoch_loss += loss.item()
@@ -201,27 +209,28 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
 
                 text_embeddings = text_encoder(
                     input_ids=text_inputs.input_ids,
-                ).last_hidden_state
+                ).last_hidden_state  # [batch_size, 77, 768]
 
-                image_embeddings = clip_model.vision_model(
+                # Get image embeddings
+                image_outputs = clip_model.vision_model(
                     pixel_values=image_inputs,
-                ).last_hidden_state
+                )
+                image_embeddings = image_outputs.last_hidden_state
 
                 # Mappa le embedding delle immagini
                 mapped_image_embeddings = mapping_network(image_embeddings, text_embeddings)
 
-                mapped_image_embeddings_pooled = mapped_image_embeddings.mean(dim=1)
-                text_embeddings_pooled = text_embeddings.mean(dim=1)
+                mapped_image_embeddings_flat = mapped_image_embeddings.reshape(-1, 768)
+                text_embeddings_flat = text_embeddings.reshape(-1, 768)
 
-                # Normalizzazione
-                mapped_image_embeddings_pooled = F.normalize(mapped_image_embeddings_pooled, dim=-1)
-                text_embeddings_pooled = F.normalize(text_embeddings_pooled, dim=-1)
+                # Normalize embeddings
+                mapped_image_embeddings_flat = F.normalize(mapped_image_embeddings_flat, p=2, dim=1)
+                text_embeddings_flat = F.normalize(text_embeddings_flat, p=2, dim=1)
 
-                # Calcolo della loss
-                target = torch.ones(text_embeddings_pooled.size(0)).to(device)
-                loss = criterion(mapped_image_embeddings_pooled, text_embeddings_pooled, target)
+                target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
+                loss = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
 
-                cosine_sim = F.cosine_similarity(text_embeddings_pooled, mapped_image_embeddings_pooled)
+                cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
                 mean_cosine_sim = cosine_sim.mean().item()
                 val_cosine_sim += mean_cosine_sim
 
