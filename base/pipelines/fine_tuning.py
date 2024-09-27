@@ -344,7 +344,7 @@ def lora_model(data, video_folder, args, training=True):
 
     # Instantiate the mapping network
     mapper = MappingNetwork().to(unet.device)
-    #mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
+    mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
@@ -512,7 +512,7 @@ def lora_model(data, video_folder, args, training=True):
             accelerator.print(f"Resuming from checkpoint {path}")
             accelerator.load_state(os.path.join(args.output_dir, path))
             # Load the mapper state dict
-            mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
+            #mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
             global_step = int(path.split("-")[1])
 
             initial_global_step = global_step
