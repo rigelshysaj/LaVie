@@ -743,11 +743,9 @@ def lora_model(data, video_folder, args, training=True):
                             )
 
                             # Save the mapper state dict
-                            torch.save(mapper.state_dict(), os.path.join(save_path, 'mapper.pt'))
+                            #torch.save(mapper.state_dict(), os.path.join(save_path, 'mapper.pt'))
 
                             print("modello salvatooooooooooo")
-
-                            logger.info(f"Saved state to {save_path}")
 
                         inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper)
 
