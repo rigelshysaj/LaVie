@@ -450,9 +450,14 @@ def lora_model(data, video_folder, args, training=True):
     )
 
 
+    optimizer_mapper = optim.AdamW(mapper.parameters(), lr=1e-4)
+    scheduler_mapper = optim.lr_scheduler.StepLR(optimizer_mapper, step_size=10, gamma=0.1)
+
+    criterion = nn.CosineEmbeddingLoss()
+
     # Prepare everything with our `accelerator`.
-    unet, mapper, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        unet, mapper, optimizer, train_dataloader, lr_scheduler 
+    unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper = accelerator.prepare(
+        unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper
     )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
@@ -534,7 +539,7 @@ def lora_model(data, video_folder, args, training=True):
 
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
-            mapper.eval()
+            mapper.train()
 
             batch_losses = []
             train_loss = 0.0
@@ -609,7 +614,15 @@ def lora_model(data, video_folder, args, training=True):
                     mapped_image_features = mapper(image_features, text_features)  # Shape: (batch_size, hidden_size)
                     #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
-                    
+                    mapped_image_embeddings_flat = mapped_image_features.reshape(-1, 768)
+                    text_embeddings_flat = text_features.reshape(-1, 768)
+
+                    # Normalize embeddings
+                    mapped_image_embeddings_flat = F.normalize(mapped_image_embeddings_flat, p=2, dim=1)
+                    text_embeddings_flat = F.normalize(text_embeddings_flat, p=2, dim=1)
+
+                    target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
+                    loss_mapper = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
 
                     similarity = compute_cosine_similarity(text_features, mapped_image_features)
                     print(f"Cosine Similarity between text and image embeddings: {similarity}")
@@ -660,6 +673,9 @@ def lora_model(data, video_folder, args, training=True):
                         loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
                         loss = loss.mean()
 
+                    lambda_alignment = 0.1
+                    loss = loss + lambda_alignment * loss_mapper
+
                     # Gather the losses across all processes for logging (if we use distributed training).
                     avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
                     train_loss += avg_loss.item() / args.gradient_accumulation_steps
@@ -671,9 +687,11 @@ def lora_model(data, video_folder, args, training=True):
                         params_to_clip = trainable_params
                         accelerator.clip_grad_norm_(params_to_clip, args.max_grad_norm)
                     optimizer.step()
-                    
+                    optimizer_mapper.step()
                     lr_scheduler.step()
-                   
+                    scheduler_mapper.step()
+
+                    optimizer_mapper.zero_grad()
                     optimizer.zero_grad()
                 # Checks if the accelerator has performed an optimization step behind the scenes
                 if accelerator.sync_gradients:
