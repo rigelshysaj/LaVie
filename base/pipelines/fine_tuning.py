@@ -626,8 +626,8 @@ def lora_model(data, video_folder, args, training=True):
                     #target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
                     #loss_mapper = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
 
-                    similarity = compute_cosine_similarity(text_features, mapped_image_features)
-                    print(f"Cosine Similarity between text and image embeddings: {similarity}")
+                    #similarity = compute_cosine_similarity(text_features, mapped_image_features)
+                    #print(f"Cosine Similarity between text and image embeddings: {similarity}")
 
                     #alpha = 0.5  # puoi regolare questo valore
                     #interpolated_features = alpha * text_features + (1 - alpha) * mapped_image_features
