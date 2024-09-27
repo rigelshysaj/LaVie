@@ -630,7 +630,7 @@ def lora_model(data, video_folder, args, training=True):
                     alpha = 0.5  # puoi regolare questo valore
                     interpolated_features = alpha * text_features + (1 - alpha) * mapped_image_features
                     
-                    encoder_hidden_states = mapped_image_features
+                    encoder_hidden_states = interpolated_features
                     
                     
                     #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
