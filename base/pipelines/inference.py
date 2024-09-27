@@ -301,7 +301,7 @@ class VideoGenPipeline(DiffusionPipeline):
             combined_features = torch.cat([prompt_embeds, mapped_image_features], dim=1)
 
             # Applica il cross-attention
-            prompt_embeds = interpolated_features
+            prompt_embeds = combined_features
 
             
 
