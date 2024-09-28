@@ -345,7 +345,7 @@ class VideoGenPipeline(DiffusionPipeline):
                                 dtype=negative_prompt_embeds.dtype)
                 
                 negative_prompt_embeds = torch.cat([negative_prompt_embeds, padding], dim=1)
-                print(f"negative_prompt_embeds4 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
+                print(f"negative_prompt_embeds2 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
                 '''
 
                 mapped_negative_image_features = self.mapper(image_features, negative_prompt_embeds)
