@@ -335,21 +335,18 @@ class VideoGenPipeline(DiffusionPipeline):
 
 
             if input_image is not None:
-                padding = torch.zeros(negative_prompt_embeds.shape[0], 
-                                prompt_embeds.shape[1] - negative_prompt_embeds.shape[1], 
-                                negative_prompt_embeds.shape[2], 
-                                device=device, 
-                                dtype=negative_prompt_embeds.dtype)
                 
-                negative_prompt_embeds = torch.cat([negative_prompt_embeds, padding], dim=1)
-                print(f"negative_prompt_embeds4 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
+                mapped_negative_image_features = self.mapper(image_features, negative_prompt_embeds)
+                negative_prompt_embeds = torch.cat([negative_prompt_embeds, mapped_negative_image_features], dim=1)
+
+                print(f"negative_prompt_embeds2 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
             
 
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and text embeddings into a single batch
             # to avoid doing two forward passes
             prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds])
-            print(f"prompt_embeds4 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
+            print(f"prompt_embeds3 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
 
         return prompt_embeds
