@@ -308,24 +308,8 @@ class VideoGenPipeline(DiffusionPipeline):
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
             uncond_tokens: List[str]
-            if negative_prompt is None:
-                uncond_tokens = [""] * batch_size
-                print("negative_prompt is None")
-            elif type(prompt) is not type(negative_prompt):
-                raise TypeError(
-                    f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
-                    f" {type(prompt)}."
-                )
-            elif isinstance(negative_prompt, str):
-                uncond_tokens = [negative_prompt]
-            elif batch_size != len(negative_prompt):
-                raise ValueError(
-                    f"`negative_prompt`: {negative_prompt} has batch size {len(negative_prompt)}, but `prompt`:"
-                    f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
-                    " the batch size of `prompt`."
-                )
-            else:
-                uncond_tokens = negative_prompt
+            
+            uncond_tokens = [""] * batch_size
 
             max_length = min(self.tokenizer.model_max_length, prompt_embeds.shape[1])
             print(f"lunghezza tokenizer: {self.tokenizer.model_max_length}, shape[1]: {prompt_embeds.shape[1]}")
@@ -346,19 +330,10 @@ class VideoGenPipeline(DiffusionPipeline):
 
 
         if do_classifier_free_guidance:
-            # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
-            seq_len = negative_prompt_embeds.shape[1]
 
             negative_prompt_embeds = negative_prompt_embeds.to(dtype=self.text_encoder.dtype, device=device)
 
-            negative_prompt_embeds = negative_prompt_embeds.repeat(1, num_images_per_prompt, 1)
-            print(f"negative_prompt_embeds2 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
 
-            negative_prompt_embeds = negative_prompt_embeds.view(batch_size * num_images_per_prompt, seq_len, -1)
-            print(f"negative_prompt_embeds3 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
-
-
-            
             if input_image is not None:
                 padding = torch.zeros(negative_prompt_embeds.shape[0], 
                                 prompt_embeds.shape[1] - negative_prompt_embeds.shape[1], 
