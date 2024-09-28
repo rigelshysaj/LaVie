@@ -703,8 +703,8 @@ def lora_model(data, video_folder, args, training=True):
                     #print(f"Step {global_step}: train_loss = {train_loss:.6f}")
                     train_loss = 0.0
 
-                    if global_step % args.logging_steps == 0:
-                        log_lora_weights(unet, global_step)
+                    #if global_step % args.logging_steps == 0:
+                    #    log_lora_weights(unet, global_step)
 
                     if global_step % args.checkpointing_steps == 0:
                         if accelerator.is_main_process:
