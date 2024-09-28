@@ -303,6 +303,8 @@ class VideoGenPipeline(DiffusionPipeline):
             # Applica il cross-attention
             prompt_embeds = combined_features
 
+            print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
+
             
 
         # get unconditional embeddings for classifier free guidance
@@ -335,7 +337,17 @@ class VideoGenPipeline(DiffusionPipeline):
 
 
             if input_image is not None:
+                '''
+                padding = torch.zeros(negative_prompt_embeds.shape[0], 
+                                prompt_embeds.shape[1] - negative_prompt_embeds.shape[1], 
+                                negative_prompt_embeds.shape[2], 
+                                device=device, 
+                                dtype=negative_prompt_embeds.dtype)
                 
+                negative_prompt_embeds = torch.cat([negative_prompt_embeds, padding], dim=1)
+                print(f"negative_prompt_embeds4 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
+                '''
+
                 mapped_negative_image_features = self.mapper(image_features, negative_prompt_embeds)
                 negative_prompt_embeds = torch.cat([negative_prompt_embeds, mapped_negative_image_features], dim=1)
 
