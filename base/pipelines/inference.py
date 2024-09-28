@@ -301,7 +301,7 @@ class VideoGenPipeline(DiffusionPipeline):
             combined_features = torch.cat([prompt_embeds, mapped_image_features], dim=1)
 
             # Applica il cross-attention
-            prompt_embeds = combined_features
+            prompt_embeds = mapped_image_features
 
             print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
@@ -349,7 +349,7 @@ class VideoGenPipeline(DiffusionPipeline):
                 '''
 
                 mapped_negative_image_features = self.mapper(image_features, negative_prompt_embeds)
-                negative_prompt_embeds = torch.cat([negative_prompt_embeds, mapped_negative_image_features], dim=1)
+                negative_prompt_embeds = mapped_negative_image_features
 
                 print(f"negative_prompt_embeds2 shape: {negative_prompt_embeds.shape}, dtype: {negative_prompt_embeds.dtype}")
             
