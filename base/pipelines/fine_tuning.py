@@ -349,6 +349,7 @@ def lora_model(data, video_folder, args, training=True):
 
 
     model, preprocess = clip.load("ViT-B/32", device=device)
+    model.eval()
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
@@ -602,27 +603,31 @@ def lora_model(data, video_folder, args, training=True):
                     
                     text_features=text_features.to(torch.float16)
 
-                    image = preprocess(Image.open(args.image_path)).unsqueeze(0).to(device)
+                    try:
+                        img = Image.open(args.image_path).convert("RGB")
+                        image = preprocess(img).unsqueeze(0).to(device)
+                    except Exception as e:
+                        print(f"Errore nel caricamento dell'immagine: {e}")
+                        exit(1)
+
+                    # Prepara il testo
                     testo = ["a horse is playing with a big red and black ball"]
-                    text = clip.tokenize(["a horse is playing with a big red and black ball"]).to(device)
+                    text = clip.tokenize(testo).to(device)
 
                     with torch.no_grad():
-                        # Ottieni le features dell'immagine
-                        image_features = model.encode_image(image)  # Shape: [1, D]
-                        
-                        # Ottieni le features del testo
-                        text_features = model.encode_text(text)    # Shape: [1, D]
-                        
-                        # Normalizza le features
+                        # Estrai le feature dell'immagine e del testo
+                        image_features = model.encode_image(image)
+                        text_features = model.encode_text(text)
+
+                        # Normalizza le feature
                         image_features_norm = image_features / image_features.norm(dim=-1, keepdim=True)
                         text_features_norm = text_features / text_features.norm(dim=-1, keepdim=True)
-                        
+
                         # Calcola la cosine similarity
                         cosine_sim = F.cosine_similarity(image_features_norm, text_features_norm)
-                        
-                        # Estrai il valore come float
                         similarity_score = cosine_sim.item()
-                    print(f"Similarità tra l'immagine e '{testo}': {similarity_score:.4f}")
+
+                    print(f"Similarità tra l'immagine e '{testo[0]}': {similarity_score:.4f}")
 
                     #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
