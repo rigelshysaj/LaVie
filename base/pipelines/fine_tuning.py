@@ -603,6 +603,7 @@ def lora_model(data, video_folder, args, training=True):
                     text_features=text_features.to(torch.float16)
 
                     image = preprocess(Image.open(args.image_path)).unsqueeze(0).to(device)
+                    testo = ["a horse is playing with a big red and black ball"]
                     text = clip.tokenize(["a horse is playing with a big red and black ball"]).to(device)
 
                     with torch.no_grad():
@@ -621,7 +622,7 @@ def lora_model(data, video_folder, args, training=True):
                         
                         # Estrai il valore come float
                         similarity_score = cosine_sim.item()
-                    print(f"Similarità tra l'immagine e '{description[0]}': {similarity_score:.4f}")
+                    print(f"Similarità tra l'immagine e '{testo}': {similarity_score:.4f}")
 
                     #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
