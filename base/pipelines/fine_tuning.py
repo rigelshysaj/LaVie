@@ -4,6 +4,7 @@ import torch
 import os
 from tqdm import tqdm
 import plotly.graph_objs as go
+import clip
 import shutil
 from transformers import CLIPProcessor, CLIPModel
 from peft import LoraConfig, get_peft_model
@@ -346,6 +347,8 @@ def lora_model(data, video_folder, args, training=True):
     mapper = MappingNetwork().to(unet.device)
     mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
 
+
+    model, preprocess = clip.load("ViT-B/32", device=device)
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
@@ -598,6 +601,27 @@ def lora_model(data, video_folder, args, training=True):
                     ).last_hidden_state
                     
                     text_features=text_features.to(torch.float16)
+
+                    image = preprocess(Image.open(args.image_path)).unsqueeze(0).to(device)
+                    text = clip.tokenize([description[0]]).to(device)
+
+                    with torch.no_grad():
+                        # Ottieni le features dell'immagine
+                        image_features = model.encode_image(image)  # Shape: [1, D]
+                        
+                        # Ottieni le features del testo
+                        text_features = model.encode_text(text)    # Shape: [1, D]
+                        
+                        # Normalizza le features
+                        image_features_norm = image_features / image_features.norm(dim=-1, keepdim=True)
+                        text_features_norm = text_features / text_features.norm(dim=-1, keepdim=True)
+                        
+                        # Calcola la cosine similarity
+                        cosine_sim = F.cosine_similarity(image_features_norm, text_features_norm)
+                        
+                        # Estrai il valore come float
+                        similarity_score = cosine_sim.item()
+                    print(f"Similarità tra l'immagine e '{description[0]}': {similarity_score:.4f}")
 
                     #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
