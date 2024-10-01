@@ -603,7 +603,7 @@ def lora_model(data, video_folder, args, training=True):
                     text_features=text_features.to(torch.float16)
 
                     image = preprocess(Image.open(args.image_path)).unsqueeze(0).to(device)
-                    text = clip.tokenize([description[0]]).to(device)
+                    text = clip.tokenize(["a horse is playing with a big red and black ball"]).to(device)
 
                     with torch.no_grad():
                         # Ottieni le features dell'immagine
