@@ -611,7 +611,7 @@ def lora_model(data, video_folder, args, training=True):
                         exit(1)
 
                     # Prepara il testo
-                    testo = ["a horse is playing with a big red and black ball"]
+                    testo = ["a horse with a ball"]
                     text = clip.tokenize(testo).to(device)
 
                     with torch.no_grad():
