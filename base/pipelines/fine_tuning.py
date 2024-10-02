@@ -117,17 +117,6 @@ def visualize_attention_maps(attention_weights, tokenizer, description_list, sav
     plt.close()
 
 
-
-def compute_cosine_similarity(text_features, image_features):
-    # Aggrega le embedding lungo la dimensione della sequenza (media)
-    text_embedding = text_features.mean(dim=1)  # Shape: [1, 768]
-    image_embedding = image_features.mean(dim=1)  # Shape: [1, 768]
-    
-    # Calcola la similarità coseno
-    cosine_similarity = F.cosine_similarity(text_embedding, image_embedding)
-    return cosine_similarity.item()
-
-
 def load_and_transform_image(path):
     image = Image.open(path).convert('RGB')
 
@@ -539,6 +528,12 @@ def lora_model(data, video_folder, args, training=True):
 
     if(training):
 
+        accum_total_loss = 0.0
+        accum_diffusion_loss = 0.0
+        accum_alignment_loss = 0.0
+        accum_cosine_similarity = 0.0
+        accum_steps = 0
+
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
             mapper.train()
@@ -626,9 +621,6 @@ def lora_model(data, video_folder, args, training=True):
                     target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
                     loss_mapper = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
 
-                    similarity = compute_cosine_similarity(text_features, mapped_image_features)
-                    print(f"Cosine Similarity between text and image embeddings: {similarity}")
-
                     #alpha = 0.5  # puoi regolare questo valore
                     #interpolated_features = alpha * text_features + (1 - alpha) * mapped_image_features
 
@@ -686,6 +678,18 @@ def lora_model(data, video_folder, args, training=True):
                     # Loss totale
                     total_loss = diffusion_loss + lambda_alignment * alignment_loss
 
+                    cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
+                    mean_cosine_sim = cosine_sim.mean().item()
+
+                    # Accumula la similarità
+                    accum_cosine_similarity += mean_cosine_sim
+
+                    # Accumula le loss
+                    accum_total_loss += total_loss.detach().item()
+                    accum_diffusion_loss += diffusion_loss.detach().item()
+                    accum_alignment_loss += alignment_loss.detach().item()
+                    accum_steps += 1
+
 
                     # Gather the losses across all processes for logging (if we use distributed training).
                     avg_loss = accelerator.gather(total_loss.repeat(args.train_batch_size)).mean()
@@ -713,6 +717,31 @@ def lora_model(data, video_folder, args, training=True):
                     train_loss = 0.0
 
                     if global_step % args.checkpointing_steps == 0:
+
+                        # Calcola le loss medie
+                        avg_total_loss = accum_total_loss / accum_steps
+                        avg_diffusion_loss = accum_diffusion_loss / accum_steps
+                        avg_alignment_loss = accum_alignment_loss / accum_steps
+                        avg_cosine_similarity = accum_cosine_similarity / accum_steps
+
+                        # Resetta gli accumulatori
+                        accum_total_loss = 0.0
+                        accum_diffusion_loss = 0.0
+                        accum_alignment_loss = 0.0
+                        accum_cosine_similarity = 0.0
+                        accum_steps = 0
+
+                        # Log nel progress bar
+                        logs = {
+                            "total_loss": avg_total_loss,
+                            "diffusion_loss": avg_diffusion_loss,
+                            "alignment_loss": avg_alignment_loss,
+                            "cosine_similarity": avg_cosine_similarity,
+                            "lr": lr_scheduler.get_last_lr()[0],
+                        }
+                        progress_bar.set_postfix(**logs)
+
+
                         if accelerator.is_main_process:
                             # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
                             if args.checkpoints_total_limit is not None:
@@ -757,14 +786,6 @@ def lora_model(data, video_folder, args, training=True):
 
 
                 #logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
-
-                logs = {
-                    "total_loss": total_loss.detach().item(),
-                    "diffusion_loss": diffusion_loss.detach().item(),
-                    "alignment_loss": alignment_loss.detach().item(),
-                    "lr": lr_scheduler.get_last_lr()[0],
-                }
-                progress_bar.set_postfix(**logs)
 
                 if global_step >= args.max_train_steps:
                     break
