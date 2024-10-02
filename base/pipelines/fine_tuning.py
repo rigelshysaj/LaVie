@@ -675,7 +675,7 @@ def lora_model(data, video_folder, args, training=True):
                         loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
                         loss = loss.mean()
 
-                    lambda_alignment = 0.1
+                    lambda_alignment = 0.5
 
                     # Calcolo della loss di diffusione
                     diffusion_loss = loss  # o rinomina 'loss' in 'diffusion_loss'
