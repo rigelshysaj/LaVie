@@ -4,7 +4,6 @@ import torch
 import os
 from tqdm import tqdm
 import plotly.graph_objs as go
-import clip
 import shutil
 from transformers import CLIPProcessor, CLIPModel
 from peft import LoraConfig, get_peft_model
@@ -347,9 +346,6 @@ def lora_model(data, video_folder, args, training=True):
     mapper = MappingNetwork().to(unet.device)
     mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
 
-
-    model, preprocess = clip.load("ViT-B/32", device=device)
-    model.eval()
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
@@ -396,13 +392,13 @@ def lora_model(data, video_folder, args, training=True):
     print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
 
     for param in mapper.parameters():
-        param.requires_grad = False
+        param.requires_grad = True
 
     lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
 
-    #trainable_params = list(lora_layers) + list(mapper.parameters())
+    trainable_params = list(lora_layers) + list(mapper.parameters())
 
-    trainable_params = list(lora_layers)
+    #trainable_params = list(lora_layers)
 
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
@@ -456,14 +452,14 @@ def lora_model(data, video_folder, args, training=True):
     )
 
 
-    #optimizer_mapper = optim.AdamW(mapper.parameters(), lr=1e-4)
-    #scheduler_mapper = optim.lr_scheduler.StepLR(optimizer_mapper, step_size=10, gamma=0.1)
+    optimizer_mapper = optim.AdamW(mapper.parameters(), lr=1e-4)
+    scheduler_mapper = optim.lr_scheduler.StepLR(optimizer_mapper, step_size=10, gamma=0.1)
 
-    #criterion = nn.CosineEmbeddingLoss()
+    criterion = nn.CosineEmbeddingLoss()
 
     # Prepare everything with our `accelerator`.
-    unet, mapper, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        unet, mapper, optimizer, train_dataloader, lr_scheduler
+    unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper = accelerator.prepare(
+        unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper
     )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
@@ -545,7 +541,7 @@ def lora_model(data, video_folder, args, training=True):
 
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
-            mapper.eval()
+            mapper.train()
 
             batch_losses = []
             train_loss = 0.0
@@ -603,32 +599,6 @@ def lora_model(data, video_folder, args, training=True):
                     
                     text_features=text_features.to(torch.float16)
 
-                    try:
-                        img = Image.open(args.image_path).convert("RGB")
-                        image = preprocess(img).unsqueeze(0).to(device)
-                    except Exception as e:
-                        print(f"Errore nel caricamento dell'immagine: {e}")
-                        exit(1)
-
-                    # Prepara il testo
-                    testo = ["a horse with a ball"]
-                    text = clip.tokenize(testo).to(device)
-
-                    with torch.no_grad():
-                        # Estrai le feature dell'immagine e del testo
-                        image_features = model.encode_image(image)
-                        text_features = model.encode_text(text)
-
-                        # Normalizza le feature
-                        image_features_norm = image_features / image_features.norm(dim=-1, keepdim=True)
-                        text_features_norm = text_features / text_features.norm(dim=-1, keepdim=True)
-
-                        # Calcola la cosine similarity
-                        cosine_sim = F.cosine_similarity(image_features_norm, text_features_norm)
-                        similarity_score = cosine_sim.item()
-
-                    print(f"Similarità tra l'immagine e '{testo[0]}': {similarity_score:.4f}")
-
                     #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
                     image_inputs = clip_processor(images=list(frame_tensor), return_tensors="pt").pixel_values.to(unet.device)
@@ -646,18 +616,18 @@ def lora_model(data, video_folder, args, training=True):
                     mapped_image_features = mapper(image_features, text_features)  # Shape: (batch_size, hidden_size)
                     #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
-                    #mapped_image_embeddings_flat = mapped_image_features.reshape(-1, 768)
-                    #text_embeddings_flat = text_features.reshape(-1, 768)
+                    mapped_image_embeddings_flat = mapped_image_features.reshape(-1, 768)
+                    text_embeddings_flat = text_features.reshape(-1, 768)
 
                     # Normalize embeddings
-                    #mapped_image_embeddings_flat = F.normalize(mapped_image_embeddings_flat, p=2, dim=1)
-                    #text_embeddings_flat = F.normalize(text_embeddings_flat, p=2, dim=1)
+                    mapped_image_embeddings_flat = F.normalize(mapped_image_embeddings_flat, p=2, dim=1)
+                    text_embeddings_flat = F.normalize(text_embeddings_flat, p=2, dim=1)
 
-                    #target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
-                    #loss_mapper = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
+                    target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
+                    loss_mapper = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
 
-                    #similarity = compute_cosine_similarity(text_features, mapped_image_features)
-                    #print(f"Cosine Similarity between text and image embeddings: {similarity}")
+                    similarity = compute_cosine_similarity(text_features, mapped_image_features)
+                    print(f"Cosine Similarity between text and image embeddings: {similarity}")
 
                     #alpha = 0.5  # puoi regolare questo valore
                     #interpolated_features = alpha * text_features + (1 - alpha) * mapped_image_features
@@ -705,25 +675,34 @@ def lora_model(data, video_folder, args, training=True):
                         loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
                         loss = loss.mean()
 
-                    #lambda_alignment = 0.1
-                    #loss = loss + lambda_alignment * loss_mapper
+                    lambda_alignment = 0.1
+
+                    # Calcolo della loss di diffusione
+                    diffusion_loss = loss  # o rinomina 'loss' in 'diffusion_loss'
+
+                    # Calcolo della loss di allineamento
+                    alignment_loss = loss_mapper
+
+                    # Loss totale
+                    total_loss = diffusion_loss + lambda_alignment * alignment_loss
+
 
                     # Gather the losses across all processes for logging (if we use distributed training).
-                    avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
+                    avg_loss = accelerator.gather(total_loss.repeat(args.train_batch_size)).mean()
                     train_loss += avg_loss.item() / args.gradient_accumulation_steps
                     batch_losses.append(train_loss)
 
                     # Backpropagate
-                    accelerator.backward(loss)
+                    accelerator.backward(total_loss)
                     if accelerator.sync_gradients:
                         params_to_clip = trainable_params
                         accelerator.clip_grad_norm_(params_to_clip, args.max_grad_norm)
                     optimizer.step()
-                    #optimizer_mapper.step()
+                    optimizer_mapper.step()
                     lr_scheduler.step()
-                    #scheduler_mapper.step()
+                    scheduler_mapper.step()
 
-                    #optimizer_mapper.zero_grad()
+                    optimizer_mapper.zero_grad()
                     optimizer.zero_grad()
                 # Checks if the accelerator has performed an optimization step behind the scenes
                 if accelerator.sync_gradients:
@@ -732,9 +711,6 @@ def lora_model(data, video_folder, args, training=True):
                     accelerator.log({"train_loss": train_loss}, step=global_step)
                     #print(f"Step {global_step}: train_loss = {train_loss:.6f}")
                     train_loss = 0.0
-
-                    #if global_step % args.logging_steps == 0:
-                    #    log_lora_weights(unet, global_step)
 
                     if global_step % args.checkpointing_steps == 0:
                         if accelerator.is_main_process:
@@ -773,14 +749,21 @@ def lora_model(data, video_folder, args, training=True):
                             )
 
                             # Save the mapper state dict
-                            #torch.save(mapper.state_dict(), os.path.join(save_path, 'mapper.pt'))
+                            torch.save(mapper.state_dict(), os.path.join(save_path, 'mapper.pt'))
 
                             print("modello salvatooooooooooo")
 
                         inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper)
 
 
-                logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
+                #logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
+
+                logs = {
+                    "total_loss": total_loss.detach().item(),
+                    "diffusion_loss": diffusion_loss.detach().item(),
+                    "alignment_loss": alignment_loss.detach().item(),
+                    "lr": lr_scheduler.get_last_lr()[0],
+                }
                 progress_bar.set_postfix(**logs)
 
                 if global_step >= args.max_train_steps:
