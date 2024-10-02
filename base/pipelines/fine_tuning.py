@@ -333,7 +333,7 @@ def lora_model(data, video_folder, args, training=True):
 
     # Instantiate the mapping network
     mapper = MappingNetwork().to(unet.device)
-    mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
+    #mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
@@ -503,7 +503,7 @@ def lora_model(data, video_folder, args, training=True):
             accelerator.print(f"Resuming from checkpoint {path}")
             accelerator.load_state(os.path.join(args.output_dir, path))
             # Load the mapper state dict
-            #mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
+            mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
             global_step = int(path.split("-")[1])
 
             initial_global_step = global_step
@@ -533,13 +533,12 @@ def lora_model(data, video_folder, args, training=True):
         accum_alignment_loss = 0.0
         accum_cosine_similarity = 0.0
         accum_steps = 0
+        train_loss = 0.0
 
         for epoch in range(first_epoch, args.num_train_epochs):
             unet.train()
             mapper.train()
 
-            batch_losses = []
-            train_loss = 0.0
             for step, batch in enumerate(train_dataloader):
                 with accelerator.accumulate(unet):
 
@@ -694,7 +693,6 @@ def lora_model(data, video_folder, args, training=True):
                     # Gather the losses across all processes for logging (if we use distributed training).
                     avg_loss = accelerator.gather(total_loss.repeat(args.train_batch_size)).mean()
                     train_loss += avg_loss.item() / args.gradient_accumulation_steps
-                    batch_losses.append(train_loss)
 
                     # Backpropagate
                     accelerator.backward(total_loss)
@@ -712,10 +710,7 @@ def lora_model(data, video_folder, args, training=True):
                 if accelerator.sync_gradients:
                     progress_bar.update(1)
                     global_step += 1
-                    accelerator.log({"train_loss": train_loss}, step=global_step)
-                    #print(f"Step {global_step}: train_loss = {train_loss:.6f}")
-                    train_loss = 0.0
-
+                    
                     if global_step % args.checkpointing_steps == 0:
 
                         # Calcola le loss medie
@@ -723,6 +718,7 @@ def lora_model(data, video_folder, args, training=True):
                         avg_diffusion_loss = accum_diffusion_loss / accum_steps
                         avg_alignment_loss = accum_alignment_loss / accum_steps
                         avg_cosine_similarity = accum_cosine_similarity / accum_steps
+                        avg_train_loss = train_loss / accum_steps
 
                         # Resetta gli accumulatori
                         accum_total_loss = 0.0
@@ -730,17 +726,16 @@ def lora_model(data, video_folder, args, training=True):
                         accum_alignment_loss = 0.0
                         accum_cosine_similarity = 0.0
                         accum_steps = 0
+                        train_loss = 0.0
 
                         # Log nel progress bar
-                        logs = {
-                            "total_loss": avg_total_loss,
-                            "diffusion_loss": avg_diffusion_loss,
-                            "alignment_loss": avg_alignment_loss,
-                            "cosine_similarity": avg_cosine_similarity,
-                            "lr": lr_scheduler.get_last_lr()[0],
-                        }
-                        progress_bar.set_postfix(**logs)
 
+                        print(f"total_loss: {avg_total_loss}")
+                        print(f"diffusion_loss: {avg_diffusion_loss}")
+                        print(f"alignment_loss: {avg_alignment_loss}")
+                        print(f"cosine_similarity: {avg_cosine_similarity}")
+                        print(f"lr: {lr_scheduler.get_last_lr()[0]}")
+                        print(f"avg_train_loss: {avg_train_loss}")
 
                         if accelerator.is_main_process:
                             # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
@@ -789,11 +784,6 @@ def lora_model(data, video_folder, args, training=True):
 
                 if global_step >= args.max_train_steps:
                     break
-
-
-            avg_epoch_loss = sum(batch_losses) / len(batch_losses)
-            #print(f"Epoch {epoch}/{args.num_train_epochs} completed with average loss: {avg_epoch_loss}")
-            epoch_losses.append(avg_epoch_loss)      
 
                     
         accelerator.end_training()
