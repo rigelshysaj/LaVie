@@ -5,6 +5,8 @@ import os
 from torchvision.io import read_video
 import numpy as np
 from torchvision import transforms
+from torchvision.transforms import Compose, Resize, ConvertImageDtype, Normalize
+
 
 class UCF101Dataset(Dataset):
     def __init__(self, csv_file, root_dir, transform=None, num_frames=16):
@@ -83,6 +85,7 @@ if __name__ == "__main__":
     # Define the transformations
     transform = transforms.Compose([
         transforms.Resize((224, 224)),  # Resize frames to 224x224
+        ConvertImageDtype(torch.float),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],  # Normalize with ImageNet mean and std
                             std=[0.229, 0.224, 0.225])
     ])
