@@ -18,6 +18,7 @@ class UCF101Dataset(Dataset):
 
         # Load annotations from the CSV file
         self.annotations = pd.read_csv(csv_file_path, sep='\t')
+        print("Columns in self.annotations:", self.annotations.columns)
 
         # Create a mapping from class labels to indices
         self.classes = sorted(self.annotations['label'].unique())
