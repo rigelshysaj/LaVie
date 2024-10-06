@@ -9,20 +9,32 @@ import torch
 
 class MSRVTTDataset(Dataset):
     def __init__(self, video_dir, annotation_file, split='validate', transform=None):
+        """
+        Args:
+            video_dir (string): Directory con i video .mp4.
+            annotation_file (string): Path al file train_val_videodatainfo.json.
+            split (string): 'train' o 'validate'.
+            transform (callable, optional): Trasformazioni da applicare ai frame.
+        """
         self.video_dir = video_dir
         self.transform = transform
         self.split = split
 
+        # Carica le annotazioni
         with open(annotation_file, 'r') as f:
             data = json.load(f)
 
+        # Stampiamo i valori unici del campo 'split'
         split_values = set(video['split'] for video in data['videos'])
         print(f"Valori unici del campo 'split': {split_values}")
 
+        # Filtra i video per lo split specificato
         self.videos = [video for video in data['videos'] if video['split'] == self.split]
         print(f"Numero di video nello split '{self.split}': {len(self.videos)}")
 
+        # Crea un mapping da video_id a caption
         self.captions = {}
+        # Creiamo un set di video_id per lo split specificato per efficienza
         split_video_ids = set([video['video_id'] for video in self.videos])
 
         for sentence in data['sentences']:
@@ -36,13 +48,16 @@ class MSRVTTDataset(Dataset):
         return len(self.videos)
 
     def __getitem__(self, idx):
+        # Ottieni le informazioni del video
         video_info = self.videos[idx]
         video_id = video_info['video_id']
         video_path = os.path.join(self.video_dir, f"{video_id}.mp4")
 
+        # Verifica se il file video esiste
         if not os.path.exists(video_path):
             raise FileNotFoundError(f"Il video {video_path} non esiste.")
 
+        # Leggi il video e ottieni i frame
         frames = self._load_video_frames(video_path)
 
         if self.transform:
@@ -50,16 +65,26 @@ class MSRVTTDataset(Dataset):
         else:
             frames = torch.stack([transforms.ToTensor()(frame) for frame in frames])
 
+        # Ottieni le didascalie (captions) associate al video
         captions = self.captions.get(video_id, [])
-        caption = random.choice(captions) if captions else ""
+        if captions:
+            # Seleziona una didascalia a caso
+            caption = random.choice(captions)
+        else:
+            caption = ""
 
-        return frames, caption, video_id
+        sample = {'video': frames, 'caption': caption, 'video_id': video_id}
+        return sample
 
     def _load_video_frames(self, video_path):
+        """
+        Carica i frame dal video specificato.
+        """
         cap = cv2.VideoCapture(video_path)
         frames = []
         success, frame = cap.read()
         while success:
+            # Converti il frame da BGR a RGB
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = Image.fromarray(frame)
             frames.append(frame)
@@ -68,21 +93,35 @@ class MSRVTTDataset(Dataset):
         return frames
     
 def collate_fn(batch):
-    videos, captions, video_ids = zip(*batch)
-    
+    # Estrai i componenti del batch
+    videos = [sample['video'] for sample in batch]
+    captions = [sample['caption'] for sample in batch]
+    video_ids = [sample['video_id'] for sample in batch]
+
+    # Trova la lunghezza minima dei video nel batch
     min_length = min(video.shape[0] for video in videos)
+
+    # Tronca tutti i video alla lunghezza minima
     truncated_videos = [video[:min_length] for video in videos]
+
+    # Stack dei video
     videos_tensor = torch.stack(truncated_videos)
 
-    return videos_tensor, captions, video_ids
+    return {'video': videos_tensor, 'caption': captions, 'video_id': video_ids}
+
+
 
 if __name__ == "__main__":
+
+    # Define the transformations (if necessary)
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225])
     ])
 
+    # Create the dataset
     dataset = MSRVTTDataset(
         video_dir='/content/drive/My Drive/msrvtt/TrainValVideo',
         annotation_file='/content/drive/My Drive/msrvtt/train_val_annotation/train_val_videodatainfo.json',
@@ -92,17 +131,27 @@ if __name__ == "__main__":
 
     print(f"Lunghezza del dataset: {len(dataset)}")
 
+    # Create the DataLoader
     data_loader = DataLoader(dataset, batch_size=4, shuffle=True, collate_fn=collate_fn)
 
-    for i, (videos, captions, video_ids) in enumerate(data_loader):
+    # Iterate through the DataLoader
+    for i, batch in enumerate(data_loader):
         print(f"Batch {i}:")
+
+        # Extract components from the batch
+        videos = batch['video']            # Tensor of shape (batch_size, num_frames, C, H, W)
+        captions = batch['caption']        # List of captions
+        video_ids = batch['video_id']      # List of video IDs
+
         print(f"Video shape: {videos.shape}")
-        print(f"Numero di caption: {len(captions)}")
-        print(f"Numero di video ID: {len(video_ids)}")
-        
-        for j in range(len(video_ids)):
-            print(f"  Elemento {j}:")
-            print(f"    Video ID: {video_ids[j]}")
-            print(f"    Caption: {captions[j]}")
-        
-        break  # Per esempio, fermiamoci dopo il primo batch
+
+        # Determine the batch size
+        batch_size = len(video_ids)
+
+        # Iterate over each sample in the batch
+        for idx in range(batch_size):
+            print(f"Video ID: {video_ids[idx]}")
+            print(f"Numero di frame: {videos.shape[1]}")  # Assuming all videos have the same number of frames
+            print(f"Caption: {captions[idx]}")
+        break  # For example, stop after the first batch
+
