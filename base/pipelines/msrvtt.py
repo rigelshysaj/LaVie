@@ -1,62 +1,84 @@
 import os
 import json
-import torch
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
-import torchvision.io as io
+from PIL import Image
+import cv2
+from torch.utils.data import DataLoader
 
 class MSRVTTDataset(Dataset):
-    def __init__(self, root_dir, transform=None):
-        self.root_dir = root_dir
+    def __init__(self, video_dir, annotation_file, split='val', transform=None):
+        """
+        Args:
+            video_dir (string): Directory con i video .mp4.
+            annotation_file (string): Path al file train_val_videodatainfo.json.
+            split (string): 'train', 'val' o 'test'. In questo caso useremo 'val'.
+            transform (callable, optional): Trasformazioni da applicare ai frame.
+        """
+        self.video_dir = video_dir
         self.transform = transform
-
-        # Percorso al file di annotazioni
-        annotation_file = os.path.join(root_dir, 'train_val_annotation', 'train_val_videodatainfo.json')
+        self.split = split
 
         # Carica le annotazioni
         with open(annotation_file, 'r') as f:
             data = json.load(f)
 
-        # Ottieni le frasi
-        sentences = data['sentences']
+        # Filtra i video per lo split specificato
+        self.videos = [video for video in data['videos'] if video['split'] == self.split]
 
-        # Ottieni la lista dei video disponibili nella cartella TrainValVideo
-        video_dir = os.path.join(root_dir, 'TrainValVideo')
-        available_videos = set(os.path.splitext(f)[0] for f in os.listdir(video_dir) if f.endswith('.mp4'))
-
-        # Filtra le frasi per includere solo quelle i cui video sono disponibili
-        self.samples = [s for s in sentences if s['video_id'] in available_videos]
-
-        print(f"Numero di campioni disponibili: {len(self.samples)}")
+        # Crea un mapping da video_id a caption
+        self.captions = {}
+        for sentence in data['sentences']:
+            video_id = sentence['video_id']
+            if video_id in [video['video_id'] for video in self.videos]:
+                if video_id not in self.captions:
+                    self.captions[video_id] = []
+                self.captions[video_id].append(sentence['caption'])
 
     def __len__(self):
-        return len(self.samples)
+        return len(self.videos)
 
     def __getitem__(self, idx):
-        sample = self.samples[idx]
-        video_id = sample['video_id']
-        caption = sample['caption']
+        # Ottieni le informazioni del video
+        video_info = self.videos[idx]
+        video_id = video_info['video_id']
+        video_path = os.path.join(self.video_dir, f"{video_id}.mp4")
 
-        # Percorso al video
-        video_path = os.path.join(self.root_dir, 'TrainValVideo', f"{video_id}.mp4")
+        # Leggi il video e ottieni i frame
+        frames = self._load_video_frames(video_path)
 
-        # Carica il video usando torchvision
-        video, _, info = io.read_video(video_path, pts_unit='sec')
-
-        # Applica le trasformazioni se presenti
+        # Applica le trasformazioni se specificate
         if self.transform:
-            video = self.transform(video)
+            frames = [self.transform(frame) for frame in frames]
 
-        return video, caption
+        # Ottieni le didascalie (captions) associate al video
+        captions = self.captions[video_id]
 
-    
+        sample = {'video': frames, 'captions': captions, 'video_id': video_id}
+        return sample
+
+    def _load_video_frames(self, video_path):
+        """
+        Carica i frame dal video specificato.
+        """
+        cap = cv2.VideoCapture(video_path)
+        frames = []
+        success, frame = cap.read()
+        while success:
+            # Converti il frame da BGR a RGB
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = Image.fromarray(frame)
+            frames.append(frame)
+            success, frame = cap.read()
+        cap.release()
+        return frames
+
 
 
 
 if __name__ == "__main__":
-    from torch.utils.data import DataLoader
 
-    # Definisci eventuali trasformazioni
+    # Definisci le trasformazioni (se necessario)
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
@@ -64,14 +86,16 @@ if __name__ == "__main__":
                             std=[0.229, 0.224, 0.225])
     ])
 
-    # Crea il dataset utilizzando i video disponibili
-    dataset = MSRVTTDataset(root_dir='/content/drive/My Drive/msrvtt', transform=transform)
+    # Crea il dataset
+    dataset = MSRVTTDataset(
+        video_dir='/content/drive/My Drive/msrvtt/TrainValVideo',
+        annotation_file='/content/drive/My Drive/msrvtt/train_val_annotation/train_val_videodatainfo.json',
+        split='val',
+        transform=transform
+    )
 
-    # Crea il DataLoader
-    dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=4)
-
-    # Itera attraverso il DataLoader
-    for videos, captions in dataloader:
-        # Qui puoi inserire il codice per l'addestramento o la validazione del tuo modello
-        print(f"videos: {videos}, captions: {captions}" )
-
+    # Ottieni un sample
+    sample = dataset[0]
+    print(f"Video ID: {sample['video_id']}")
+    print(f"Numero di frame: {len(sample['video'])}")
+    print(f"Captions: {sample['captions']}")
