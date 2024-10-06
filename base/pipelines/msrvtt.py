@@ -77,7 +77,7 @@ if __name__ == "__main__":
     ])
 
     # Crea il dataset
-    dataset = MSRVTTDataset(root_dir='/content/drive/My Drive/', split='val', transform=transform)
+    dataset = MSRVTTDataset(root_dir='/content/drive/My Drive/msrvtt', split='val', transform=transform)
 
     # Crea il DataLoader
     dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=4)
