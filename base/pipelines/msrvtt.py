@@ -6,15 +6,8 @@ import torchvision.transforms as transforms
 import torchvision.io as io
 
 class MSRVTTDataset(Dataset):
-    def __init__(self, root_dir, split='train', transform=None):
-        """
-        Args:
-            root_dir (string): Directory con tutti i dati.
-            split (string): 'train', 'val' o 'test'.
-            transform (callable, optional): Trasformazioni opzionali da applicare ai video.
-        """
+    def __init__(self, root_dir, transform=None):
         self.root_dir = root_dir
-        self.split = split
         self.transform = transform
 
         # Percorso al file di annotazioni
@@ -24,25 +17,17 @@ class MSRVTTDataset(Dataset):
         with open(annotation_file, 'r') as f:
             data = json.load(f)
 
-        # Ottieni i video e le frasi
-        videos = data['videos']
+        # Ottieni le frasi
         sentences = data['sentences']
 
-        # Filtra i video in base allo split
-        self.videos = [video for video in videos if video['split'] == split]
-        video_ids = set(video['video_id'] for video in self.videos)
+        # Ottieni la lista dei video disponibili nella cartella TrainValVideo
+        video_dir = os.path.join(root_dir, 'TrainValVideo')
+        available_videos = set(os.path.splitext(f)[0] for f in os.listdir(video_dir) if f.endswith('.mp4'))
 
-        # Crea una mappa da video_id a informazioni video
-        self.video_dict = {video['video_id']: video for video in self.videos}
+        # Filtra le frasi per includere solo quelle i cui video sono disponibili
+        self.samples = [s for s in sentences if s['video_id'] in available_videos]
 
-        # Associa le didascalie ai video corrispondenti
-        self.samples = []
-        for sentence in sentences:
-            if sentence['video_id'] in video_ids:
-                self.samples.append({
-                    'video_id': sentence['video_id'],
-                    'caption': sentence['caption']
-                })
+        print(f"Numero di campioni disponibili: {len(self.samples)}")
 
     def __len__(self):
         return len(self.samples)
@@ -56,7 +41,7 @@ class MSRVTTDataset(Dataset):
         video_path = os.path.join(self.root_dir, 'TrainValVideo', f"{video_id}.mp4")
 
         # Carica il video usando torchvision
-        video, _, _ = io.read_video(video_path, pts_unit='sec')
+        video, _, info = io.read_video(video_path, pts_unit='sec')
 
         # Applica le trasformazioni se presenti
         if self.transform:
@@ -64,23 +49,29 @@ class MSRVTTDataset(Dataset):
 
         return video, caption
 
+    
+
+
 
 if __name__ == "__main__":
     from torch.utils.data import DataLoader
 
-
     # Definisci eventuali trasformazioni
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),  # Ridimensiona i frame del video
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],  # Normalizza i frame
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
                             std=[0.229, 0.224, 0.225])
     ])
 
-    # Crea il dataset
-    dataset = MSRVTTDataset(root_dir='/content/drive/My Drive/msrvtt', split='val', transform=transform)
+    # Crea il dataset utilizzando i video disponibili
+    dataset = MSRVTTDataset(root_dir='/content/drive/My Drive/msrvtt', transform=transform)
 
     # Crea il DataLoader
-    dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=4)
 
+    # Itera attraverso il DataLoader
     for videos, captions in dataloader:
-        print(f"video: {videos}, captions: {captions}")
+        # Qui puoi inserire il codice per l'addestramento o la validazione del tuo modello
+        print(f"videos: {videos}, captions: {captions}" )
+
