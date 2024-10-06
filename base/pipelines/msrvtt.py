@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
 from PIL import Image
 import cv2
+import torch
 
 class MSRVTTDataset(Dataset):
     def __init__(self, video_dir, annotation_file, split='validate', transform=None):
@@ -89,6 +90,24 @@ class MSRVTTDataset(Dataset):
             success, frame = cap.read()
         cap.release()
         return frames
+    
+def collate_fn(batch):
+    # Estrai i componenti del batch
+    videos = [sample['video'] for sample in batch]
+    captions = [sample['caption'] for sample in batch]
+    video_ids = [sample['video_id'] for sample in batch]
+
+    # Trova la lunghezza minima dei video nel batch
+    min_length = min(video.shape[0] for video in videos)
+
+    # Tronca tutti i video alla lunghezza minima
+    truncated_videos = [video[:min_length] for video in videos]
+
+    # Stack dei video
+    videos_tensor = torch.stack(truncated_videos)
+
+    return {'video': videos_tensor, 'caption': captions, 'video_id': video_ids}
+
 
 
 if __name__ == "__main__":
@@ -111,9 +130,6 @@ if __name__ == "__main__":
 
     print(f"Lunghezza del dataset: {len(dataset)}")
 
-    # Definisci una funzione di collate personalizzata
-    def collate_fn(batch):
-        return batch
 
     # Crea il DataLoader
     data_loader = DataLoader(dataset, batch_size=4, shuffle=True, collate_fn=collate_fn)
