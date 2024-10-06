@@ -6,12 +6,12 @@ from PIL import Image
 import cv2
 
 class MSRVTTDataset(Dataset):
-    def __init__(self, video_dir, annotation_file, split='val', transform=None):
+    def __init__(self, video_dir, annotation_file, split='validate', transform=None):
         """
         Args:
             video_dir (string): Directory con i video .mp4.
             annotation_file (string): Path al file train_val_videodatainfo.json.
-            split (string): 'train', 'val' o 'test'.
+            split (string): 'train' o 'validate'.
             transform (callable, optional): Trasformazioni da applicare ai frame.
         """
         self.video_dir = video_dir
@@ -85,8 +85,6 @@ class MSRVTTDataset(Dataset):
         return frames
 
 
-
-
 if __name__ == "__main__":
 
     # Definisci le trasformazioni (se necessario)
@@ -101,7 +99,7 @@ if __name__ == "__main__":
     dataset = MSRVTTDataset(
         video_dir='/content/drive/My Drive/msrvtt/TrainValVideo',
         annotation_file='/content/drive/My Drive/msrvtt/train_val_annotation/train_val_videodatainfo.json',
-        split='val',
+        split='validate',
         transform=transform
     )
 
