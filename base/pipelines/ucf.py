@@ -99,7 +99,7 @@ if __name__ == "__main__":
     )
 
     # Create the DataLoader
-    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=4)
+    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=2)
 
     # Example of iterating through the DataLoader
     for batch in train_loader:
@@ -108,3 +108,21 @@ if __name__ == "__main__":
         print(f"Frames shape: {frames.shape}")
         print(f"Labels: {labels}")
         break  # Remove this break to iterate over the entire dataset
+
+    for batch_idx, batch in enumerate(train_loader):
+        print(f"\nBatch {batch_idx}:")
+        # Estrai i componenti del batch
+        frames = batch['frames']          # Tensor di forma [batch_size, C, T, H, W]
+        labels = batch['label']           # Tensor di forma [batch_size]
+        print(f"Frames shape: {frames.shape}")
+        print(f"Labels: {labels}")
+
+        # Determina la dimensione del batch
+        batch_size = labels.size(0)       # Alternativamente: len(labels)
+
+        # Itera su ogni elemento nel batch
+        for idx in range(batch_size):
+            print(f"\n  Elemento {idx + 1} in Batch {batch_idx}:")
+            print(f"    Label: {labels[idx].item()}")
+            print(f"    Frames shape: {frames[idx].shape}")  # [C, T, H, W]
+        break
