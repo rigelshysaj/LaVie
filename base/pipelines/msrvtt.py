@@ -80,7 +80,7 @@ if __name__ == "__main__":
     dataset = MSRVTTDataset(root_dir='/content/drive/My Drive/msrvtt', split='val', transform=transform)
 
     # Crea il DataLoader
-    dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=4)
+    dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
 
     for videos, captions in dataloader:
         print(f"video: {videos}, captions: {captions}")
