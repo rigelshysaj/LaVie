@@ -113,15 +113,15 @@ def collate_fn(batch):
 
 if __name__ == "__main__":
 
-    # Definisci le trasformazioni (se necessario)
+    # Define the transformations (if necessary)
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                            std=[0.229, 0.224, 0.225])
+                             std=[0.229, 0.224, 0.225])
     ])
 
-    # Crea il dataset
+    # Create the dataset
     dataset = MSRVTTDataset(
         video_dir='/content/drive/My Drive/msrvtt/TrainValVideo',
         annotation_file='/content/drive/My Drive/msrvtt/train_val_annotation/train_val_videodatainfo.json',
@@ -131,15 +131,25 @@ if __name__ == "__main__":
 
     print(f"Lunghezza del dataset: {len(dataset)}")
 
-
-    # Crea il DataLoader
+    # Create the DataLoader
     data_loader = DataLoader(dataset, batch_size=4, shuffle=True, collate_fn=collate_fn)
 
-    # Itera attraverso il DataLoader
+    # Iterate through the DataLoader
     for i, batch in enumerate(data_loader):
         print(f"Batch {i}:")
-        for sample in batch:
-            print(f"Video ID: {sample['video_id']}")
-            print(f"Numero di frame: {len(sample['video'])}")
-            print(f"Caption: {sample['caption']}")
-        break  # Per esempio, fermiamoci dopo il primo batch
+
+        # Extract components from the batch
+        videos = batch['video']            # Tensor of shape (batch_size, num_frames, C, H, W)
+        captions = batch['caption']        # List of captions
+        video_ids = batch['video_id']      # List of video IDs
+
+        # Determine the batch size
+        batch_size = len(video_ids)
+
+        # Iterate over each sample in the batch
+        for idx in range(batch_size):
+            print(f"Video ID: {video_ids[idx]}")
+            print(f"Numero di frame: {videos.shape[1]}")  # Assuming all videos have the same number of frames
+            print(f"Caption: {captions[idx]}")
+        break  # For example, stop after the first batch
+
