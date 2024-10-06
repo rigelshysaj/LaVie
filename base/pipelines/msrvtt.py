@@ -1,6 +1,7 @@
 import os
 import json
-from torch.utils.data import Dataset
+import random
+from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
 from PIL import Image
 import cv2
@@ -64,8 +65,13 @@ class MSRVTTDataset(Dataset):
 
         # Ottieni le didascalie (captions) associate al video
         captions = self.captions.get(video_id, [])
+        if captions:
+            # Seleziona una didascalia a caso
+            caption = random.choice(captions)
+        else:
+            caption = ""
 
-        sample = {'video': frames, 'captions': captions, 'video_id': video_id}
+        sample = {'video': frames, 'caption': caption, 'video_id': video_id}
         return sample
 
     def _load_video_frames(self, video_path):
@@ -105,12 +111,18 @@ if __name__ == "__main__":
 
     print(f"Lunghezza del dataset: {len(dataset)}")
 
-    # Se il dataset non è vuoto, prova ad accedere al primo elemento
-    if len(dataset) > 0:
-        sample = dataset[0]
-        print(f"Video ID: {sample['video_id']}")
-        print(f"Numero di frame: {len(sample['video'])}")
-        print(f"Captions: {sample['captions']}")
-    else:
-        print("Il dataset è vuoto.")
+    # Definisci una funzione di collate personalizzata
+    def collate_fn(batch):
+        return batch
 
+    # Crea il DataLoader
+    data_loader = DataLoader(dataset, batch_size=4, shuffle=True, collate_fn=collate_fn)
+
+    # Itera attraverso il DataLoader
+    for i, batch in enumerate(data_loader):
+        print(f"Batch {i}:")
+        for sample in batch:
+            print(f"Video ID: {sample['video_id']}")
+            print(f"Numero di frame: {len(sample['video'])}")
+            print(f"Caption: {sample['caption']}")
+        break  # Per esempio, fermiamoci dopo il primo batch
