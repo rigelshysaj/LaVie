@@ -17,7 +17,8 @@ class UCF101Dataset(Dataset):
         csv_file_path = os.path.join(self.root_dir, self.csv_file)
 
         # Load annotations from the CSV file
-        self.annotations = pd.read_csv(csv_file_path, sep='\t')
+        self.annotations = pd.read_csv(csv_file_path, sep=',')
+
         print("Columns in self.annotations:", self.annotations.columns)
 
         # Create a mapping from class labels to indices
