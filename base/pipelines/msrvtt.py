@@ -98,11 +98,8 @@ def collate_fn(batch):
     captions = [sample['caption'] for sample in batch]
     video_ids = [sample['video_id'] for sample in batch]
 
-    # Trova la lunghezza minima dei video nel batch
-    min_length = min(video.shape[0] for video in videos)
-
     # Tronca tutti i video alla lunghezza minima
-    truncated_videos = [video[:min_length] for video in videos]
+    truncated_videos = [video[:240] for video in videos]
 
     # Stack dei video
     videos_tensor = torch.stack(truncated_videos)
