@@ -37,28 +37,29 @@ class UCF101Dataset(Dataset):
         video_path = os.path.join(self.root_dir, clip_path)
         label = self.class_to_idx[video_info['label']]
 
-        # Load video frames
-        video_frames, _, _ = read_video(video_path)
+        # Carica i frame del video
+        video_frames, _, _ = read_video(video_path, pts_unit='sec')
 
-        # Ensure the video has the desired number of frames
+        # Assicurati che il video abbia il numero desiderato di frame
         frames = self.process_frames(video_frames)
 
         # frames shape: [C, T, H, W]
-        # Permute to [T, C, H, W] to apply transforms
+        # Permute to [T, C, H, W] per applicare le trasformazioni
         frames = frames.permute(1, 0, 2, 3)
 
         if self.transform:
-            # Apply the transformation to each frame
+            # Applica la trasformazione a ciascun frame
             frames = torch.stack([self.transform(frame) for frame in frames])
         else:
-            # Convert frames to float and normalize to [0, 1]
-            frames = torch.stack([transforms.ToTensor()(frame) for frame in frames])
+            # Normalizza i frame se nessuna trasformazione è fornita
+            frames = frames.float() / 255.0
 
-        # Permute back to [C, T, H, W]
+        # Permute di nuovo a [C, T, H, W]
         frames = frames.permute(1, 0, 2, 3)
 
         sample = {'frames': frames, 'label': label}
         return sample
+
 
     def process_frames(self, video_frames):
         num_video_frames = video_frames.shape[0]
@@ -82,7 +83,6 @@ if __name__ == "__main__":
     # Define the transformations
     transform = transforms.Compose([
         transforms.Resize((224, 224)),  # Resize frames to 224x224
-        transforms.ToTensor(),          # Convert PIL Image or ndarray to tensor and scales values to [0, 1]
         transforms.Normalize(mean=[0.485, 0.456, 0.406],  # Normalize with ImageNet mean and std
                             std=[0.229, 0.224, 0.225])
     ])
