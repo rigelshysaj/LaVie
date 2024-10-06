@@ -60,9 +60,10 @@ class MSRVTTDataset(Dataset):
         # Leggi il video e ottieni i frame
         frames = self._load_video_frames(video_path)
 
-        # Applica le trasformazioni se specificate
         if self.transform:
-            frames = [self.transform(frame) for frame in frames]
+            frames = torch.stack([self.transform(frame) for frame in frames])
+        else:
+            frames = torch.stack([transforms.ToTensor()(frame) for frame in frames])
 
         # Ottieni le didascalie (captions) associate al video
         captions = self.captions.get(video_id, [])
