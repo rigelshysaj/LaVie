@@ -623,9 +623,9 @@ def lora_model(data, video_folder, args, training=True):
                     #alpha = 0.5  # puoi regolare questo valore
                     #interpolated_features = alpha * text_features + (1 - alpha) * mapped_image_features
 
-                    #combined_features = torch.cat([text_features, mapped_image_features], dim=1)
+                    combined_features = torch.cat([text_features, mapped_image_features], dim=1)
                     
-                    encoder_hidden_states = mapped_image_features
+                    encoder_hidden_states = combined_features
                     
                     
                     #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
@@ -828,7 +828,7 @@ def model(args):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, args, training=False)
+    lora_model(data, video_folder, args, training=True)
 
 
 
