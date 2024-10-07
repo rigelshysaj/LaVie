@@ -298,10 +298,10 @@ class VideoGenPipeline(DiffusionPipeline):
             #alpha = 0.5  # puoi regolare questo valore
             #interpolated_features = alpha * prompt_embeds + (1 - alpha) * mapped_image_features
 
-            #combined_features = torch.cat([prompt_embeds, mapped_image_features], dim=1)
+            combined_features = torch.cat([prompt_embeds, mapped_image_features], dim=1)
 
             # Applica il cross-attention
-            prompt_embeds = mapped_image_features
+            prompt_embeds = combined_features
 
             print(f"prompt_embeds2 shape: {prompt_embeds.shape}, dtype: {prompt_embeds.dtype}")
 
