@@ -175,42 +175,6 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
                 del videos
 
-                '''
-                if(not is_original):
-                    zero_tensor = torch.zeros_like(image_tensor)
-                    test = pipeline(
-                        prompt,
-                        image_tensor=zero_tensor,
-                        video_length=args.video_length, 
-                        height=args.image_size[0], 
-                        width=args.image_size[1], 
-                        num_inference_steps=args.num_sampling_steps,
-                        guidance_scale=args.guidance_scale
-                    ).video
-
-                    imageio.mimwrite(f"/content/drive/My Drive/test111111_fine_tuned.mp4", test[0], fps=8, quality=9)
-                    del test
-
-                    image_2 = load_and_transform_image("/content/drive/My Drive/horse.jpeg")
-
-                    test_2 = pipeline(
-                        prompt,
-                        image_tensor=image_2,
-                        video_length=args.video_length, 
-                        height=args.image_size[0], 
-                        width=args.image_size[1], 
-                        num_inference_steps=args.num_sampling_steps,
-                        guidance_scale=args.guidance_scale
-                    ).video
-                    
-                    imageio.mimwrite(f"/content/drive/My Drive/test2222222_fine_tuned.mp4", test_2[0], fps=8, quality=9)
-                    del test_2
-            
-                
-                del pipeline
-                torch.cuda.empty_cache()
-                '''
-
         # Genera video con il modello fine-tuned
         generate_video(unet, is_original=False)
 
@@ -333,7 +297,7 @@ def lora_model(data, video_folder, args, training=True):
 
     # Instantiate the mapping network
     mapper = MappingNetwork().to(unet.device)
-    #mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
+    mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
@@ -494,7 +458,7 @@ def lora_model(data, video_folder, args, training=True):
             accelerator.print(f"Resuming from checkpoint {path}")
             accelerator.load_state(os.path.join(args.output_dir, path))
             # Load the mapper state dict
-            mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
+            #mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
             global_step = int(path.split("-")[1])
 
             initial_global_step = global_step
