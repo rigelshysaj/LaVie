@@ -119,7 +119,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
         # Genera video con il modello fine-tuned
         video = generate_video(unet, is_original=False)
 
-        #generate_video(original_unet, is_original=True)
+        generate_video(original_unet, is_original=True)
 
         #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
         torch.cuda.empty_cache()
@@ -712,4 +712,4 @@ def model(caption):
 
 
 if __name__ == "__main__":
-    model("people are going hiking")
+    model("a lion playing with a ball")
