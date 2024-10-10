@@ -774,8 +774,6 @@ def model(caption):
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
-
-    model(OmegaConf.load(args.config))
     
     # Determina se sei su Google Colab
     on_colab = 'COLAB_GPU' in os.environ
@@ -791,7 +789,7 @@ def model(caption):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    return lora_model(data, video_folder, args, caption, training=False)
+    return lora_model(data, video_folder, OmegaConf.load(args.config), caption, training=False)
 
 
 
