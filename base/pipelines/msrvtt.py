@@ -9,6 +9,9 @@ import torch
 import clip
 from tqdm import tqdm
 import fine_tuning
+from torch.utils.data import Subset
+import random
+
 
 class MSRVTTDataset(Dataset):
     def __init__(self, video_dir, annotation_file, split='validate', transform=None):
@@ -128,7 +131,6 @@ def get_clip_similarity(clip_model, preprocess, text, image, device):
         # Compute similarity
         similarity = (image_features @ text_features.T).item()
 
-        print("bbbbbbbbbbbbbbbbbbb")
     return similarity
 
 
@@ -153,7 +155,6 @@ def evaluate_msrvtt_clip_similarity(clip_model, preprocess, dataset, device):
         gt_frames = [transforms.ToPILImage()(frame.cpu()) for frame in gt_video]
         gen_frames = [frame for frame in generated_video_frames]
 
-        print("aaaaaaaaaaaaaaaaaaa")
         
         # Compute CLIP Similarity for Ground Truth Video
         gt_frame_similarities = []
@@ -180,20 +181,22 @@ def evaluate_msrvtt_clip_similarity(clip_model, preprocess, dataset, device):
     return average_gt_similarity, average_gen_similarity
 
 
+
 if __name__ == "__main__":
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
-    # Load the CLIP model
+    # Carica il modello CLIP
     clip_model, preprocess = clip.load("ViT-B/32", device=device)
     
-    # Prepare the dataset
+    # Prepara le trasformazioni
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),  # Adjust as needed
+        transforms.Resize((224, 224)),  # Regola secondo necessità
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
     
+    # Inizializza il dataset
     dataset = MSRVTTDataset(
         video_dir='/content/drive/My Drive/msrvtt/TrainValVideo',
         annotation_file='/content/drive/My Drive/msrvtt/train_val_annotation/train_val_videodatainfo.json',
@@ -201,9 +204,22 @@ if __name__ == "__main__":
         transform=transform
     )
     
-    # Perform evaluation
+    # Imposta un seme per la riproducibilità (opzionale)
+    random.seed(42)
+    
+    # Verifica che il dataset abbia almeno 10 campioni
+    if len(dataset) < 10:
+        raise ValueError("Il dataset contiene meno di 10 campioni.")
+    
+    # Seleziona casualmente 10 indici
+    subset_indices = random.sample(range(len(dataset)), 10)
+    
+    # Crea il sottoinsieme del dataset
+    subset_dataset = Subset(dataset, subset_indices)
+    
+    # Esegui la valutazione sul sottoinsieme
     average_gt_similarity, average_gen_similarity = evaluate_msrvtt_clip_similarity(
-        clip_model, preprocess, dataset, device
+        clip_model, preprocess, subset_dataset, device
     )
     
     print(f"Average Ground Truth CLIP Similarity (CLIPSIM): {average_gt_similarity:.4f}")
