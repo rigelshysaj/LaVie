@@ -208,7 +208,7 @@ def lora_model(data, video_folder, args, caption, training=True):
     # Instantiate the mapping network
     mapper = MappingNetwork().to(device)
     # Optionally load mapper state dict if available
-    # mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
+    mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
     
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
