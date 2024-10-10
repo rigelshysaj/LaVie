@@ -6,6 +6,8 @@ import torchvision.transforms as transforms
 from PIL import Image
 import cv2
 import torch
+import clip
+from tqdm import tqdm
 
 class MSRVTTDataset(Dataset):
     def __init__(self, video_dir, annotation_file, split='validate', transform=None):
@@ -106,49 +108,83 @@ def collate_fn(batch):
 
     return {'video': videos_tensor, 'caption': captions, 'video_id': video_ids}
 
+def get_clip_similarity(clip_model, preprocess, text, image, device):
+    with torch.no_grad():
+        text_features = clip_model.encode_text(clip.tokenize(text).to(device))
+        image_features = clip_model.encode_image(preprocess(image).unsqueeze(0).to(device))
+        
+        text_features /= text_features.norm(dim=-1, keepdim=True)
+        image_features /= image_features.norm(dim=-1, keepdim=True)
+        
+        similarity = (100.0 * image_features @ text_features.T).item()
+    return similarity
+
+def evaluate_msrvtt_zero_shot(lavie_fine_tuned, clip_model, preprocess, dataset, device):
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
+    
+    total_similarity = 0
+    num_videos = 0
+    
+    for batch in tqdm(dataloader, desc="Evaluating"):
+        video = batch['video'].squeeze(0).to(device)  # (num_frames, C, H, W)
+        caption = batch['caption'][0]  # Prendiamo solo una didascalia
+        
+        # Genera il video con lavie_fine_tuned
+        with torch.no_grad():
+            generated_video = lavie_fine_tuned.generate(caption)  # Assumiamo che questo sia il modo corretto di chiamare il tuo modello
+        
+        # Calcola la similarità CLIP per ogni frame
+        frame_similarities = []
+        for frame in generated_video:
+            similarity = get_clip_similarity(clip_model, preprocess, caption, frame)
+            frame_similarities.append(similarity)
+        
+        # Calcola la media delle similarità per questo video
+        avg_similarity = sum(frame_similarities) / len(frame_similarities)
+        total_similarity += avg_similarity
+        num_videos += 1
+    
+    # Calcola la similarità media su tutti i video
+    average_similarity = total_similarity / num_videos
+    return average_similarity
+
 
 
 if __name__ == "__main__":
 
-    # Define the transformations (if necessary)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    # Carica il modello CLIP
+    clip_model, preprocess = clip.load("ViT-B/32", device=device)
+    
+    # Carica il tuo modello pre-addestrato
+    lavie_fine_tuned = torch.load("path/to/your/lavie_fine_tuned_model.pth")
+    lavie_fine_tuned.to(device)
+    lavie_fine_tuned.eval()
+    
+    # Prepara il dataset
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
-
-    # Create the dataset
+    
     dataset = MSRVTTDataset(
         video_dir='/content/drive/My Drive/msrvtt/TrainValVideo',
         annotation_file='/content/drive/My Drive/msrvtt/train_val_annotation/train_val_videodatainfo.json',
         split='validate',
         transform=transform
     )
+    
+    # Esegui la valutazione
+    average_similarity = evaluate_msrvtt_zero_shot(lavie_fine_tuned, clip_model, preprocess, dataset, device)
+    
+    print(f"Average CLIP Similarity (CLIPSIM): {average_similarity:.4f}")
 
-    print(f"Lunghezza del dataset: {len(dataset)}")
+   
+
+    #print(f"Lunghezza del dataset: {len(dataset)}")
 
     # Create the DataLoader
-    data_loader = DataLoader(dataset, batch_size=4, shuffle=True, collate_fn=collate_fn)
-
-    # Iterate through the DataLoader
-    for i, batch in enumerate(data_loader):
-        print(f"Batch {i}:")
-
-        # Extract components from the batch
-        videos = batch['video']            # Tensor of shape (batch_size, num_frames, C, H, W)
-        captions = batch['caption']        # List of captions
-        video_ids = batch['video_id']      # List of video IDs
-
-        print(f"Video shape: {videos.shape}")
-
-        # Determine the batch size
-        batch_size = len(video_ids)
-
-        # Iterate over each sample in the batch
-        for idx in range(batch_size):
-            print(f"Video ID: {video_ids[idx]}")
-            print(f"Numero di frame: {videos.shape[1]}")  # Assuming all videos have the same number of frames
-            print(f"Caption: {captions[idx]}")
-        break  # For example, stop after the first batch
+    #data_loader = DataLoader(dataset, batch_size=4, shuffle=True, collate_fn=collate_fn)
 

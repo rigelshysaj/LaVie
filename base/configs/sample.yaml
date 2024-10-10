@@ -1,5 +1,5 @@
 text_prompt: [
-              'a car driving in an empty street'
+              'a dog playing with a ball'
        ]
 
 # Path configurations
@@ -32,7 +32,7 @@ enable_xformers_memory_efficient_attention: false
 allow_tf32: false
 
 # Sample configurations
-image_path: "/content/drive/My Drive/a_car_driving_in_empty_street.jpeg"
+image_path: "/content/drive/My Drive/dog_playing_ball.png"
 seed: null
 run_time: 0
 guidance_scale: 7.5
