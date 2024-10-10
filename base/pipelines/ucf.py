@@ -101,14 +101,6 @@ if __name__ == "__main__":
     # Create the DataLoader
     train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True, num_workers=2)
 
-    # Example of iterating through the DataLoader
-    for batch in train_loader:
-        frames = batch['frames']  # Tensor of shape [batch_size, C, T, H, W]
-        labels = batch['label']   # Tensor of shape [batch_size]
-        print(f"Frames shape: {frames.shape}")
-        print(f"Labels: {labels}")
-        break  # Remove this break to iterate over the entire dataset
-
     for batch_idx, batch in enumerate(train_loader):
         print(f"\nBatch {batch_idx}:")
         # Estrai i componenti del batch

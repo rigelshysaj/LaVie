@@ -178,7 +178,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
         # Genera video con il modello fine-tuned
         generate_video(unet, is_original=False)
 
-        #generate_video(original_unet, is_original=True)
+        generate_video(original_unet, is_original=True)
 
         #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
         torch.cuda.empty_cache()
@@ -783,7 +783,7 @@ def model(args):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, args, training=True)
+    lora_model(data, video_folder, args, training=False)
 
 
 
