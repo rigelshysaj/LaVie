@@ -109,61 +109,85 @@ def collate_fn(batch):
 
     return {'video': videos_tensor, 'caption': captions, 'video_id': video_ids}
 
+
 def get_clip_similarity(clip_model, preprocess, text, image, device):
     with torch.no_grad():
-        text_features = clip_model.encode_text(clip.tokenize(text).to(device))
-        image_features = clip_model.encode_image(preprocess(image).unsqueeze(0).to(device))
+        # Preprocess the image
+        image_input = preprocess(image).unsqueeze(0).to(device)
+        # Tokenize the text
+        text_input = clip.tokenize([text]).to(device)
         
-        text_features /= text_features.norm(dim=-1, keepdim=True)
-        image_features /= image_features.norm(dim=-1, keepdim=True)
+        # Compute features
+        image_features = clip_model.encode_image(image_input)
+        text_features = clip_model.encode_text(text_input)
         
-        similarity = (100.0 * image_features @ text_features.T).item()
+        # Normalize the features
+        image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+        text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+        
+        # Compute similarity
+        similarity = (image_features @ text_features.T).item()
     return similarity
 
-def evaluate_msrvtt_zero_shot(clip_model, preprocess, dataset, device):
+
+def evaluate_msrvtt_clip_similarity(clip_model, preprocess, dataset, device):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
     
-    total_similarity = 0
+    total_gt_similarity = 0  # For ground truth videos
+    total_gen_similarity = 0  # For generated videos
     num_videos = 0
     
     for batch in tqdm(dataloader, desc="Evaluating"):
-        video = batch['video'].squeeze(0).to(device)  # (num_frames, C, H, W)
-        caption = batch['caption'][0]  # Prendiamo solo una didascalia
+        # Ground Truth Video Frames and Caption
+        gt_video = batch['video'].squeeze(0).to(device)  # (num_frames, C, H, W)
+        caption = batch['caption'][0]  # Single caption
+        video_id = batch['video_id'][0]
         
-        # Genera il video con lavie_fine_tuned
+        # Generate Video from Caption using Your Model
         with torch.no_grad():
-            generated_video = fine_tuning.model(caption)  # Assumiamo che questo sia il modo corretto di chiamare il tuo modello
+            generated_video_frames = fine_tuning.model(caption)  # Assuming this returns frames in tensor format
         
-        # Calcola la similarità CLIP per ogni frame
-        frame_similarities = []
-        for frame in generated_video:
-            similarity = get_clip_similarity(clip_model, preprocess, caption, frame)
-            frame_similarities.append(similarity)
+        # Ensure frames are in the correct format (e.g., list of PIL Images)
+        gt_frames = [transforms.ToPILImage()(frame.cpu()) for frame in gt_video]
+        gen_frames = [frame for frame in generated_video_frames]
         
-        # Calcola la media delle similarità per questo video
-        avg_similarity = sum(frame_similarities) / len(frame_similarities)
-        total_similarity += avg_similarity
+        # Compute CLIP Similarity for Ground Truth Video
+        gt_frame_similarities = []
+        for frame in gt_frames:
+            similarity = get_clip_similarity(clip_model, preprocess, caption, frame, device)
+            gt_frame_similarities.append(similarity)
+        avg_gt_similarity = sum(gt_frame_similarities) / len(gt_frame_similarities)
+        total_gt_similarity += avg_gt_similarity
+        
+        # Compute CLIP Similarity for Generated Video
+        gen_frame_similarities = []
+        for frame in gen_frames:
+            similarity = get_clip_similarity(clip_model, preprocess, caption, frame, device)
+            gen_frame_similarities.append(similarity)
+        avg_gen_similarity = sum(gen_frame_similarities) / len(gen_frame_similarities)
+        total_gen_similarity += avg_gen_similarity
+        
         num_videos += 1
     
-    # Calcola la similarità media su tutti i video
-    average_similarity = total_similarity / num_videos
-    return average_similarity
-
+    # Compute Average CLIPSIM Scores
+    average_gt_similarity = total_gt_similarity / num_videos
+    average_gen_similarity = total_gen_similarity / num_videos
+    
+    return average_gt_similarity, average_gen_similarity
 
 
 if __name__ == "__main__":
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
-    # Carica il modello CLIP
+    # Load the CLIP model
     clip_model, preprocess = clip.load("ViT-B/32", device=device)
     
-    
-    # Prepara il dataset
+    # Prepare the dataset
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize((224, 224)),  # Adjust as needed
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
     
     dataset = MSRVTTDataset(
@@ -173,15 +197,10 @@ if __name__ == "__main__":
         transform=transform
     )
     
-    # Esegui la valutazione
-    average_similarity = evaluate_msrvtt_zero_shot(clip_model, preprocess, dataset, device)
+    # Perform evaluation
+    average_gt_similarity, average_gen_similarity = evaluate_msrvtt_clip_similarity(
+        clip_model, preprocess, dataset, device
+    )
     
-    print(f"Average CLIP Similarity (CLIPSIM): {average_similarity:.4f}")
-
-   
-
-    #print(f"Lunghezza del dataset: {len(dataset)}")
-
-    # Create the DataLoader
-    #data_loader = DataLoader(dataset, batch_size=4, shuffle=True, collate_fn=collate_fn)
-
+    print(f"Average Ground Truth CLIP Similarity (CLIPSIM): {average_gt_similarity:.4f}")
+    print(f"Average Generated Video CLIP Similarity (CLIPSIM): {average_gen_similarity:.4f}")
