@@ -127,6 +127,8 @@ def get_clip_similarity(clip_model, preprocess, text, image, device):
         
         # Compute similarity
         similarity = (image_features @ text_features.T).item()
+
+        print("bbbbbbbbbbbbbbbbbbb")
     return similarity
 
 
