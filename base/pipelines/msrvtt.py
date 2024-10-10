@@ -10,7 +10,6 @@ import clip
 from tqdm import tqdm
 import fine_tuning
 from torch.utils.data import Subset
-import random
 
 
 class MSRVTTDataset(Dataset):
@@ -181,7 +180,6 @@ def evaluate_msrvtt_clip_similarity(clip_model, preprocess, dataset, device):
     return average_gt_similarity, average_gen_similarity
 
 
-
 if __name__ == "__main__":
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -208,11 +206,11 @@ if __name__ == "__main__":
     random.seed(42)
     
     # Verifica che il dataset abbia almeno 10 campioni
-    if len(dataset) < 10:
+    if len(dataset) < 5:
         raise ValueError("Il dataset contiene meno di 10 campioni.")
     
     # Seleziona casualmente 10 indici
-    subset_indices = random.sample(range(len(dataset)), 10)
+    subset_indices = random.sample(range(len(dataset)), 5)
     
     # Crea il sottoinsieme del dataset
     subset_dataset = Subset(dataset, subset_indices)
@@ -224,3 +222,4 @@ if __name__ == "__main__":
     
     print(f"Average Ground Truth CLIP Similarity (CLIPSIM): {average_gt_similarity:.4f}")
     print(f"Average Generated Video CLIP Similarity (CLIPSIM): {average_gen_similarity:.4f}")
+
