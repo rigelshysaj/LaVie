@@ -337,103 +337,105 @@ def lora_model(data, video_folder, args, caption, training=True):
     unet = get_peft_model(unet, lora_config)
 
 
-    if args.mixed_precision == "fp16":
-        # only upcast trainable parameters (LoRA) into fp32
-        cast_training_params([unet, mapper], dtype=torch.float32)
+    if(training):
 
-    #dataset = VideoDatasetMsrvtt(data, video_folder)
-    dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
-    train_dataloader = DataLoader(dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=custom_collate)
-    print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
+        if args.mixed_precision == "fp16":
+            # only upcast trainable parameters (LoRA) into fp32
+            cast_training_params([unet, mapper], dtype=torch.float32)
 
-    for param in mapper.parameters():
-        param.requires_grad = True
+        #dataset = VideoDatasetMsrvtt(data, video_folder)
+        dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
+        train_dataloader = DataLoader(dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=custom_collate)
+        print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
 
-    lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
+        for param in mapper.parameters():
+            param.requires_grad = True
 
-    trainable_params = list(lora_layers) + list(mapper.parameters())
+        lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
 
-    #trainable_params = list(lora_layers)
+        trainable_params = list(lora_layers) + list(mapper.parameters())
 
-    if args.gradient_checkpointing:
-        unet.enable_gradient_checkpointing()
+        #trainable_params = list(lora_layers)
 
-    # Enable TF32 for faster training on Ampere GPUs,
-    # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
-    if args.allow_tf32:
-        torch.backends.cuda.matmul.allow_tf32 = True
+        if args.gradient_checkpointing:
+            unet.enable_gradient_checkpointing()
 
-    if args.scale_lr:
-        args.learning_rate = (
-            args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
-        )
+        # Enable TF32 for faster training on Ampere GPUs,
+        # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
+        if args.allow_tf32:
+            torch.backends.cuda.matmul.allow_tf32 = True
 
-    # Initialize the optimizer
-    if args.use_8bit_adam:
-        try:
-            import bitsandbytes as bnb
-        except ImportError:
-            raise ImportError(
-                "Please install bitsandbytes to use 8-bit Adam. You can do so by running `pip install bitsandbytes`"
+        if args.scale_lr:
+            args.learning_rate = (
+                args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
             )
 
-        optimizer_cls = bnb.optim.AdamW8bit
-    else:
-        optimizer_cls = torch.optim.AdamW
+        # Initialize the optimizer
+        if args.use_8bit_adam:
+            try:
+                import bitsandbytes as bnb
+            except ImportError:
+                raise ImportError(
+                    "Please install bitsandbytes to use 8-bit Adam. You can do so by running `pip install bitsandbytes`"
+                )
 
-    optimizer = optimizer_cls(
-        trainable_params,
-        lr=args.learning_rate,
-        betas=(args.adam_beta1, args.adam_beta2),
-        weight_decay=args.adam_weight_decay,
-        eps=args.adam_epsilon,
-    )
+            optimizer_cls = bnb.optim.AdamW8bit
+        else:
+            optimizer_cls = torch.optim.AdamW
 
-    num_warmup_steps_for_scheduler = args.lr_warmup_steps * accelerator.num_processes
-    if args.max_train_steps is None:
-        len_train_dataloader_after_sharding = math.ceil(len(train_dataloader) / accelerator.num_processes)
-        num_update_steps_per_epoch = math.ceil(len_train_dataloader_after_sharding / args.gradient_accumulation_steps)
-        num_training_steps_for_scheduler = (
-            args.num_train_epochs * num_update_steps_per_epoch * accelerator.num_processes
+        optimizer = optimizer_cls(
+            trainable_params,
+            lr=args.learning_rate,
+            betas=(args.adam_beta1, args.adam_beta2),
+            weight_decay=args.adam_weight_decay,
+            eps=args.adam_epsilon,
         )
-    else:
-        num_training_steps_for_scheduler = args.max_train_steps * accelerator.num_processes
 
-    lr_scheduler = get_scheduler(
-        args.lr_scheduler,
-        optimizer=optimizer,
-        num_warmup_steps=num_warmup_steps_for_scheduler,
-        num_training_steps=num_training_steps_for_scheduler,
-    )
-
-
-    optimizer_mapper = optim.AdamW(mapper.parameters(), lr=1e-4)
-    scheduler_mapper = optim.lr_scheduler.StepLR(optimizer_mapper, step_size=10, gamma=0.1)
-
-    criterion = nn.CosineEmbeddingLoss()
-
-    # Prepare everything with our `accelerator`.
-    unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper = accelerator.prepare(
-        unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper
-    )
-
-    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
-    if args.max_train_steps is None:
-        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
-        if num_training_steps_for_scheduler != args.max_train_steps * accelerator.num_processes:
-            logger.warning(
-                f"The length of the 'train_dataloader' after 'accelerator.prepare' ({len(train_dataloader)}) does not match "
-                f"the expected length ({len_train_dataloader_after_sharding}) when the learning rate scheduler was created. "
-                f"This inconsistency may result in the learning rate scheduler not functioning properly."
+        num_warmup_steps_for_scheduler = args.lr_warmup_steps * accelerator.num_processes
+        if args.max_train_steps is None:
+            len_train_dataloader_after_sharding = math.ceil(len(train_dataloader) / accelerator.num_processes)
+            num_update_steps_per_epoch = math.ceil(len_train_dataloader_after_sharding / args.gradient_accumulation_steps)
+            num_training_steps_for_scheduler = (
+                args.num_train_epochs * num_update_steps_per_epoch * accelerator.num_processes
             )
-    # Afterwards we recalculate our number of training epochs
-    args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
+        else:
+            num_training_steps_for_scheduler = args.max_train_steps * accelerator.num_processes
 
-    # We need to initialize the trackers we use, and also store our configuration.
-    # The trackers initializes automatically on the main process.
-    if accelerator.is_main_process:
-        accelerator.init_trackers("text2image-fine-tune", config=vars(args))
+        lr_scheduler = get_scheduler(
+            args.lr_scheduler,
+            optimizer=optimizer,
+            num_warmup_steps=num_warmup_steps_for_scheduler,
+            num_training_steps=num_training_steps_for_scheduler,
+        )
+
+
+        optimizer_mapper = optim.AdamW(mapper.parameters(), lr=1e-4)
+        scheduler_mapper = optim.lr_scheduler.StepLR(optimizer_mapper, step_size=10, gamma=0.1)
+
+        criterion = nn.CosineEmbeddingLoss()
+
+        # Prepare everything with our `accelerator`.
+        unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper = accelerator.prepare(
+            unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper
+        )
+
+        # We need to recalculate our total training steps as the size of the training dataloader may have changed.
+        num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+        if args.max_train_steps is None:
+            args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+            if num_training_steps_for_scheduler != args.max_train_steps * accelerator.num_processes:
+                logger.warning(
+                    f"The length of the 'train_dataloader' after 'accelerator.prepare' ({len(train_dataloader)}) does not match "
+                    f"the expected length ({len_train_dataloader_after_sharding}) when the learning rate scheduler was created. "
+                    f"This inconsistency may result in the learning rate scheduler not functioning properly."
+                )
+        # Afterwards we recalculate our number of training epochs
+        args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
+
+        # We need to initialize the trackers we use, and also store our configuration.
+        # The trackers initializes automatically on the main process.
+        if accelerator.is_main_process:
+            accelerator.init_trackers("text2image-fine-tune", config=vars(args))
 
     
     global_step = 0
@@ -463,8 +465,13 @@ def lora_model(data, video_folder, args, caption, training=True):
             mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
             global_step = int(path.split("-")[1])
 
-            initial_global_step = global_step
-            first_epoch = global_step // num_update_steps_per_epoch
+            if(training):
+                initial_global_step = global_step
+                first_epoch = global_step // num_update_steps_per_epoch
+            else:
+                initial_global_step = 0
+                first_epoch = 0
+
     else:
         initial_global_step = 0
 
