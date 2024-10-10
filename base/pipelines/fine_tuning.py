@@ -475,13 +475,15 @@ def lora_model(data, video_folder, args, caption, training=True):
     else:
         initial_global_step = 0
 
-    progress_bar = tqdm(
-        range(0, args.max_train_steps),
-        initial=initial_global_step,
-        desc="Steps",
-        # Only show the progress bar once on each machine.
-        disable=not accelerator.is_local_main_process,
-    )
+
+    if(training):
+        progress_bar = tqdm(
+            range(0, args.max_train_steps),
+            initial=initial_global_step,
+            desc="Steps",
+            # Only show the progress bar once on each machine.
+            disable=not accelerator.is_local_main_process,
+        )
 
     unet.enable_xformers_memory_efficient_attention()
 
