@@ -706,10 +706,10 @@ def model(caption):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
 
-    return lora_model(data, video_folder, args, caption, training=False)
+    return lora_model(data, video_folder, args, caption, training=True)
 
 
 
 
 if __name__ == "__main__":
-    model("")
+    model("people are going hiking")
