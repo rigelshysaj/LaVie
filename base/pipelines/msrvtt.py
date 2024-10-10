@@ -206,11 +206,11 @@ if __name__ == "__main__":
     random.seed(42)
     
     # Verifica che il dataset abbia almeno 10 campioni
-    if len(dataset) < 5:
+    if len(dataset) < 1:
         raise ValueError("Il dataset contiene meno di 10 campioni.")
     
     # Seleziona casualmente 10 indici
-    subset_indices = random.sample(range(len(dataset)), 5)
+    subset_indices = random.sample(range(len(dataset)), 1)
     
     # Crea il sottoinsieme del dataset
     subset_dataset = Subset(dataset, subset_indices)
