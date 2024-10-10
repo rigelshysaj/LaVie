@@ -253,7 +253,7 @@ def log_lora_weights(model, step):
                print(f"Step {step}: LoRA weight '{name}' mean = {param.data.mean().item():.6f}")
 
 
-def lora_model(data, video_folder, args, training=True):
+def lora_model(data, video_folder, args, training=1):
 
     logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
 
@@ -481,7 +481,7 @@ def lora_model(data, video_folder, args, training=True):
     print(f"first_epoch: {first_epoch}")
     print(f"num_train_epochs: {args.num_train_epochs}")
 
-    if(training):
+    if(training==1):
 
         accum_total_loss = 0.0
         accum_diffusion_loss = 0.0
@@ -762,12 +762,22 @@ def lora_model(data, video_folder, args, training=True):
 
         # Opzionale: visualizza il grafico interattivo in Colab
         fig.show()
-    else:
+    elif(training == 2):
         inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper)
 
+    else:
+        return args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper
 
 
-def model(args):
+
+
+def model():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="")
+    args = parser.parse_args()
+
+    model(OmegaConf.load(args.config))
     
     # Determina se sei su Google Colab
     on_colab = 'COLAB_GPU' in os.environ
@@ -788,8 +798,4 @@ def model(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="")
-    args = parser.parse_args()
-
-    model(OmegaConf.load(args.config))
+    model()
