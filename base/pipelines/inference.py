@@ -614,6 +614,7 @@ class VideoGenPipeline(DiffusionPipeline):
 
                 latent_model_input = latent_model_input.to(torch.float32)
                 prompt_embeds = prompt_embeds.to(torch.float32)
+                self.unet = self.unet.to(torch.float32)
                 # predict the noise residual
                 noise_pred = self.unet(
                     latent_model_input, #torch.Size([2, 4, 16, 40, 64])
