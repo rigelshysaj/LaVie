@@ -731,7 +731,7 @@ def model(caption):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    return lora_model(data, video_folder, OmegaConf.load(args.config), caption, training=True)
+    return lora_model(data, video_folder, OmegaConf.load(args.config), caption, training=False)
 
 
 
