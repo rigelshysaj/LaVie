@@ -81,6 +81,8 @@ class VideoGenPipeline(DiffusionPipeline):
     ):
         super().__init__()
 
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
         if hasattr(scheduler.config, "steps_offset") and scheduler.config.steps_offset != 1:
             deprecation_message = (
                 f"The configuration file of this scheduler: {scheduler} is outdated. `steps_offset`"
