@@ -8,6 +8,7 @@ import cv2
 import torch
 import clip
 from tqdm import tqdm
+import fine_tuning
 
 class MSRVTTDataset(Dataset):
     def __init__(self, video_dir, annotation_file, split='validate', transform=None):
@@ -119,7 +120,7 @@ def get_clip_similarity(clip_model, preprocess, text, image, device):
         similarity = (100.0 * image_features @ text_features.T).item()
     return similarity
 
-def evaluate_msrvtt_zero_shot(lavie_fine_tuned, clip_model, preprocess, dataset, device):
+def evaluate_msrvtt_zero_shot(clip_model, preprocess, dataset, device):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
     
     total_similarity = 0
@@ -131,7 +132,7 @@ def evaluate_msrvtt_zero_shot(lavie_fine_tuned, clip_model, preprocess, dataset,
         
         # Genera il video con lavie_fine_tuned
         with torch.no_grad():
-            generated_video = lavie_fine_tuned.generate(caption)  # Assumiamo che questo sia il modo corretto di chiamare il tuo modello
+            generated_video = fine_tuning.model(caption)  # Assumiamo che questo sia il modo corretto di chiamare il tuo modello
         
         # Calcola la similarità CLIP per ogni frame
         frame_similarities = []
@@ -157,10 +158,6 @@ if __name__ == "__main__":
     # Carica il modello CLIP
     clip_model, preprocess = clip.load("ViT-B/32", device=device)
     
-    # Carica il tuo modello pre-addestrato
-    lavie_fine_tuned = torch.load("path/to/your/lavie_fine_tuned_model.pth")
-    lavie_fine_tuned.to(device)
-    lavie_fine_tuned.eval()
     
     # Prepara il dataset
     transform = transforms.Compose([
@@ -177,7 +174,7 @@ if __name__ == "__main__":
     )
     
     # Esegui la valutazione
-    average_similarity = evaluate_msrvtt_zero_shot(lavie_fine_tuned, clip_model, preprocess, dataset, device)
+    average_similarity = evaluate_msrvtt_zero_shot(clip_model, preprocess, dataset, device)
     
     print(f"Average CLIP Similarity (CLIPSIM): {average_similarity:.4f}")
 

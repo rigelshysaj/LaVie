@@ -135,7 +135,7 @@ def load_and_transform_image(path):
     return image_tensor
 
 
-def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper):
+def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption):
         
     mapper.dtype = next(mapper.parameters()).dtype
 
@@ -159,31 +159,33 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
             if(not is_original):
                 image_tensor = load_and_transform_image(args.image_path)
             
-            for prompt in args.text_prompt:
-                print(f'Processing the ({prompt}) prompt for {"original" if is_original else "fine-tuned"} model')
-                videos = pipeline(
-                    prompt,
-                    image_tensor=image_tensor if not is_original else None,
-                    video_length=args.video_length, 
-                    height=args.image_size[0], 
-                    width=args.image_size[1], 
-                    num_inference_steps=args.num_sampling_steps,
-                    guidance_scale=args.guidance_scale
-                ).video
+            
+            print(f'Processing the ({caption}) prompt for {"original" if is_original else "fine-tuned"} model')
+            videos = pipeline(
+                caption,
+                image_tensor=image_tensor if not is_original else None,
+                video_length=args.video_length, 
+                height=args.image_size[0], 
+                width=args.image_size[1], 
+                num_inference_steps=args.num_sampling_steps,
+                guidance_scale=args.guidance_scale
+            ).video
 
-                suffix = "original" if is_original else "fine_tuned"
-                imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
-                del videos
+            suffix = "original" if is_original else "fine_tuned"
+            imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
+            return videos[0]
 
         # Genera video con il modello fine-tuned
-        generate_video(unet, is_original=False)
+        video = generate_video(unet, is_original=False)
 
-        generate_video(original_unet, is_original=True)
+        #generate_video(original_unet, is_original=True)
 
         #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
         torch.cuda.empty_cache()
 
         print('save path {}'.format("/content/drive/My Drive/"))
+
+        return video
     
 
 
@@ -253,7 +255,7 @@ def log_lora_weights(model, step):
                print(f"Step {step}: LoRA weight '{name}' mean = {param.data.mean().item():.6f}")
 
 
-def lora_model(data, video_folder, args, training=1):
+def lora_model(data, video_folder, args, caption, training=True):
 
     logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
 
@@ -481,7 +483,7 @@ def lora_model(data, video_folder, args, training=1):
     print(f"first_epoch: {first_epoch}")
     print(f"num_train_epochs: {args.num_train_epochs}")
 
-    if(training==1):
+    if(training):
 
         accum_total_loss = 0.0
         accum_diffusion_loss = 0.0
@@ -732,7 +734,7 @@ def lora_model(data, video_folder, args, training=1):
 
                             print("modello salvatooooooooooo")
 
-                        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper)
+                        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, args.text_prompt)
 
 
                 #logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
@@ -762,16 +764,12 @@ def lora_model(data, video_folder, args, training=1):
 
         # Opzionale: visualizza il grafico interattivo in Colab
         fig.show()
-    elif(training == 2):
-        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper)
-
     else:
-        return args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper
+        return inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption)
 
+    
 
-
-
-def model():
+def model(caption):
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="")
@@ -793,9 +791,9 @@ def model():
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, args, training=False)
+    return lora_model(data, video_folder, args, caption, training=False)
 
 
 
 if __name__ == "__main__":
-    model()
+    model("")
