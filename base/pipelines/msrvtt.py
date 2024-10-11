@@ -10,7 +10,11 @@ import clip
 from tqdm import tqdm
 import fine_tuning
 from torch.utils.data import Subset
-
+import argparse
+from transformers import CLIPProcessor, CLIPModel
+from transformers import CLIPTokenizer, CLIPTextModel
+from diffusers import AutoencoderKL, StableDiffusionPipeline
+from diffusers.schedulers import DDPMScheduler
 
 class MSRVTTDataset(Dataset):
     def __init__(self, video_dir, annotation_file, split='validate', transform=None):
@@ -186,6 +190,19 @@ def evaluate_msrvtt_clip_similarity(clip_model, preprocess, dataset, device):
 if __name__ == "__main__":
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="")
+    args = parser.parse_args()
+
+    sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
+    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
+    text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
+    vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
+    # Load CLIP model and processor for image conditioning
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
+    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
+    noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
     
     # Carica il modello CLIP
     clip_model, preprocess = clip.load("ViT-B/32", device=device)
