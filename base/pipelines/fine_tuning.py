@@ -197,230 +197,9 @@ def log_lora_weights(model, step):
                print(f"Step {step}: LoRA weight '{name}' mean = {param.data.mean().item():.6f}")
 
 
-def lora_model(data, video_folder, args, caption, training=True):
-
-    logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
-
-    accelerator_project_config = ProjectConfiguration(project_dir="/content/drive/My Drive/", logging_dir=logging_dir)
-
-    accelerator = Accelerator(
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
-        mixed_precision=args.mixed_precision,
-        log_with=args.report_to,
-        project_config=accelerator_project_config,
-    )
-
-    # Disable AMP for MPS.
-    if torch.backends.mps.is_available():
-        accelerator.native_amp = False
+def lora_model(args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, caption, first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet, training=False):
 
     
-    logger.info(accelerator.state, main_process_only=False)
-    if accelerator.is_local_main_process:
-        transformers.utils.logging.set_verbosity_warning()
-        diffusers.utils.logging.set_verbosity_info()
-    else:
-        transformers.utils.logging.set_verbosity_error()
-        diffusers.utils.logging.set_verbosity_error()
-
-    # If passed along, set the training seed now.
-    if args.seed is not None:
-        set_seed(args.seed)
-
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    # Carica il modello UNet e applica LoRA
-    sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
-    unet = get_models(args, sd_path).to(device, dtype=torch.float16)
-    state_dict = find_model(args.ckpt_path)
-    unet.load_state_dict(state_dict)
-
-    # Carica il modello UNet originale
-    original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
-    original_unet.load_state_dict(state_dict)
-
-    # Instantiate the mapping network
-    mapper = MappingNetwork().to(unet.device)
-    #mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
-
-    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
-    text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
-    vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
-    # Load CLIP model and processor for image conditioning
-    clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
-    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
-    noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
-
-    unet.requires_grad_(False)
-    vae.requires_grad_(False)
-    text_encoder.requires_grad_(False)
-
-    weight_dtype = torch.float32
-    if accelerator.mixed_precision == "fp16":
-        weight_dtype = torch.float16
-    elif accelerator.mixed_precision == "bf16":
-        weight_dtype = torch.bfloat16
-
-    for param in unet.parameters():
-        param.requires_grad_(False)
-
-    lora_config = LoraConfig(
-        r=args.rank,
-        lora_alpha=args.rank,
-        init_lora_weights="gaussian",
-        target_modules=["to_k", "to_q", "to_v", "to_out.0"],
-    )
-
-    unet.to(accelerator.device, dtype=weight_dtype)
-    vae.to(accelerator.device, dtype=weight_dtype)
-    text_encoder.to(accelerator.device, dtype=weight_dtype)
-
-    
-    unet = get_peft_model(unet, lora_config)
-
-
-    if args.mixed_precision == "fp16":
-        # only upcast trainable parameters (LoRA) into fp32
-        cast_training_params([unet, mapper], dtype=torch.float32)
-
-    #dataset = VideoDatasetMsrvtt(data, video_folder)
-    dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
-    train_dataloader = DataLoader(dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=custom_collate)
-    print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
-
-    for param in mapper.parameters():
-        param.requires_grad = True
-
-    lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
-
-    trainable_params = list(lora_layers) + list(mapper.parameters())
-
-    #trainable_params = list(lora_layers)
-
-    if args.gradient_checkpointing:
-        unet.enable_gradient_checkpointing()
-
-    # Enable TF32 for faster training on Ampere GPUs,
-    # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
-    if args.allow_tf32:
-        torch.backends.cuda.matmul.allow_tf32 = True
-
-    if args.scale_lr:
-        args.learning_rate = (
-            args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
-        )
-
-    # Initialize the optimizer
-    if args.use_8bit_adam:
-        try:
-            import bitsandbytes as bnb
-        except ImportError:
-            raise ImportError(
-                "Please install bitsandbytes to use 8-bit Adam. You can do so by running `pip install bitsandbytes`"
-            )
-
-        optimizer_cls = bnb.optim.AdamW8bit
-    else:
-        optimizer_cls = torch.optim.AdamW
-
-    optimizer = optimizer_cls(
-        trainable_params,
-        lr=args.learning_rate,
-        betas=(args.adam_beta1, args.adam_beta2),
-        weight_decay=args.adam_weight_decay,
-        eps=args.adam_epsilon,
-    )
-
-    num_warmup_steps_for_scheduler = args.lr_warmup_steps * accelerator.num_processes
-    if args.max_train_steps is None:
-        len_train_dataloader_after_sharding = math.ceil(len(train_dataloader) / accelerator.num_processes)
-        num_update_steps_per_epoch = math.ceil(len_train_dataloader_after_sharding / args.gradient_accumulation_steps)
-        num_training_steps_for_scheduler = (
-            args.num_train_epochs * num_update_steps_per_epoch * accelerator.num_processes
-        )
-    else:
-        num_training_steps_for_scheduler = args.max_train_steps * accelerator.num_processes
-
-    lr_scheduler = get_scheduler(
-        args.lr_scheduler,
-        optimizer=optimizer,
-        num_warmup_steps=num_warmup_steps_for_scheduler,
-        num_training_steps=num_training_steps_for_scheduler,
-    )
-
-
-    optimizer_mapper = optim.AdamW(mapper.parameters(), lr=1e-4)
-    scheduler_mapper = optim.lr_scheduler.StepLR(optimizer_mapper, step_size=10, gamma=0.1)
-
-    criterion = nn.CosineEmbeddingLoss()
-
-    # Prepare everything with our `accelerator`.
-    unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper = accelerator.prepare(
-        unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper
-    )
-
-    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
-    if args.max_train_steps is None:
-        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
-        if num_training_steps_for_scheduler != args.max_train_steps * accelerator.num_processes:
-            logger.warning(
-                f"The length of the 'train_dataloader' after 'accelerator.prepare' ({len(train_dataloader)}) does not match "
-                f"the expected length ({len_train_dataloader_after_sharding}) when the learning rate scheduler was created. "
-                f"This inconsistency may result in the learning rate scheduler not functioning properly."
-            )
-    # Afterwards we recalculate our number of training epochs
-    args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
-
-    # We need to initialize the trackers we use, and also store our configuration.
-    # The trackers initializes automatically on the main process.
-    if accelerator.is_main_process:
-        accelerator.init_trackers("text2image-fine-tune", config=vars(args))
-
-    
-    global_step = 0
-    first_epoch = 0
-
-    # Potentially load in the weights and states from a previous save
-    if args.resume_from_checkpoint:
-        if args.resume_from_checkpoint != "latest":
-            path = os.path.basename(args.resume_from_checkpoint)
-        else:
-            # Get the most recent checkpoint
-            dirs = os.listdir(args.output_dir)
-            dirs = [d for d in dirs if d.startswith("checkpoint")]
-            dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
-            path = dirs[-1] if len(dirs) > 0 else None
-
-        if path is None:
-            accelerator.print(
-                f"Checkpoint '{args.resume_from_checkpoint}' does not exist. Starting a new training run."
-            )
-            args.resume_from_checkpoint = None
-            initial_global_step = 0
-        else:
-            accelerator.print(f"Resuming from checkpoint {path}")
-            accelerator.load_state(os.path.join(args.output_dir, path))
-            # Load the mapper state dict
-            mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
-            global_step = int(path.split("-")[1])
-
-            initial_global_step = global_step
-            first_epoch = global_step // num_update_steps_per_epoch
-    else:
-        initial_global_step = 0
-
-    progress_bar = tqdm(
-        range(0, args.max_train_steps),
-        initial=initial_global_step,
-        desc="Steps",
-        # Only show the progress bar once on each machine.
-        disable=not accelerator.is_local_main_process,
-    )
-
-    unet.enable_xformers_memory_efficient_attention()
-
-    epoch_losses = []
 
     print(f"first_epoch: {first_epoch}")
     print(f"num_train_epochs: {args.num_train_epochs}")
@@ -686,38 +465,102 @@ def lora_model(data, video_folder, args, caption, training=True):
 
                     
         accelerator.end_training()
-
-        num_epochs = len(epoch_losses)
-        epochs = list(range(1, num_epochs + 1))  # Crea una lista [1, 2, 3, ..., num_epochs]
-        print(f"num_epochs: {num_epochs}")
-
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=epochs, y=epoch_losses, mode='lines'))
-
-        # Personalizza il layout
-        fig.update_layout(
-            title='Training Loss',
-            xaxis_title='Epoch',
-            yaxis_title='Loss'
-        )
-
-        # Salva il grafico come immagine
-        fig.write_image("/content/drive/My Drive/training_loss.png")
-
-        # Opzionale: visualizza il grafico interattivo in Colab
-        fig.show()
     else:
         return inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption)
 
     
 
-def model(caption):
+def model():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
+
+    unet = get_models(args, sd_path).to(device, dtype=torch.float16)
+    state_dict = find_model(args.ckpt_path)
+    unet.load_state_dict(state_dict)
+
+    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
+    text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
+    vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
+    # Load CLIP model and processor for image conditioning
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
+    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
+    noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
+
+    logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
+
+    accelerator_project_config = ProjectConfiguration(project_dir="/content/drive/My Drive/", logging_dir=logging_dir)
+
+    accelerator = Accelerator(
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        mixed_precision=args.mixed_precision,
+        log_with=args.report_to,
+        project_config=accelerator_project_config,
+    )
+
+    # Disable AMP for MPS.
+    if torch.backends.mps.is_available():
+        accelerator.native_amp = False
+
     
-    # Determina se sei su Google Colab
+    logger.info(accelerator.state, main_process_only=False)
+    if accelerator.is_local_main_process:
+        transformers.utils.logging.set_verbosity_warning()
+        diffusers.utils.logging.set_verbosity_info()
+    else:
+        transformers.utils.logging.set_verbosity_error()
+        diffusers.utils.logging.set_verbosity_error()
+
+    # If passed along, set the training seed now.
+    if args.seed is not None:
+        set_seed(args.seed)
+
+    # Carica il modello UNet originale
+    #original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
+    #original_unet.load_state_dict(state_dict)
+    original_unet = None
+
+    # Instantiate the mapping network
+    mapper = MappingNetwork().to(unet.device)
+    #mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
+
+    unet.requires_grad_(False)
+    vae.requires_grad_(False)
+    text_encoder.requires_grad_(False)
+
+    weight_dtype = torch.float32
+    if accelerator.mixed_precision == "fp16":
+        weight_dtype = torch.float16
+    elif accelerator.mixed_precision == "bf16":
+        weight_dtype = torch.bfloat16
+
+    for param in unet.parameters():
+        param.requires_grad_(False)
+
+    lora_config = LoraConfig(
+        r=args.rank,
+        lora_alpha=args.rank,
+        init_lora_weights="gaussian",
+        target_modules=["to_k", "to_q", "to_v", "to_out.0"],
+    )
+
+    unet.to(accelerator.device, dtype=weight_dtype)
+    vae.to(accelerator.device, dtype=weight_dtype)
+    text_encoder.to(accelerator.device, dtype=weight_dtype)
+
+    
+    unet = get_peft_model(unet, lora_config)
+
+
+    if args.mixed_precision == "fp16":
+        # only upcast trainable parameters (LoRA) into fp32
+        cast_training_params([unet, mapper], dtype=torch.float32)
+
     on_colab = 'COLAB_GPU' in os.environ
 
     if on_colab:
@@ -730,10 +573,149 @@ def model(caption):
     # Percorsi dei file
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
+
+    #dataset = VideoDatasetMsrvtt(data, video_folder)
+    dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
+    train_dataloader = DataLoader(dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=custom_collate)
+    print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
+
+    for param in mapper.parameters():
+        param.requires_grad = True
+
+    lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
+
+    trainable_params = list(lora_layers) + list(mapper.parameters())
+
+    #trainable_params = list(lora_layers)
+
+    if args.gradient_checkpointing:
+        unet.enable_gradient_checkpointing()
+
+    # Enable TF32 for faster training on Ampere GPUs,
+    # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
+    if args.allow_tf32:
+        torch.backends.cuda.matmul.allow_tf32 = True
+
+    if args.scale_lr:
+        args.learning_rate = (
+            args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
+        )
+
+    # Initialize the optimizer
+    if args.use_8bit_adam:
+        try:
+            import bitsandbytes as bnb
+        except ImportError:
+            raise ImportError(
+                "Please install bitsandbytes to use 8-bit Adam. You can do so by running `pip install bitsandbytes`"
+            )
+
+        optimizer_cls = bnb.optim.AdamW8bit
+    else:
+        optimizer_cls = torch.optim.AdamW
+
+    optimizer = optimizer_cls(
+        trainable_params,
+        lr=args.learning_rate,
+        betas=(args.adam_beta1, args.adam_beta2),
+        weight_decay=args.adam_weight_decay,
+        eps=args.adam_epsilon,
+    )
+
+    num_warmup_steps_for_scheduler = args.lr_warmup_steps * accelerator.num_processes
+    if args.max_train_steps is None:
+        len_train_dataloader_after_sharding = math.ceil(len(train_dataloader) / accelerator.num_processes)
+        num_update_steps_per_epoch = math.ceil(len_train_dataloader_after_sharding / args.gradient_accumulation_steps)
+        num_training_steps_for_scheduler = (
+            args.num_train_epochs * num_update_steps_per_epoch * accelerator.num_processes
+        )
+    else:
+        num_training_steps_for_scheduler = args.max_train_steps * accelerator.num_processes
+
+    lr_scheduler = get_scheduler(
+        args.lr_scheduler,
+        optimizer=optimizer,
+        num_warmup_steps=num_warmup_steps_for_scheduler,
+        num_training_steps=num_training_steps_for_scheduler,
+    )
+
+
+    optimizer_mapper = optim.AdamW(mapper.parameters(), lr=1e-4)
+    scheduler_mapper = optim.lr_scheduler.StepLR(optimizer_mapper, step_size=10, gamma=0.1)
+
+    criterion = nn.CosineEmbeddingLoss()
+
+    # Prepare everything with our `accelerator`.
+    unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper = accelerator.prepare(
+        unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper
+    )
+
+    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    if args.max_train_steps is None:
+        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+        if num_training_steps_for_scheduler != args.max_train_steps * accelerator.num_processes:
+            logger.warning(
+                f"The length of the 'train_dataloader' after 'accelerator.prepare' ({len(train_dataloader)}) does not match "
+                f"the expected length ({len_train_dataloader_after_sharding}) when the learning rate scheduler was created. "
+                f"This inconsistency may result in the learning rate scheduler not functioning properly."
+            )
+    # Afterwards we recalculate our number of training epochs
+    args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
+
+    # We need to initialize the trackers we use, and also store our configuration.
+    # The trackers initializes automatically on the main process.
+    if accelerator.is_main_process:
+        accelerator.init_trackers("text2image-fine-tune", config=vars(args))
+
     
-    return lora_model(data, video_folder, OmegaConf.load(args.config), caption, training=False)
+    global_step = 0
+    first_epoch = 0
+
+    # Potentially load in the weights and states from a previous save
+    if args.resume_from_checkpoint:
+        if args.resume_from_checkpoint != "latest":
+            path = os.path.basename(args.resume_from_checkpoint)
+        else:
+            # Get the most recent checkpoint
+            dirs = os.listdir(args.output_dir)
+            dirs = [d for d in dirs if d.startswith("checkpoint")]
+            dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
+            path = dirs[-1] if len(dirs) > 0 else None
+
+        if path is None:
+            accelerator.print(
+                f"Checkpoint '{args.resume_from_checkpoint}' does not exist. Starting a new training run."
+            )
+            args.resume_from_checkpoint = None
+            initial_global_step = 0
+        else:
+            accelerator.print(f"Resuming from checkpoint {path}")
+            accelerator.load_state(os.path.join(args.output_dir, path))
+            # Load the mapper state dict
+            mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
+            global_step = int(path.split("-")[1])
+
+            initial_global_step = global_step
+            first_epoch = global_step // num_update_steps_per_epoch
+    else:
+        initial_global_step = 0
+
+    progress_bar = tqdm(
+        range(0, args.max_train_steps),
+        initial=initial_global_step,
+        desc="Steps",
+        # Only show the progress bar once on each machine.
+        disable=not accelerator.is_local_main_process,
+    )
+
+    unet.enable_xformers_memory_efficient_attention()
+    
+    
+    return data, video_folder, args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet
 
 
 
 if __name__ == "__main__":
-    model("a lion is playing with a ball")
+    data, video_folder, args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet = model()
+    lora_model(data, video_folder, args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, "a lion is playing with a ball", first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet, training=True)
