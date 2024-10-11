@@ -83,14 +83,12 @@ def load_and_transform_image(path):
 
 
 def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption):
-    print("Inizio funzione inference")
+        
     mapper.dtype = next(mapper.parameters()).dtype
-    print("Tipo di dato mapper:", mapper.dtype)
-    
+
     with torch.no_grad():
         # Funzione per generare video
         def generate_video(unet, is_original):
-            print(f"Inizio generazione video con unet {'original' if is_original else 'fine-tuned'}")
             pipeline = VideoGenPipeline(
                 vae=vae, 
                 text_encoder=text_encoder, 
@@ -102,56 +100,38 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 mapper=mapper
             ).to(device)
 
-            print("Pipeline creata e spostata sul device")
             pipeline.enable_xformers_memory_efficient_attention()
-            print("Memoria efficiente abilitata per pipeline")
-    
-            if not is_original:
-                print("Caricamento e trasformazione immagine")
+
+
+            if(not is_original):
                 image_tensor = load_and_transform_image(args.image_path)
-            else:
-                image_tensor = None  # Assicurati che l'immagine sia gestita correttamente
-    
+            
             print(f'Processing the ({caption}) prompt for {"original" if is_original else "fine-tuned"} model')
-            try:
-                videos = pipeline(
-                    caption[0],
-                    image_tensor=image_tensor if not is_original else None,
-                    video_length=args.video_length, 
-                    height=args.image_size[0], 
-                    width=args.image_size[1], 
-                    num_inference_steps=args.num_sampling_steps,
-                    guidance_scale=args.guidance_scale
-                ).video
-                print("Pipeline completata")
-            except Exception as e:
-                print(f"Errore durante la pipeline: {e}")
-                return []
-    
+            videos = pipeline(
+                caption[0],
+                image_tensor=image_tensor if not is_original else None,
+                video_length=args.video_length, 
+                height=args.image_size[0], 
+                width=args.image_size[1], 
+                num_inference_steps=args.num_sampling_steps,
+                guidance_scale=args.guidance_scale
+            ).video
+
             suffix = "original" if is_original else "fine_tuned"
-            try:
-                print(f"Salvataggio video come /content/drive/My Drive/{suffix}.mp4")
-                imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
-                print("Video salvato correttamente")
-            except Exception as e:
-                print(f"Errore durante il salvataggio del video: {e}")
-                return []
-    
+            imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
             return videos[0]
-    
+
         # Genera video con il modello fine-tuned
-        print("Generazione video fine-tuned")
         video = generate_video(unet, is_original=False)
-        print("Video fine-tuned generato")
-    
+
         #generate_video(original_unet, is_original=True)
-    
+
         #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
         torch.cuda.empty_cache()
-        print('save path {}'.format("/content/drive/My Drive/"))
-    
-        return video
 
+        print('save path {}'.format("/content/drive/My Drive/"))
+
+        return video
     
 
 
@@ -743,15 +723,10 @@ def lora_model(data, video_folder, args, method=1):
         # Crea il sottoinsieme del dataset
         subset_dataset = Subset(datasetM, subset_indices)
         
-        try:
-            # Il tuo codice principale qui
-            average_gt_similarity, average_gen_similarity = evaluate_msrvtt_clip_similarity(
-                clip_model32, preprocess32, subset_dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper
-            )
-        except Exception as e:
-            print(f"Si è verificato un errore: {e}")
         # Esegui la valutazione sul sottoinsieme
-        
+        average_gt_similarity, average_gen_similarity = evaluate_msrvtt_clip_similarity(
+            clip_model32, preprocess32, subset_dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper
+        )
         
         print(f"Average Ground Truth CLIP Similarity (CLIPSIM): {average_gt_similarity:.4f}")
         print(f"Average Generated Video CLIP Similarity (CLIPSIM): {average_gen_similarity:.4f}")
@@ -759,69 +734,45 @@ def lora_model(data, video_folder, args, method=1):
 
 
 def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper):
+
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=msrvtt.collate_fn)
     
-    total_gt_similarity = 0
-    total_gen_similarity = 0
+    total_gt_similarity = 0  # For ground truth videos
+    total_gen_similarity = 0  # For generated videos
     num_videos = 0
     
-    print("Inizio valutazione CLIP similarity")
-    
     for batch in tqdm(dataloader, desc="Evaluating"):
-        try:
-            print(f"Valutazione video numero: {num_videos + 1}")
-            
-            # Ground Truth Video Frames and Caption
-            gt_video = batch['video'].squeeze(0).to(device)  # (num_frames, C, H, W)
-            caption = batch['caption'][0]  # Single caption
-            video_id = batch['video_id'][0]
-            
-            print("Inizio inference")
-            # Generate Video from Caption using Your Model
-            with torch.no_grad():
-                generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption)
-            print("Inference completata")
-            
-            # Ensure frames are in the correct format (e.g., list of PIL Images)
-            gt_frames = [transforms.ToPILImage()(frame.cpu()) for frame in gt_video]
-            gen_frames = [transforms.ToPILImage()(frame.cpu()) for frame in generated_video_frames]
-    
-            print("Calcolo similarità CLIP per Ground Truth")
-            # Compute CLIP Similarity for Ground Truth Video
-            gt_frame_similarities = []
-            for frame in gt_frames:
-                similarity = get_clip_similarity(clip_model32, preprocess32, caption, frame, device)
-                gt_frame_similarities.append(similarity)
-            avg_gt_similarity = sum(gt_frame_similarities) / len(gt_frame_similarities)
-            total_gt_similarity += avg_gt_similarity
-            
-            print("Calcolo similarità CLIP per Video Generato")
-            # Compute CLIP Similarity for Generated Video
-            
-            gen_frame_similarities = []
-            for frame in gen_frames:
-                similarity = get_clip_similarity(clip_model32, preprocess32, caption, frame, device)
-                gen_frame_similarities.append(similarity)
-            avg_gen_similarity = sum(gen_frame_similarities) / len(gen_frame_similarities)
-            total_gen_similarity += avg_gen_similarity
-            
-            
-            num_videos += 1
-            
-            # Pulizia della memoria
-            del generated_video_frames, gt_frames, gen_frames
-            torch.cuda.empty_cache()
-            gc.collect()
-            
-            print(f"Video {num_videos} valutato correttamente")
+        # Ground Truth Video Frames and Caption
+        gt_video = batch['video'].squeeze(0).to(device)  # (num_frames, C, H, W)
+        caption = batch['caption'][0]  # Single caption
+        video_id = batch['video_id'][0]
         
-        except Exception as e:
-            print(f"Si è verificato un errore durante la valutazione del video {num_videos + 1}: {e}")
-            continue
-    
-    if num_videos == 0:
-        print("Nessun video valutato.")
-        return 0, 0
+        # Generate Video from Caption using Your Model
+        with torch.no_grad():
+            generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption)
+        
+        # Ensure frames are in the correct format (e.g., list of PIL Images)
+        gt_frames = [transforms.ToPILImage()(frame.cpu()) for frame in gt_video]
+        gen_frames = [frame for frame in generated_video_frames]
+
+        
+        # Compute CLIP Similarity for Ground Truth Video
+        gt_frame_similarities = []
+        for frame in gt_frames:
+            similarity = get_clip_similarity(clip_model32, preprocess32, caption, frame, device)
+            gt_frame_similarities.append(similarity)
+        avg_gt_similarity = sum(gt_frame_similarities) / len(gt_frame_similarities)
+        total_gt_similarity += avg_gt_similarity
+        
+        # Compute CLIP Similarity for Generated Video
+        gen_frame_similarities = []
+        for frame in gen_frames:
+            similarity = get_clip_similarity(clip_model32, preprocess32, caption, frame, device)
+            gen_frame_similarities.append(similarity)
+        avg_gen_similarity = sum(gen_frame_similarities) / len(gen_frame_similarities)
+        total_gen_similarity += avg_gen_similarity
+        
+        num_videos += 1
     
     # Compute Average CLIPSIM Scores
     average_gt_similarity = total_gt_similarity / num_videos
@@ -831,61 +782,22 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
 
 
 def get_clip_similarity(clip_model, preprocess, text, image, device):
-    print("Inizio get_clip_similarity")
     with torch.no_grad():
         # Preprocess the image
-        try:
-            print("Preprocess image")
-            image_input = preprocess(image).unsqueeze(0).to(device)
-            print("Immagine preprocessata")
-        except Exception as e:
-            print(f"Errore nel preprocess dell'immagine: {e}")
-            return 0
-        
+        image_input = preprocess(image).unsqueeze(0).to(device)
         # Tokenize the text
-        try:
-            print("Tokenizzo testo")
-            text_input = clip.tokenize([text]).to(device)
-            print("Testo tokenizzato")
-        except Exception as e:
-            print(f"Errore nella tokenizzazione del testo: {e}")
-            return 0
+        text_input = clip.tokenize([text]).to(device)
         
         # Compute features
-        try:
-            print("Encoding image features")
-            image_features = clip_model.encode_image(image_input)
-            print("Image features encoded")
-        except Exception as e:
-            print(f"Errore nella codifica delle immagini: {e}")
-            return 0
-        
-        try:
-            print("Encoding text features")
-            text_features = clip_model.encode_text(text_input)
-            print("Text features encoded")
-        except Exception as e:
-            print(f"Errore nella codifica del testo: {e}")
-            return 0
+        image_features = clip_model.encode_image(image_input)
+        text_features = clip_model.encode_text(text_input)
         
         # Normalize the features
-        try:
-            print("Normalizzo le features delle immagini")
-            image_features = image_features / image_features.norm(dim=-1, keepdim=True)
-            print("Normalizzo le features del testo")
-            text_features = text_features / text_features.norm(dim=-1, keepdim=True)
-        except Exception as e:
-            print(f"Errore nella normalizzazione delle features: {e}")
-            return 0
+        image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+        text_features = text_features / text_features.norm(dim=-1, keepdim=True)
         
         # Compute similarity
-        try:
-            print("Calcolo la similarità")
-            similarity = (image_features @ text_features.T).item()
-            print("Calcolo similarità completato")
-        except Exception as e:
-            print(f"Errore nel calcolo della similarità: {e}")
-            return 0
+        similarity = (image_features @ text_features.T).item()
 
     return similarity
 
