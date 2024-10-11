@@ -78,9 +78,6 @@ class MappingNetwork(nn.Module):
         # image_embeds: [batch_size, seq_len_in, input_dim]
         # text_embeds: [batch_size, seq_len_out, output_dim]
 
-        image_embeds = image_embeds.to(torch.float16)
-        text_embeds = text_embeds.to(torch.float16)
-
         # Project image embeddings
         image_embeds = self.image_proj(image_embeds) + self.image_pos_embedding  # [batch_size, seq_len_in, output_dim]
 
