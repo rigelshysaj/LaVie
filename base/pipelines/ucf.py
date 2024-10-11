@@ -10,7 +10,6 @@ from scipy.linalg import sqrtm
 from torch import nn
 from tqdm import tqdm
 import torchvision.models.video as models_video
-from pytorch_fvd.fvd import FVD
 
 
 class UCF101Dataset(Dataset):
