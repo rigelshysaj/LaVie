@@ -690,7 +690,7 @@ def lora_model(data, video_folder, args, method=1):
         accelerator.end_training()
 
     elif(method==2):
-        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper, args.text_prompt)
+        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, args.text_prompt)
 
     else:
         clip_model32, preprocess32 = clip.load("ViT-B/32", device=device)
