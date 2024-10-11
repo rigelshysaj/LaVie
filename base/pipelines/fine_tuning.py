@@ -801,7 +801,7 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
             gen_frames = [frame for frame in generated_video_frames]
             
             # Compute similarities in smaller batches
-            batch_size = 4  # Adjust this based on your GPU memory
+            batch_size = 1  # Adjust this based on your GPU memory
             gt_similarities = []
             gen_similarities = []
             
