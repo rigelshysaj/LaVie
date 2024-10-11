@@ -4,8 +4,11 @@ import torch
 import msrvtt
 import clip
 import os
+import ucf
 from tqdm import tqdm
 import gc
+from torchvision.transforms import Compose, Resize, ConvertImageDtype, Normalize
+import torchvision.models.video as models_video
 import plotly.graph_objs as go
 from torch.utils.data import Subset
 import random
@@ -693,7 +696,7 @@ def lora_model(data, video_folder, args, method=1):
     elif(method==2):
         inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, args.text_prompt)
 
-    else:
+    elif(method==3):
         clip_model32, preprocess32 = clip.load("ViT-B/32", device=device)
 
         transform = transforms.Compose([
@@ -730,6 +733,87 @@ def lora_model(data, video_folder, args, method=1):
         
         #print(f"Average Ground Truth CLIP Similarity (CLIPSIM): {average_gt_similarity:.4f}")
         print(f"Average Generated Video CLIP Similarity (CLIPSIM): {average_gen_similarity:.4f}")
+    
+    else:
+        # Definisci le trasformazioni per i video reali
+        transform = transforms.Compose([
+            transforms.Resize((224, 224)),  # Ridimensiona i frame a 224x224
+            ConvertImageDtype(torch.float),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],  std=[0.229, 0.224, 0.225])
+        ])
+
+        # Crea il dataset
+        train_dataset = ucf.UCF101Dataset(
+            csv_file='train.csv',
+            root_dir='/content/drive/My Drive/UCF101',  # Sostituisci con il tuo percorso reale
+            transform=transform,
+            num_frames=16
+        )
+
+        # Crea il DataLoader per i video reali
+        dataloader = DataLoader(train_dataset, batch_size=8, shuffle=False, num_workers=4)
+
+        # Carica il modello I3D pre-addestrato
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Utilizziamo R3D-18 come sostituto per I3D in torchvision
+        i3d_model = models_video.r3d_18(pretrained=True)
+        # Rimuovi l'ultimo strato per ottenere le feature
+        i3d_model = nn.Sequential(*list(i3d_model.children())[:-1])  # Rimuovi l'ultimo strato
+        i3d_model = i3d_model.to(device)
+        i3d_model.eval()
+
+        # Ottieni i nomi delle classi
+        class_names = train_dataset.classes
+        num_classes = len(class_names)
+
+        # Inizializza le liste per le feature
+        features_gen = []
+        features_real = []
+
+        # Inizializza l'oggetto FVD (se usi pytorch-fvd)
+        #fvd_metric = FVD(feature_layer='pre_pool', max_features=10000)
+
+        # Genera video sintetici e estrae le feature
+        print("Generazione e estrazione delle feature dai video sintetici...")
+        for class_name in tqdm(class_names, desc="Generando video"):
+            for _ in range(100):
+                # Genera un video utilizzando fine_tuned_lavie
+                video_tensor = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, class_name) # [16, 320, 512, 3], uint8
+
+                # Preprocessa il video generato
+                video = ucf.preprocess_generated_video(video_tensor)  # [3, 16, 224, 224]
+
+                # Aggiungi una dimensione batch
+                video = video.unsqueeze(0)  # [1, 3, 16, 224, 224]
+
+                # Estrai le feature utilizzando I3D
+                feat = ucf.extract_i3d_features(video, i3d_model, device)  # [1, feature_dim, 1, 1, 1]
+                feat = feat.view(feat.size(0), -1)  # Appiattisci a [1, feature_dim]
+                features_gen.append(feat.squeeze(0).numpy())
+
+        # Estrai le feature dai video reali
+        print("Estrazione delle feature dai video reali...")
+        for batch in tqdm(dataloader, desc="Processando video reali"):
+            frames = batch['frames']  # [B, C, T, H, W]
+            labels = batch['label']  # [B]
+
+            # Estrai le feature utilizzando I3D
+            feat = ucf.extract_i3d_features(frames, i3d_model, device)  # [B, feature_dim, 1, 1, 1]
+            feat = feat.view(feat.size(0), -1)  # [B, feature_dim]
+            features_real.extend(feat.cpu().numpy())
+
+        # Converti le liste in array numpy
+        features_gen = np.array(features_gen)
+        features_real = np.array(features_real)
+
+        # Calcola l'FVD
+        print("Calcolando l'FVD...")
+        fvd_score = ucf.compute_fvd(features_gen, features_real)
+        print(f"FVD score: {fvd_score}")
+
+        # Se utilizzi pytorch-fvd, puoi fare qualcosa di simile:
+        #fvd_score = fvd_metric(features_gen, features_real)
+        #print(f"FVD score: {fvd_score}")
 
 
 
@@ -842,4 +926,4 @@ if __name__ == "__main__":
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, OmegaConf.load(args.config), method=3)
+    lora_model(data, video_folder, OmegaConf.load(args.config), method=4)

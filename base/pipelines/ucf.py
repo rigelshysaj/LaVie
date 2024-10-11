@@ -6,6 +6,11 @@ from torchvision.io import read_video
 import numpy as np
 from torchvision import transforms
 from torchvision.transforms import Compose, Resize, ConvertImageDtype, Normalize
+from scipy.linalg import sqrtm
+from torch import nn
+from tqdm import tqdm
+import torchvision.models.video as models_video
+from pytorch_fvd.fvd import FVD
 
 
 class UCF101Dataset(Dataset):
@@ -79,6 +84,81 @@ class UCF101Dataset(Dataset):
 
         frames = frames.permute(3, 0, 1, 2)  # [C, T, H, W]
         return frames
+    
+
+# Funzione di preprocessamento per i video generati
+def preprocess_generated_video(video_tensor):
+    """
+    Preprocessa un video generato per adattarsi ai requisiti dell'I3D.
+    :param video_tensor: Tensor di forma [16, 320, 512, 3], dtype torch.uint8
+    :return: Tensor di forma [3, 16, 224, 224]
+    """
+    # Converti a [C, T, H, W] e normalizza
+    video = video_tensor.permute(3, 0, 1, 2).float() / 255.0  # [3, 16, 320, 512]
+
+    # Definisci le trasformazioni: center crop a 270x270 e resize a 224x224
+    transform = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.CenterCrop(270),
+        transforms.Resize(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],  std=[0.229, 0.224, 0.225])
+    ])
+
+    frames = []
+    for t in range(video.shape[1]):
+        frame = video[:, t, :, :]  # [3, H, W]
+        frame = transform(frame)
+        frames.append(frame)
+
+    # Stack dei frame: [T, C, H, W]
+    video = torch.stack(frames)  # [16, 3, 224, 224]
+
+    # Permuta a [C, T, H, W]
+    video = video.permute(1, 0, 2, 3)  # [3, 16, 224, 224]
+
+    return video
+
+# Funzione per estrarre le feature usando I3D
+def extract_i3d_features(videos, i3d_model, device):
+    """
+    Estrae le feature dei video utilizzando il modello I3D.
+    :param videos: Tensor di forma [N, C, T, H, W]
+    :param i3d_model: Modello I3D pre-addestrato
+    :param device: Dispositivo (CPU o GPU)
+    :return: Tensor delle feature di forma [N, feature_dim]
+    """
+    videos = videos.to(device)
+    with torch.no_grad():
+        features = i3d_model(videos)  # Supponendo che il modello restituisca [N, feature_dim]
+    return features.cpu()
+
+# Funzione per calcolare l'FVD
+def compute_fvd(features_gen, features_real):
+    """
+    Calcola la Fréchet Video Distance (FVD) tra le feature generate e reali.
+    :param features_gen: Numpy array delle feature generate [N_gen, feature_dim]
+    :param features_real: Numpy array delle feature reali [N_real, feature_dim]
+    :return: Valore FVD
+    """
+    # Calcola la media e la covarianza delle feature generate
+    mu_gen = np.mean(features_gen, axis=0)
+    sigma_gen = np.cov(features_gen, rowvar=False)
+
+    # Calcola la media e la covarianza delle feature reali
+    mu_real = np.mean(features_real, axis=0)
+    sigma_real = np.cov(features_real, rowvar=False)
+
+    # Calcola la radice quadrata del prodotto delle matrici di covarianza
+    covmean, _ = sqrtm(sigma_gen.dot(sigma_real), disp=False)
+
+    # Gestione dei numeri complessi
+    if np.iscomplexobj(covmean):
+        covmean = covmean.real
+
+    # Calcola l'FVD
+    fvd = np.sum((mu_gen - mu_real) ** 2) + np.trace(sigma_gen + sigma_real - 2 * covmean)
+    return fvd
 
 
 if __name__ == "__main__":
@@ -100,21 +180,3 @@ if __name__ == "__main__":
 
     # Create the DataLoader
     train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True, num_workers=2)
-
-    for batch_idx, batch in enumerate(train_loader):
-        print(f"\nBatch {batch_idx}:")
-        # Estrai i componenti del batch
-        frames = batch['frames']          # Tensor di forma [batch_size, C, T, H, W]
-        labels = batch['label']           # Tensor di forma [batch_size]
-        print(f"Frames shape: {frames.shape}")
-        print(f"Labels: {labels}")
-
-        # Determina la dimensione del batch
-        batch_size = labels.size(0)       # Alternativamente: len(labels)
-
-        # Itera su ogni elemento nel batch
-        for idx in range(batch_size):
-            print(f"\n  Elemento {idx + 1} in Batch {batch_idx}:")
-            print(f"    Label: {labels[idx].item()}")
-            print(f"    Frames shape: {frames[idx].shape}")  # [C, T, H, W]
-        break
