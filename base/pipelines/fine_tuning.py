@@ -732,7 +732,7 @@ def lora_model(data, video_folder, args, method=1):
 
 
 
-def evaluate_msrvtt_clip_similarity_(clip_model32, preprocess32, dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper):
+def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper):
 
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=msrvtt.collate_fn)
     
@@ -779,7 +779,7 @@ def evaluate_msrvtt_clip_similarity_(clip_model32, preprocess32, dataset, device
     
     return average_gt_similarity, average_gen_similarity
 
-def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper):
+def evaluate_msrvtt_clip_similarity_(clip_model32, preprocess32, dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=msrvtt.collate_fn)
     
     total_gt_similarity = 0
