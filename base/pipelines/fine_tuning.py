@@ -757,7 +757,11 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
 
         # Ensure frames are in the correct format (e.g., list of PIL Images)
         gt_frames = [transforms.ToPILImage()(frame.cpu()) for frame in gt_video]
-        gen_frames = [transforms.ToPILImage()(frame.cpu()) for frame in generated_video_frames]
+        gen_frames = process_video_frames(generated_video_frames)
+        
+        # Salva un frame per debug (opzionale)
+        if len(gen_frames) > 0:
+            gen_frames[0].save("/content/drive/My Drive/Images/generated_frame_0.png")
 
         
         # Compute CLIP Similarity for Ground Truth Video
@@ -804,6 +808,16 @@ def get_clip_similarity(clip_model, preprocess, text, image, device):
         similarity = (image_features @ text_features.T).item()
 
     return similarity
+
+def process_video_frames(generated_video_frames):
+    # generated_video_frames ha forma [16, 320, 512, 3]
+    gen_frames = []
+    for frame in generated_video_frames:
+        # frame ha forma [320, 512, 3]
+        # Convertiamo direttamente in immagine PIL
+        pil_image = Image.fromarray(frame.cpu().numpy())
+        gen_frames.append(pil_image)
+    return gen_frames
 
 
 
