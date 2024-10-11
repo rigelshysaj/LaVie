@@ -720,4 +720,4 @@ def model():
 
 if __name__ == "__main__":
     data, video_folder, args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet = model()
-    lora_model(data, video_folder, args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, "a lion is playing with a ball", first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet, training=True)
+    lora_model(args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, "a lion is playing with a ball", first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet, training=True)
