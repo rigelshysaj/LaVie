@@ -57,6 +57,115 @@ logger = logging.get_logger(__name__)
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
 
+class VideoGenerator:
+    def __init__(self, args):
+        self.args = args  # Salva args per uso futuro
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        
+        logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
+
+        accelerator_project_config = ProjectConfiguration(project_dir="/content/drive/My Drive/", logging_dir=logging_dir)
+
+        accelerator = Accelerator(
+            gradient_accumulation_steps=args.gradient_accumulation_steps,
+            mixed_precision=args.mixed_precision,
+            log_with=args.report_to,
+            project_config=accelerator_project_config,
+        )
+
+        # Percorso del modello pre-addestrato
+        sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
+
+        # Carica il modello UNet fine-tuned
+        self.unet = get_models(args, sd_path).to(self.device, dtype=torch.float16)
+        state_dict = find_model(args.ckpt_path)
+        self.unet.load_state_dict(state_dict)
+
+        # Carica il modello UNet originale
+        self.original_unet = get_models(args, sd_path).to(self.device, dtype=torch.float32)
+        self.original_unet.load_state_dict(state_dict)
+
+        # Istanzia il mapping network
+        self.mapper = MappingNetwork().to(self.unet.device)
+        self.mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
+
+        # Carica gli altri modelli e tokenizer
+        self.tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
+        self.text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(self.device)
+        self.vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(self.device)
+        self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(self.device)
+        self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
+        self.noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
+
+
+        self.unet, self.mapper,  = self.accelerator.prepare(
+            self.unet, self.mapper
+        )
+
+
+        if args.resume_from_checkpoint != "latest":
+            path = os.path.basename(args.resume_from_checkpoint)
+        else:
+            # Get the most recent checkpoint
+            dirs = os.listdir(args.output_dir)
+            dirs = [d for d in dirs if d.startswith("checkpoint")]
+            dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
+            path = dirs[-1] if len(dirs) > 0 else None
+
+        if path is None:
+            accelerator.print(
+                f"Checkpoint '{args.resume_from_checkpoint}' does not exist. Starting a new training run."
+            )
+            args.resume_from_checkpoint = None
+        else:
+            accelerator.print(f"Resuming from checkpoint {path}")
+            accelerator.load_state(os.path.join(args.output_dir, path))
+            # Load the mapper state dict
+            #self.mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
+
+        # Prepara la pipeline
+        self.pipeline = VideoGenPipeline(
+            vae=self.vae,
+            text_encoder=self.text_encoder,
+            tokenizer=self.tokenizer,
+            scheduler=self.noise_scheduler,
+            unet=self.unet,
+            clip_processor=self.clip_processor,
+            clip_model=self.clip_model,
+            mapper=self.mapper
+        ).to(self.device)
+
+        self.pipeline.enable_xformers_memory_efficient_attention()
+
+    def generate_video(self, caption, is_original=False):
+        if is_original:
+            # Usa il modello UNet originale
+            self.pipeline.unet = self.original_unet
+        else:
+            # Usa il modello UNet fine-tuned
+            self.pipeline.unet = self.unet
+
+        # Se necessario, carica e trasforma l'immagine
+        if not is_original:
+            image_tensor = load_and_transform_image(self.args.image_path)
+        else:
+            image_tensor = None
+
+        print(f'Processing the ({caption}) prompt for {"original" if is_original else "fine-tuned"} model')
+        videos = self.pipeline(
+            caption,
+            image_tensor=image_tensor,
+            video_length=self.args.video_length,
+            height=self.args.image_size[0],
+            width=self.args.image_size[1],
+            num_inference_steps=self.args.num_sampling_steps,
+            guidance_scale=self.args.guidance_scale
+        ).video
+
+        suffix = "original" if is_original else "fine_tuned"
+        imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
+        return videos[0]
+
 
 
 def load_and_transform_image(path):
@@ -707,8 +816,10 @@ def lora_model(data, video_folder, args, caption, training=True):
         # Opzionale: visualizza il grafico interattivo in Colab
         fig.show()
     else:
-        return inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption)
-
+        video_generator = VideoGenerator(args)
+        # Genera il video utilizzando il caption
+        video = video_generator.generate_video(caption)
+        return video
     
 
 def model(caption):
@@ -734,6 +845,28 @@ def model(caption):
     return lora_model(data, video_folder, OmegaConf.load(args.config), caption, training=False)
 
 
+def model_inference(caption, video_generator, args=None):
+
+    if(args is None):
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--config", type=str, default="")
+        args = parser.parse_args()
+        args = OmegaConf.load(args.config)
+    
+    # Crea un'istanza di VideoGenerator
+    video_generator = VideoGenerator(args)
+    # Genera il video
+    video = video_generator.generate_video(caption)
+    return video
+
+
+
 
 if __name__ == "__main__":
-    model("a lion is playing with a ball")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="")
+    args = parser.parse_args()
+
+    video_generator = VideoGenerator(args)
+
+    model_inference(args.text_prompt, video_generator, OmegaConf.load(args.config))
