@@ -784,7 +784,7 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
             
             # Ensure frames are in the correct format (e.g., list of PIL Images)
             gt_frames = [transforms.ToPILImage()(frame.cpu()) for frame in gt_video]
-            gen_frames = [frame for frame in generated_video_frames]
+            gen_frames = [transforms.ToPILImage()(frame.cpu()) for frame in generated_video_frames]
     
             print("Calcolo similarità CLIP per Ground Truth")
             # Compute CLIP Similarity for Ground Truth Video
