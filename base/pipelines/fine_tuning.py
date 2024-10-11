@@ -751,6 +751,10 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
         with torch.no_grad():
             generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption)
         
+
+        print(f"Shape of generated_video_frames: {generated_video_frames.shape}")
+        print(f"Dtype of generated_video_frames: {generated_video_frames.dtype}")
+
         # Ensure frames are in the correct format (e.g., list of PIL Images)
         gt_frames = [transforms.ToPILImage()(frame.cpu()) for frame in gt_video]
         gen_frames = [transforms.ToPILImage()(frame.cpu()) for frame in generated_video_frames]
@@ -800,7 +804,6 @@ def get_clip_similarity(clip_model, preprocess, text, image, device):
         similarity = (image_features @ text_features.T).item()
 
     return similarity
-
 
 
 
