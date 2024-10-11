@@ -120,7 +120,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
         # Genera video con il modello fine-tuned
         video = generate_video(unet, is_original=False)
 
-        #generate_video(original_unet, is_original=True)
+        generate_video(original_unet, is_original=True)
 
         #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
         torch.cuda.empty_cache()
@@ -720,4 +720,4 @@ def model():
 
 if __name__ == "__main__":
     data, video_folder, args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet, global_step = model()
-    lora_model(args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, "a lion is playing with a ball", first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet, global_step, training=True)
+    lora_model(args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, "a lion is playing with a ball", first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet, global_step, training=False)
