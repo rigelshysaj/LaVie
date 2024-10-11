@@ -249,7 +249,7 @@ def lora_model(data, video_folder, args, method=1):
 
     # Instantiate the mapping network
     mapper = MappingNetwork().to(unet.device)
-    #mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
+    mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
@@ -765,6 +765,7 @@ def lora_model(data, video_folder, args, method=1):
         # Ottieni i nomi delle classi
         class_names = train_dataset.classes
         num_classes = len(class_names)
+        print(f"number of classes is: {num_classes}")
 
         # Inizializza le liste per le feature
         features_gen = []
