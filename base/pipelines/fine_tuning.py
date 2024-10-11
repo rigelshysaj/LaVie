@@ -704,7 +704,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
 
     mapper.dtype = next(mapper.parameters()).dtype
 
-    mapper = mapper.to(torch.float16)
+    mapper = mapper.to(torch.float32)
 
     with torch.no_grad():
         # Funzione per generare video
