@@ -845,16 +845,7 @@ def model(caption):
     return lora_model(data, video_folder, OmegaConf.load(args.config), caption, training=False)
 
 
-def model_inference(caption, video_generator, args=None):
-
-    if(args is None):
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--config", type=str, default="")
-        args = parser.parse_args()
-        args = OmegaConf.load(args.config)
-    
-    # Crea un'istanza di VideoGenerator
-    video_generator = VideoGenerator(args)
+def model_inference(caption, video_generator):
     # Genera il video
     video = video_generator.generate_video(caption)
     return video
@@ -867,6 +858,6 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
-    video_generator = VideoGenerator(args)
+    video_generator = VideoGenerator(OmegaConf.load(args.config))
 
-    model_inference(args.text_prompt, video_generator, OmegaConf.load(args.config))
+    model_inference(args.text_prompt, video_generator)
