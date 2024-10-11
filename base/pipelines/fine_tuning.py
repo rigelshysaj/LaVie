@@ -797,12 +797,14 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
             
             print("Calcolo similarità CLIP per Video Generato")
             # Compute CLIP Similarity for Generated Video
+            '''
             gen_frame_similarities = []
             for frame in gen_frames:
                 similarity = get_clip_similarity(clip_model32, preprocess32, caption, frame, device)
                 gen_frame_similarities.append(similarity)
             avg_gen_similarity = sum(gen_frame_similarities) / len(gen_frame_similarities)
             total_gen_similarity += avg_gen_similarity
+            '''
             
             num_videos += 1
             
@@ -823,9 +825,9 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
     
     # Compute Average CLIPSIM Scores
     average_gt_similarity = total_gt_similarity / num_videos
-    average_gen_similarity = total_gen_similarity / num_videos
+    #average_gen_similarity = total_gen_similarity / num_videos
     
-    return average_gt_similarity, average_gen_similarity
+    return average_gt_similarity
 
 
 
