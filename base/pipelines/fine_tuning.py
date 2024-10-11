@@ -714,21 +714,21 @@ def lora_model(data, video_folder, args, method=1):
         random.seed(42)
         
         # Verifica che il dataset abbia almeno 10 campioni
-        if len(datasetM) < 10:
+        if len(datasetM) < 100:
             raise ValueError("Il dataset contiene meno di 10 campioni.")
         
         # Seleziona casualmente 10 indici
-        subset_indices = random.sample(range(len(datasetM)), 10)
+        subset_indices = random.sample(range(len(datasetM)), 100)
         
         # Crea il sottoinsieme del dataset
         subset_dataset = Subset(datasetM, subset_indices)
         
         # Esegui la valutazione sul sottoinsieme
-        average_gt_similarity, average_gen_similarity = evaluate_msrvtt_clip_similarity(
+        average_gen_similarity = evaluate_msrvtt_clip_similarity(
             clip_model32, preprocess32, subset_dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper
         )
         
-        print(f"Average Ground Truth CLIP Similarity (CLIPSIM): {average_gt_similarity:.4f}")
+        #print(f"Average Ground Truth CLIP Similarity (CLIPSIM): {average_gt_similarity:.4f}")
         print(f"Average Generated Video CLIP Similarity (CLIPSIM): {average_gen_similarity:.4f}")
 
 
@@ -752,18 +752,19 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
             generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption)
         
 
-        print(f"Shape of generated_video_frames: {generated_video_frames.shape}")
-        print(f"Dtype of generated_video_frames: {generated_video_frames.dtype}")
+        #print(f"Shape of generated_video_frames: {generated_video_frames.shape}")
+        #print(f"Dtype of generated_video_frames: {generated_video_frames.dtype}")
 
         # Ensure frames are in the correct format (e.g., list of PIL Images)
-        gt_frames = [transforms.ToPILImage()(frame.cpu()) for frame in gt_video]
+        #gt_frames = [transforms.ToPILImage()(frame.cpu()) for frame in gt_video]
         gen_frames = process_video_frames(generated_video_frames)
         
         # Salva un frame per debug (opzionale)
-        if len(gen_frames) > 0:
-            gen_frames[0].save("/content/drive/My Drive/Images/generated_frame_0.png")
+        #if len(gen_frames) > 0:
+        #    gen_frames[0].save("/content/drive/My Drive/Images/generated_frame_0.png")
 
         
+        '''
         # Compute CLIP Similarity for Ground Truth Video
         gt_frame_similarities = []
         for frame in gt_frames:
@@ -771,6 +772,7 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
             gt_frame_similarities.append(similarity)
         avg_gt_similarity = sum(gt_frame_similarities) / len(gt_frame_similarities)
         total_gt_similarity += avg_gt_similarity
+        '''
         
         # Compute CLIP Similarity for Generated Video
         gen_frame_similarities = []
@@ -783,10 +785,10 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
         num_videos += 1
     
     # Compute Average CLIPSIM Scores
-    average_gt_similarity = total_gt_similarity / num_videos
+    #average_gt_similarity = total_gt_similarity / num_videos
     average_gen_similarity = total_gen_similarity / num_videos
     
-    return average_gt_similarity, average_gen_similarity
+    return average_gen_similarity
 
 
 def get_clip_similarity(clip_model, preprocess, text, image, device):

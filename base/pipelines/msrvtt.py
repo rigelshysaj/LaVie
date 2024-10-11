@@ -104,10 +104,10 @@ def collate_fn(batch):
     video_ids = [sample['video_id'] for sample in batch]
 
     # Tronca tutti i video alla lunghezza minima
-    truncated_videos = [video[:5] for video in videos]
+    #truncated_videos = [video[:5] for video in videos]
 
     # Stack dei video
-    videos_tensor = torch.stack(truncated_videos)
+    videos_tensor = torch.stack(videos)
 
     return {'video': videos_tensor, 'caption': captions, 'video_id': video_ids}
 
