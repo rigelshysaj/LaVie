@@ -240,8 +240,9 @@ def lora_model(data, video_folder, args, method=1):
     unet.load_state_dict(state_dict)
 
     # Carica il modello UNet originale
-    original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
-    original_unet.load_state_dict(state_dict)
+    #original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
+    #original_unet.load_state_dict(state_dict)
+    original_unet = None
 
     # Instantiate the mapping network
     mapper = MappingNetwork().to(unet.device)
@@ -725,8 +726,8 @@ def lora_model(data, video_folder, args, method=1):
         try:
             # Il tuo codice principale qui
             average_gt_similarity, average_gen_similarity = evaluate_msrvtt_clip_similarity(
-            clip_model32, preprocess32, subset_dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper
-        )
+                clip_model32, preprocess32, subset_dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper
+            )
         except Exception as e:
             print(f"Si è verificato un errore: {e}")
         # Esegui la valutazione sul sottoinsieme
