@@ -197,76 +197,73 @@ def log_lora_weights(model, step):
                print(f"Step {step}: LoRA weight '{name}' mean = {param.data.mean().item():.6f}")
 
 
+def lora_model(data, video_folder, args, caption, training=True):
 
-def load_models(args):
+    logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
+
+    accelerator_project_config = ProjectConfiguration(project_dir="/content/drive/My Drive/", logging_dir=logging_dir)
+
+    accelerator = Accelerator(
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        mixed_precision=args.mixed_precision,
+        log_with=args.report_to,
+        project_config=accelerator_project_config,
+    )
+
+    # Disable AMP for MPS.
+    if torch.backends.mps.is_available():
+        accelerator.native_amp = False
+
+    
+    logger.info(accelerator.state, main_process_only=False)
+    if accelerator.is_local_main_process:
+        transformers.utils.logging.set_verbosity_warning()
+        diffusers.utils.logging.set_verbosity_info()
+    else:
+        transformers.utils.logging.set_verbosity_error()
+        diffusers.utils.logging.set_verbosity_error()
+
+    # If passed along, set the training seed now.
+    if args.seed is not None:
+        set_seed(args.seed)
+
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    # Load models
-    sd_path = os.path.join(args.pretrained_path, "stable-diffusion-v1-4")
+    # Carica il modello UNet e applica LoRA
+    sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
     unet = get_models(args, sd_path).to(device, dtype=torch.float16)
     state_dict = find_model(args.ckpt_path)
     unet.load_state_dict(state_dict)
 
-    # Load the original UNet
+    # Carica il modello UNet originale
     original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
     original_unet.load_state_dict(state_dict)
 
     # Instantiate the mapping network
-    mapper = MappingNetwork().to(device)
+    mapper = MappingNetwork().to(unet.device)
+    #mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
 
-    # Load tokenizer and text encoder
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
-
-    # Load VAE
     vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(device)
-
     # Load CLIP model and processor for image conditioning
     clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
     clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
-
-    # Load noise scheduler
     noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
 
-    return {
-        "unet": unet,
-        "original_unet": original_unet,
-        "mapper": mapper,
-        "tokenizer": tokenizer,
-        "text_encoder": text_encoder,
-        "vae": vae,
-        "clip_model": clip_model,
-        "clip_processor": clip_processor,
-        "noise_scheduler": noise_scheduler,
-    }
+    unet.requires_grad_(False)
+    vae.requires_grad_(False)
+    text_encoder.requires_grad_(False)
 
-
-def prepare_for_training(args, models, accelerator):
-    device = accelerator.device
-
-    # Unpack models
-    unet = models["unet"]
-    mapper = models["mapper"]
-    text_encoder = models["text_encoder"]
-    vae = models["vae"]
-
-    # Set models to appropriate devices and data types
     weight_dtype = torch.float32
     if accelerator.mixed_precision == "fp16":
         weight_dtype = torch.float16
     elif accelerator.mixed_precision == "bf16":
         weight_dtype = torch.bfloat16
 
-    unet.to(device, dtype=weight_dtype)
-    vae.to(device, dtype=weight_dtype)
-    text_encoder.to(device, dtype=weight_dtype)
+    for param in unet.parameters():
+        param.requires_grad_(False)
 
-    # Freeze parameters
-    unet.requires_grad_(False)
-    vae.requires_grad_(False)
-    text_encoder.requires_grad_(False)
-
-    # Set LoRA configuration
     lora_config = LoraConfig(
         r=args.rank,
         lora_alpha=args.rank,
@@ -274,55 +271,40 @@ def prepare_for_training(args, models, accelerator):
         target_modules=["to_k", "to_q", "to_v", "to_out.0"],
     )
 
+    unet.to(accelerator.device, dtype=weight_dtype)
+    vae.to(accelerator.device, dtype=weight_dtype)
+    text_encoder.to(accelerator.device, dtype=weight_dtype)
+
+    
     unet = get_peft_model(unet, lora_config)
 
+
     if args.mixed_precision == "fp16":
-        # Upcast trainable parameters (LoRA) into fp32
+        # only upcast trainable parameters (LoRA) into fp32
         cast_training_params([unet, mapper], dtype=torch.float32)
 
-    models["unet"] = unet
-
-    return models
-
-
-def train_lora_model(args, data, video_folder, models, accelerator):
-    # Unpack models
-    unet = models["unet"]
-    mapper = models["mapper"]
-    tokenizer = models["tokenizer"]
-    text_encoder = models["text_encoder"]
-    vae = models["vae"]
-    clip_model = models["clip_model"]
-    clip_processor = models["clip_processor"]
-    noise_scheduler = models["noise_scheduler"]
-
-    device = accelerator.device
-
-    # Prepare models for training
-    models = prepare_for_training(args, models, accelerator)
-
-    # Load dataset and dataloader
+    #dataset = VideoDatasetMsrvtt(data, video_folder)
     dataset = VideoDatasetMsvd(annotations_file=data, video_dir=video_folder)
-    train_dataloader = DataLoader(
-        dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=custom_collate
-    )
-    print(f"Total number of elements in the dataloader: {len(train_dataloader)}")
+    train_dataloader = DataLoader(dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=custom_collate)
+    print(f"Numero totale di elementi nel dataloader: {len(train_dataloader)}")
 
-    # Set trainable parameters
     for param in mapper.parameters():
         param.requires_grad = True
 
     lora_layers = filter(lambda p: p.requires_grad, unet.parameters())
+
     trainable_params = list(lora_layers) + list(mapper.parameters())
+
+    #trainable_params = list(lora_layers)
 
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
 
-    # Enable TF32 for faster training on Ampere GPUs
+    # Enable TF32 for faster training on Ampere GPUs,
+    # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
     if args.allow_tf32:
         torch.backends.cuda.matmul.allow_tf32 = True
 
-    # Scale learning rate
     if args.scale_lr:
         args.learning_rate = (
             args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
@@ -336,6 +318,7 @@ def train_lora_model(args, data, video_folder, models, accelerator):
             raise ImportError(
                 "Please install bitsandbytes to use 8-bit Adam. You can do so by running `pip install bitsandbytes`"
             )
+
         optimizer_cls = bnb.optim.AdamW8bit
     else:
         optimizer_cls = torch.optim.AdamW
@@ -348,9 +331,7 @@ def train_lora_model(args, data, video_folder, models, accelerator):
         eps=args.adam_epsilon,
     )
 
-    # Prepare learning rate scheduler
     num_warmup_steps_for_scheduler = args.lr_warmup_steps * accelerator.num_processes
-
     if args.max_train_steps is None:
         len_train_dataloader_after_sharding = math.ceil(len(train_dataloader) / accelerator.num_processes)
         num_update_steps_per_epoch = math.ceil(len_train_dataloader_after_sharding / args.gradient_accumulation_steps)
@@ -367,31 +348,18 @@ def train_lora_model(args, data, video_folder, models, accelerator):
         num_training_steps=num_training_steps_for_scheduler,
     )
 
+
     optimizer_mapper = optim.AdamW(mapper.parameters(), lr=1e-4)
     scheduler_mapper = optim.lr_scheduler.StepLR(optimizer_mapper, step_size=10, gamma=0.1)
 
     criterion = nn.CosineEmbeddingLoss()
 
-    # Prepare everything with the accelerator
-    (
-        unet,
-        mapper,
-        optimizer,
-        train_dataloader,
-        lr_scheduler,
-        optimizer_mapper,
-        scheduler_mapper,
-    ) = accelerator.prepare(
-        unet,
-        mapper,
-        optimizer,
-        train_dataloader,
-        lr_scheduler,
-        optimizer_mapper,
-        scheduler_mapper,
+    # Prepare everything with our `accelerator`.
+    unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper = accelerator.prepare(
+        unet, mapper, optimizer, train_dataloader, lr_scheduler, optimizer_mapper, scheduler_mapper
     )
 
-    # Recalculate total training steps
+    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
     if args.max_train_steps is None:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
@@ -401,13 +369,15 @@ def train_lora_model(args, data, video_folder, models, accelerator):
                 f"the expected length ({len_train_dataloader_after_sharding}) when the learning rate scheduler was created. "
                 f"This inconsistency may result in the learning rate scheduler not functioning properly."
             )
-    # Recalculate number of training epochs
+    # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
-    # Initialize trackers
+    # We need to initialize the trackers we use, and also store our configuration.
+    # The trackers initializes automatically on the main process.
     if accelerator.is_main_process:
         accelerator.init_trackers("text2image-fine-tune", config=vars(args))
 
+    
     global_step = 0
     first_epoch = 0
 
@@ -444,369 +414,325 @@ def train_lora_model(args, data, video_folder, models, accelerator):
         range(0, args.max_train_steps),
         initial=initial_global_step,
         desc="Steps",
+        # Only show the progress bar once on each machine.
         disable=not accelerator.is_local_main_process,
     )
 
     unet.enable_xformers_memory_efficient_attention()
 
-    # Training loop
+    epoch_losses = []
+
     print(f"first_epoch: {first_epoch}")
     print(f"num_train_epochs: {args.num_train_epochs}")
 
-    accum_total_loss = 0.0
-    accum_diffusion_loss = 0.0
-    accum_alignment_loss = 0.0
-    accum_cosine_similarity = 0.0
-    accum_steps = 0
-    train_loss = 0.0
+    if(training):
 
-    for epoch in range(first_epoch, args.num_train_epochs):
-        unet.train()
-        mapper.train()
+        accum_total_loss = 0.0
+        accum_diffusion_loss = 0.0
+        accum_alignment_loss = 0.0
+        accum_cosine_similarity = 0.0
+        accum_steps = 0
+        train_loss = 0.0
 
-        for step, batch in enumerate(train_dataloader):
-            with accelerator.accumulate(unet):
-                try:
-                    video, description, frame_tensor = batch
-                    description[0]
-                except Exception as e:
-                    print(f"Skipping iteration due to error: {e}")
-                    print(description)
-                    continue
+        for epoch in range(first_epoch, args.num_train_epochs):
+            unet.train()
+            mapper.train()
 
-                print(f"Epoch {epoch}, iteration {step}, global_step {global_step}")
+            for step, batch in enumerate(train_dataloader):
+                with accelerator.accumulate(unet):
 
-                # Encode latents
-                latents = encode_latents(video, vae)
-                latents = latents * vae.config.scaling_factor
+                    try:
+                        video, description, frame_tensor = batch
+                        description[0]
+                    except Exception as e:
+                        print(f"Skipping iteration due to error: {e}")
+                        print(description)
+                        continue
+                    
 
-                # Sample noise
-                noise = torch.randn_like(latents)
-                if args.noise_offset:
-                    noise += args.noise_offset * torch.randn(
-                        (latents.shape[0], latents.shape[1], latents.shape[2], 1, 1), device=latents.device
-                    )
+                    print(f"epoca {epoch}, iterazione {step}, global_step {global_step}")
 
-                bsz = latents.shape[0]
-                timesteps = torch.randint(
-                    0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device
-                ).long()
+                    latents = encode_latents(video, vae)
+                    #print(f"train_lora_model latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
 
-                # Add noise to the latents
-                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
-                # Prepare text inputs
-                text_inputs = tokenizer(
-                    list(description),
-                    max_length=tokenizer.model_max_length,
-                    padding="max_length",
-                    truncation=True,
-                    return_tensors="pt",
-                ).to(unet.device)
+                    latents = latents * vae.config.scaling_factor
 
-                text_features = text_encoder(input_ids=text_inputs.input_ids).last_hidden_state.to(torch.float16)
+                    # Sample noise that we'll add to the latents
+                    noise = torch.randn_like(latents)
+                    if args.noise_offset:
+                        # https://www.crosslabs.org//blog/diffusion-with-offset-noise
+                        noise += args.noise_offset * torch.randn(
+                            (latents.shape[0], latents.shape[1], latents.shape[2], 1, 1), device=latents.device
+                        )
 
-                # Prepare image inputs
-                image_inputs = clip_processor(images=list(frame_tensor), return_tensors="pt").pixel_values.to(unet.device)
-                image_features = clip_model.vision_model(pixel_values=image_inputs).last_hidden_state.to(torch.float16)
+                    bsz = latents.shape[0]
+                    # Sample a random timestep for each image
+                    timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
+                    timesteps = timesteps.long()
 
-                # Map image embeddings to text embedding space using the mapping network
-                mapped_image_features = mapper(image_features, text_features)
+                    # Add noise to the latents according to the noise magnitude at each timestep
+                    # (this is the forward diffusion process)
+                    noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
+                    #print(f"train_lora_model noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
+                   
+                    
+                    text_inputs = tokenizer(
+                        list(description),
+                        max_length=tokenizer.model_max_length,
+                        padding="max_length",
+                        truncation=True,
+                        return_tensors="pt"
+                    ).to(unet.device)
 
-                mapped_image_embeddings_flat = mapped_image_features.reshape(-1, 768)
-                text_embeddings_flat = text_features.reshape(-1, 768)
 
-                # Normalize embeddings
-                mapped_image_embeddings_flat = F.normalize(mapped_image_embeddings_flat, p=2, dim=1)
-                text_embeddings_flat = F.normalize(text_embeddings_flat, p=2, dim=1)
+                    text_features = text_encoder(
+                        input_ids=text_inputs.input_ids,
+                    ).last_hidden_state
+                    
+                    text_features=text_features.to(torch.float16)
 
-                target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)
-                loss_mapper = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
+                    #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
-                # Combine features
-                combined_features = torch.cat([text_features, mapped_image_features], dim=1)
-                encoder_hidden_states = combined_features
+                    image_inputs = clip_processor(images=list(frame_tensor), return_tensors="pt").pixel_values.to(unet.device)
+                    image_features = clip_model.vision_model(
+                        pixel_values=image_inputs,
+                    ).last_hidden_state
 
-                # Get the target for loss depending on the prediction type
-                if args.prediction_type is not None:
-                    # Set prediction_type of scheduler if defined
-                    noise_scheduler.register_to_config(prediction_type=args.prediction_type)
+                    #print(f"image_outputs shape: {image_outputs.shape}, dtype: {image_outputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
 
-                if noise_scheduler.config.prediction_type == "epsilon":
-                    target = noise
-                elif noise_scheduler.config.prediction_type == "v_prediction":
-                    target = noise_scheduler.get_velocity(latents, noise, timesteps)
-                else:
-                    raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+                    image_features=image_features.to(torch.float16)
+                    #image_features = image_outputs.pooler_output
+                    #print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
 
-                # Predict the noise residual and compute loss
-                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states, return_dict=False)[0]
+                    # Map image embeddings to text embedding space using the mapping network
+                    mapped_image_features = mapper(image_features, text_features)  # Shape: (batch_size, hidden_size)
+                    #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
-                if args.snr_gamma is None:
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
-                else:
-                    # Compute loss-weights as per Section 3.4
-                    snr = compute_snr(noise_scheduler, timesteps)
-                    mse_loss_weights = torch.stack(
-                        [snr, args.snr_gamma * torch.ones_like(timesteps)], dim=1
-                    ).min(dim=1)[0]
+                    mapped_image_embeddings_flat = mapped_image_features.reshape(-1, 768)
+                    text_embeddings_flat = text_features.reshape(-1, 768)
+
+                    # Normalize embeddings
+                    mapped_image_embeddings_flat = F.normalize(mapped_image_embeddings_flat, p=2, dim=1)
+                    text_embeddings_flat = F.normalize(text_embeddings_flat, p=2, dim=1)
+
+                    target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
+                    loss_mapper = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
+
+                    #alpha = 0.5  # puoi regolare questo valore
+                    #interpolated_features = alpha * text_features + (1 - alpha) * mapped_image_features
+
+                    combined_features = torch.cat([text_features, mapped_image_features], dim=1)
+                    
+                    encoder_hidden_states = combined_features
+                    
+                    
+                    #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
+                    #print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
+
+                    # Get the target for loss depending on the prediction type
+                    if args.prediction_type is not None:
+                        # set prediction_type of scheduler if defined
+                        noise_scheduler.register_to_config(prediction_type=args.prediction_type)
+
                     if noise_scheduler.config.prediction_type == "epsilon":
-                        mse_loss_weights = mse_loss_weights / snr
+                        target = noise
                     elif noise_scheduler.config.prediction_type == "v_prediction":
-                        mse_loss_weights = mse_loss_weights / (snr + 1)
+                        target = noise_scheduler.get_velocity(latents, noise, timesteps)
+                    else:
+                        raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+                    
 
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
-                    loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
-                    loss = loss.mean()
+                    # Predict the noise residual and compute loss
+                    model_pred = unet(noisy_latents, timesteps, encoder_hidden_states, return_dict=False)[0]
 
-                lambda_alignment = 0.1
+                    if args.snr_gamma is None:
+                        loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+                    else:
+                        # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
+                        # Since we predict the noise instead of x_0, the original formulation is slightly changed.
+                        # This is discussed in Section 4.2 of the same paper.
+                        snr = compute_snr(noise_scheduler, timesteps)
+                        mse_loss_weights = torch.stack([snr, args.snr_gamma * torch.ones_like(timesteps)], dim=1).min(
+                            dim=1
+                        )[0]
+                        if noise_scheduler.config.prediction_type == "epsilon":
+                            mse_loss_weights = mse_loss_weights / snr
+                        elif noise_scheduler.config.prediction_type == "v_prediction":
+                            mse_loss_weights = mse_loss_weights / (snr + 1)
 
-                # Compute losses
-                diffusion_loss = loss
-                alignment_loss = loss_mapper
-                total_loss = diffusion_loss + lambda_alignment * alignment_loss
+                        loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
+                        loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
+                        loss = loss.mean()
 
-                cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
-                mean_cosine_sim = cosine_sim.mean().item()
+                    lambda_alignment = 0.1
 
-                # Accumulate metrics
-                accum_cosine_similarity += mean_cosine_sim
-                accum_total_loss += total_loss.detach().item()
-                accum_diffusion_loss += diffusion_loss.detach().item()
-                accum_alignment_loss += alignment_loss.detach().item()
-                accum_steps += 1
+                    # Calcolo della loss di diffusione
+                    diffusion_loss = loss  # o rinomina 'loss' in 'diffusion_loss'
 
-                # Gather the losses across all processes for logging
-                avg_loss = accelerator.gather(total_loss.repeat(args.train_batch_size)).mean()
-                train_loss += avg_loss.item() / args.gradient_accumulation_steps
+                    # Calcolo della loss di allineamento
+                    alignment_loss = loss_mapper
 
-                # Backpropagate
-                accelerator.backward(total_loss)
+                    # Loss totale
+                    total_loss = diffusion_loss + lambda_alignment * alignment_loss
+
+                    cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
+                    mean_cosine_sim = cosine_sim.mean().item()
+
+                    # Accumula la similarità
+                    accum_cosine_similarity += mean_cosine_sim
+
+                    # Accumula le loss
+                    accum_total_loss += total_loss.detach().item()
+                    accum_diffusion_loss += diffusion_loss.detach().item()
+                    accum_alignment_loss += alignment_loss.detach().item()
+                    accum_steps += 1
+
+
+                    # Gather the losses across all processes for logging (if we use distributed training).
+                    avg_loss = accelerator.gather(total_loss.repeat(args.train_batch_size)).mean()
+                    train_loss += avg_loss.item() / args.gradient_accumulation_steps
+
+                    # Backpropagate
+                    accelerator.backward(total_loss)
+                    if accelerator.sync_gradients:
+                        params_to_clip = trainable_params
+                        accelerator.clip_grad_norm_(params_to_clip, args.max_grad_norm)
+                    optimizer.step()
+                    optimizer_mapper.step()
+                    lr_scheduler.step()
+                    scheduler_mapper.step()
+
+                    optimizer_mapper.zero_grad()
+                    optimizer.zero_grad()
+                # Checks if the accelerator has performed an optimization step behind the scenes
                 if accelerator.sync_gradients:
-                    params_to_clip = trainable_params
-                    accelerator.clip_grad_norm_(params_to_clip, args.max_grad_norm)
-                optimizer.step()
-                optimizer_mapper.step()
-                lr_scheduler.step()
-                scheduler_mapper.step()
+                    progress_bar.update(1)
+                    global_step += 1
+                    
+                    if global_step % args.checkpointing_steps == 0:
 
-                optimizer_mapper.zero_grad()
-                optimizer.zero_grad()
+                        # Calcola le loss medie
+                        avg_total_loss = accum_total_loss / accum_steps
+                        avg_diffusion_loss = accum_diffusion_loss / accum_steps
+                        avg_alignment_loss = accum_alignment_loss / accum_steps
+                        avg_cosine_similarity = accum_cosine_similarity / accum_steps
+                        avg_train_loss = train_loss / accum_steps
 
-            # Checks if the accelerator has performed an optimization step
-            if accelerator.sync_gradients:
-                progress_bar.update(1)
-                global_step += 1
+                        # Resetta gli accumulatori
+                        accum_total_loss = 0.0
+                        accum_diffusion_loss = 0.0
+                        accum_alignment_loss = 0.0
+                        accum_cosine_similarity = 0.0
+                        accum_steps = 0
+                        train_loss = 0.0
 
-                if global_step % args.checkpointing_steps == 0:
-                    # Compute average losses
-                    avg_total_loss = accum_total_loss / accum_steps
-                    avg_diffusion_loss = accum_diffusion_loss / accum_steps
-                    avg_alignment_loss = accum_alignment_loss / accum_steps
-                    avg_cosine_similarity = accum_cosine_similarity / accum_steps
-                    avg_train_loss = train_loss / accum_steps
+                        # Log nel progress bar
 
-                    # Reset accumulators
-                    accum_total_loss = 0.0
-                    accum_diffusion_loss = 0.0
-                    accum_alignment_loss = 0.0
-                    accum_cosine_similarity = 0.0
-                    accum_steps = 0
-                    train_loss = 0.0
+                        print(f"total_loss: {avg_total_loss}")
+                        print(f"diffusion_loss: {avg_diffusion_loss}")
+                        print(f"alignment_loss: {avg_alignment_loss}")
+                        print(f"cosine_similarity: {avg_cosine_similarity}")
+                        print(f"lr: {lr_scheduler.get_last_lr()[0]}")
+                        print(f"avg_train_loss: {avg_train_loss}")
 
-                    # Log progress
-                    print(f"total_loss: {avg_total_loss}")
-                    print(f"diffusion_loss: {avg_diffusion_loss}")
-                    print(f"alignment_loss: {avg_alignment_loss}")
-                    print(f"cosine_similarity: {avg_cosine_similarity}")
-                    print(f"lr: {lr_scheduler.get_last_lr()[0]}")
-                    print(f"avg_train_loss: {avg_train_loss}")
+                        if accelerator.is_main_process:
+                            # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
+                            if args.checkpoints_total_limit is not None:
+                                checkpoints = os.listdir(args.output_dir)
+                                checkpoints = [d for d in checkpoints if d.startswith("checkpoint")]
+                                checkpoints = sorted(checkpoints, key=lambda x: int(x.split("-")[1]))
 
-                    if accelerator.is_main_process:
-                        # Before saving state, check if this save would set us over the `checkpoints_total_limit`
-                        if args.checkpoints_total_limit is not None:
-                            checkpoints = os.listdir(args.output_dir)
-                            checkpoints = [d for d in checkpoints if d.startswith("checkpoint")]
-                            checkpoints = sorted(checkpoints, key=lambda x: int(x.split("-")[1]))
+                                # before we save the new checkpoint, we need to have at _most_ `checkpoints_total_limit - 1` checkpoints
+                                if len(checkpoints) >= args.checkpoints_total_limit:
+                                    num_to_remove = len(checkpoints) - args.checkpoints_total_limit + 1
+                                    removing_checkpoints = checkpoints[0:num_to_remove]
 
-                            # Remove old checkpoints
-                            if len(checkpoints) >= args.checkpoints_total_limit:
-                                num_to_remove = len(checkpoints) - args.checkpoints_total_limit + 1
-                                removing_checkpoints = checkpoints[0:num_to_remove]
+                                    logger.info(
+                                        f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints"
+                                    )
+                                    logger.info(f"removing checkpoints: {', '.join(removing_checkpoints)}")
 
-                                logger.info(
-                                    f"{len(checkpoints)} checkpoints already exist, removing {len(removing_checkpoints)} checkpoints"
-                                )
-                                logger.info(f"removing checkpoints: {', '.join(removing_checkpoints)}")
+                                    for removing_checkpoint in removing_checkpoints:
+                                        removing_checkpoint = os.path.join(args.output_dir, removing_checkpoint)
+                                        shutil.rmtree(removing_checkpoint)
 
-                                for removing_checkpoint in removing_checkpoints:
-                                    removing_checkpoint = os.path.join(args.output_dir, removing_checkpoint)
-                                    shutil.rmtree(removing_checkpoint)
+                            save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
+                            accelerator.save_state(save_path)
 
-                        save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
-                        accelerator.save_state(save_path)
+                            unwrapped_unet = unwrap_model(unet, accelerator=accelerator)
+                            unet_lora_state_dict = convert_state_dict_to_diffusers(
+                                get_peft_model_state_dict(unwrapped_unet)
+                            )
 
-                        unwrapped_unet = unwrap_model(unet, accelerator=accelerator)
-                        unet_lora_state_dict = convert_state_dict_to_diffusers(
-                            get_peft_model_state_dict(unwrapped_unet)
-                        )
+                            StableDiffusionPipeline.save_lora_weights(
+                                save_directory=save_path,
+                                unet_lora_layers=unet_lora_state_dict,
+                                safe_serialization=True,
+                            )
 
-                        StableDiffusionPipeline.save_lora_weights(
-                            save_directory=save_path,
-                            unet_lora_layers=unet_lora_state_dict,
-                            safe_serialization=True,
-                        )
+                            # Save the mapper state dict
+                            torch.save(mapper.state_dict(), os.path.join(save_path, 'mapper.pt'))
 
-                        # Save the mapper state dict
-                        torch.save(mapper.state_dict(), os.path.join(save_path, 'mapper.pt'))
+                            print("modello salvatooooooooooo")
 
-                        print("Model saved.")
+                        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, args.text_prompt)
+
+
+                #logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
 
                 if global_step >= args.max_train_steps:
                     break
 
-        if global_step >= args.max_train_steps:
-            break
+                    
+        accelerator.end_training()
 
-    accelerator.end_training()
+        num_epochs = len(epoch_losses)
+        epochs = list(range(1, num_epochs + 1))  # Crea una lista [1, 2, 3, ..., num_epochs]
+        print(f"num_epochs: {num_epochs}")
 
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=epochs, y=epoch_losses, mode='lines'))
+
+        # Personalizza il layout
+        fig.update_layout(
+            title='Training Loss',
+            xaxis_title='Epoch',
+            yaxis_title='Loss'
+        )
+
+        # Salva il grafico come immagine
+        fig.write_image("/content/drive/My Drive/training_loss.png")
+
+        # Opzionale: visualizza il grafico interattivo in Colab
+        fig.show()
+    else:
+        return inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption)
 
     
 
-def inference(args, models, caption):
-    # Unpack models
-    unet = models["unet"]
-    original_unet = models["original_unet"]
-    mapper = models["mapper"]
-    tokenizer = models["tokenizer"]
-    text_encoder = models["text_encoder"]
-    vae = models["vae"]
-    clip_model = models["clip_model"]
-    clip_processor = models["clip_processor"]
-    noise_scheduler = models["noise_scheduler"]
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    # Set models to evaluation mode
-    unet.eval()
-    mapper.eval()
-    text_encoder.eval()
-    vae.eval()
-    clip_model.eval()
-
-    # Ensure mapper's dtype is set
-    mapper.dtype = next(mapper.parameters()).dtype
-
-    with torch.no_grad():
-        # Function to generate video
-        def generate_video(unet_model, is_original):
-            pipeline = VideoGenPipeline(
-                vae=vae, 
-                text_encoder=text_encoder, 
-                tokenizer=tokenizer, 
-                scheduler=noise_scheduler, 
-                unet=unet_model,
-                clip_processor=clip_processor,
-                clip_model=clip_model,
-                mapper=mapper
-            ).to(device)
-
-            pipeline.enable_xformers_memory_efficient_attention()
-
-            if not is_original:
-                # Load and transform image for conditioning
-                image_tensor = load_and_transform_image(args.image_path)
-            else:
-                image_tensor = None
-
-            print(f'Processing the ({caption}) prompt for {"original" if is_original else "fine-tuned"} model')
-            videos = pipeline(
-                caption,
-                image_tensor=image_tensor,
-                video_length=args.video_length, 
-                height=args.image_size[0], 
-                width=args.image_size[1], 
-                num_inference_steps=args.num_sampling_steps,
-                guidance_scale=args.guidance_scale
-            ).video
-
-            suffix = "original" if is_original else "fine_tuned"
-            output_path = os.path.join("/content/drive/My Drive/", f"{suffix}.mp4")
-            imageio.mimwrite(output_path, videos[0], fps=8, quality=9)
-            return videos[0]
-
-        # Generate video with the fine-tuned model
-        video = generate_video(unet, is_original=False)
-
-        # Generate video with the original model
-        generate_video(original_unet, is_original=True)
-
-        torch.cuda.empty_cache()
-
-        print('Save path: {}'.format("/content/drive/My Drive/"))
-
-        return video
-
-
-def lora_model(data, video_folder, args, caption, training=True):
-    if args.seed is not None:
-        set_seed(args.seed)
-
-    # Load models
-    models = load_models(args)
-
-    if training:
-        # Set up accelerator
-        logging_dir = Path("/content/drive/My Drive/")
-        accelerator_project_config = ProjectConfiguration(
-            project_dir="/content/drive/My Drive/", logging_dir=logging_dir
-        )
-        accelerator = Accelerator(
-            gradient_accumulation_steps=args.gradient_accumulation_steps,
-            mixed_precision=args.mixed_precision,
-            log_with=args.report_to,
-            project_config=accelerator_project_config,
-        )
-
-        # Disable AMP for MPS
-        if torch.backends.mps.is_available():
-            accelerator.native_amp = False
-
-        logger.info(accelerator.state, main_process_only=False)
-        if accelerator.is_local_main_process:
-            transformers.utils.logging.set_verbosity_warning()
-            diffusers.utils.logging.set_verbosity_info()
-        else:
-            transformers.utils.logging.set_verbosity_error()
-            diffusers.utils.logging.set_verbosity_error()
-
-        # Training function
-        train_lora_model(args, data, video_folder, models, accelerator)
-    else:
-        # Inference function
-        return inference(args, models, caption)
-
-
 def model(caption):
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
-
-    # Determine if running on Google Colab
+    
+    # Determina se sei su Google Colab
     on_colab = 'COLAB_GPU' in os.environ
 
     if on_colab:
-        # Dataset path on Google Colab
+        # Percorso del dataset su Google Colab
         dataset_path = '/content/drive/My Drive/msvd'
     else:
-        # Local dataset path
+        # Percorso del dataset locale (sincronizzato con Google Drive)
         dataset_path = '/path/to/your/Google_Drive/sync/folder/path/to/your/dataset'
-
-    # File paths
+    
+    # Percorsi dei file
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
-
+    
     return lora_model(data, video_folder, OmegaConf.load(args.config), caption, training=True)
+
 
 
 if __name__ == "__main__":
