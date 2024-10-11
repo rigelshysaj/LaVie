@@ -5,6 +5,7 @@ import msrvtt
 import clip
 import os
 from tqdm import tqdm
+import gc
 import plotly.graph_objs as go
 from torch.utils.data import Subset
 import random
@@ -739,15 +740,9 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
     
     for batch in tqdm(dataloader, desc="Evaluating"):
         with torch.no_grad():
-            # Move models to CPU to free up GPU memory
-            clip_model32 = clip_model32.cpu()
-            vae = vae.cpu()
-            text_encoder = text_encoder.cpu()
-            unet = unet.cpu()
-            mapper = mapper.cpu()
             
             # Process ground truth video
-            gt_video = batch['video'].squeeze(0).to('cpu')
+            gt_video = batch['video'].squeeze(0).to(device)
             caption = batch['caption'][0]
             
             # Generate video from caption
