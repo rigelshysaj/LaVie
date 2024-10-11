@@ -797,14 +797,14 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
             
             print("Calcolo similarità CLIP per Video Generato")
             # Compute CLIP Similarity for Generated Video
-            '''
+            
             gen_frame_similarities = []
             for frame in gen_frames:
                 similarity = get_clip_similarity(clip_model32, preprocess32, caption, frame, device)
                 gen_frame_similarities.append(similarity)
             avg_gen_similarity = sum(gen_frame_similarities) / len(gen_frame_similarities)
             total_gen_similarity += avg_gen_similarity
-            '''
+            
             
             num_videos += 1
             
@@ -825,29 +825,67 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
     
     # Compute Average CLIPSIM Scores
     average_gt_similarity = total_gt_similarity / num_videos
-    #average_gen_similarity = total_gen_similarity / num_videos
+    average_gen_similarity = total_gen_similarity / num_videos
     
-    return average_gt_similarity
-
+    return average_gt_similarity, average_gen_similarity
 
 
 def get_clip_similarity(clip_model, preprocess, text, image, device):
+    print("Inizio get_clip_similarity")
     with torch.no_grad():
         # Preprocess the image
-        image_input = preprocess(image).unsqueeze(0).to(device)
+        try:
+            print("Preprocess image")
+            image_input = preprocess(image).unsqueeze(0).to(device)
+            print("Immagine preprocessata")
+        except Exception as e:
+            print(f"Errore nel preprocess dell'immagine: {e}")
+            return 0
+        
         # Tokenize the text
-        text_input = clip.tokenize([text]).to(device)
+        try:
+            print("Tokenizzo testo")
+            text_input = clip.tokenize([text]).to(device)
+            print("Testo tokenizzato")
+        except Exception as e:
+            print(f"Errore nella tokenizzazione del testo: {e}")
+            return 0
         
         # Compute features
-        image_features = clip_model.encode_image(image_input)
-        text_features = clip_model.encode_text(text_input)
+        try:
+            print("Encoding image features")
+            image_features = clip_model.encode_image(image_input)
+            print("Image features encoded")
+        except Exception as e:
+            print(f"Errore nella codifica delle immagini: {e}")
+            return 0
+        
+        try:
+            print("Encoding text features")
+            text_features = clip_model.encode_text(text_input)
+            print("Text features encoded")
+        except Exception as e:
+            print(f"Errore nella codifica del testo: {e}")
+            return 0
         
         # Normalize the features
-        image_features = image_features / image_features.norm(dim=-1, keepdim=True)
-        text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+        try:
+            print("Normalizzo le features delle immagini")
+            image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+            print("Normalizzo le features del testo")
+            text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+        except Exception as e:
+            print(f"Errore nella normalizzazione delle features: {e}")
+            return 0
         
         # Compute similarity
-        similarity = (image_features @ text_features.T).item()
+        try:
+            print("Calcolo la similarità")
+            similarity = (image_features @ text_features.T).item()
+            print("Calcolo similarità completato")
+        except Exception as e:
+            print(f"Errore nel calcolo della similarità: {e}")
+            return 0
 
     return similarity
 
