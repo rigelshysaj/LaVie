@@ -123,7 +123,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
         # Genera video con il modello fine-tuned
         video = generate_video(unet, is_original=False)
 
-        generate_video(original_unet, is_original=True)
+        #generate_video(original_unet, is_original=True)
 
         #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
         torch.cuda.empty_cache()
@@ -730,49 +730,60 @@ def lora_model(data, video_folder, args, method=1):
         print(f"Average Generated Video CLIP Similarity (CLIPSIM): {average_gen_similarity:.4f}")
 
 
-
 def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper):
-
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=msrvtt.collate_fn)
     
-    total_gt_similarity = 0  # For ground truth videos
-    total_gen_similarity = 0  # For generated videos
+    total_gt_similarity = 0
+    total_gen_similarity = 0
     num_videos = 0
     
     for batch in tqdm(dataloader, desc="Evaluating"):
-        # Ground Truth Video Frames and Caption
-        gt_video = batch['video'].squeeze(0).to(device)  # (num_frames, C, H, W)
-        caption = batch['caption'][0]  # Single caption
-        video_id = batch['video_id'][0]
-        
-        # Generate Video from Caption using Your Model
         with torch.no_grad():
-            generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption)
+            # Move models to CPU to free up GPU memory
+            clip_model32 = clip_model32.cpu()
+            vae = vae.cpu()
+            text_encoder = text_encoder.cpu()
+            unet = unet.cpu()
+            mapper = mapper.cpu()
+            
+            # Process ground truth video
+            gt_video = batch['video'].squeeze(0).to('cpu')
+            caption = batch['caption'][0]
+            
+            # Generate video from caption
+            generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, 'cpu', mapper, caption)
+            
+            # Compute CLIP similarity for ground truth and generated video
+            gt_frames = [transforms.ToPILImage()(frame) for frame in gt_video]
+            gen_frames = generated_video_frames
+            
+            # Move models back to GPU for CLIP similarity computation
+            clip_model32 = clip_model32.to(device)
+            
+            # Compute similarities in smaller batches
+            batch_size = 4  # Adjust this based on your GPU memory
+            gt_similarities = []
+            gen_similarities = []
+            
+            for i in range(0, len(gt_frames), batch_size):
+                gt_batch = gt_frames[i:i+batch_size]
+                gen_batch = gen_frames[i:i+batch_size]
+                
+                gt_similarities.extend([get_clip_similarity(clip_model32, preprocess32, caption, frame, device) for frame in gt_batch])
+                gen_similarities.extend([get_clip_similarity(clip_model32, preprocess32, caption, frame, device) for frame in gen_batch])
+            
+            avg_gt_similarity = sum(gt_similarities) / len(gt_similarities)
+            avg_gen_similarity = sum(gen_similarities) / len(gen_similarities)
+            
+            total_gt_similarity += avg_gt_similarity
+            total_gen_similarity += avg_gen_similarity
+            num_videos += 1
         
-        # Ensure frames are in the correct format (e.g., list of PIL Images)
-        gt_frames = [transforms.ToPILImage()(frame.cpu()) for frame in gt_video]
-        gen_frames = [frame for frame in generated_video_frames]
-
-        
-        # Compute CLIP Similarity for Ground Truth Video
-        gt_frame_similarities = []
-        for frame in gt_frames:
-            similarity = get_clip_similarity(clip_model32, preprocess32, caption, frame, device)
-            gt_frame_similarities.append(similarity)
-        avg_gt_similarity = sum(gt_frame_similarities) / len(gt_frame_similarities)
-        total_gt_similarity += avg_gt_similarity
-        
-        # Compute CLIP Similarity for Generated Video
-        gen_frame_similarities = []
-        for frame in gen_frames:
-            similarity = get_clip_similarity(clip_model32, preprocess32, caption, frame, device)
-            gen_frame_similarities.append(similarity)
-        avg_gen_similarity = sum(gen_frame_similarities) / len(gen_frame_similarities)
-        total_gen_similarity += avg_gen_similarity
-        
-        num_videos += 1
+        # Clear cache and collect garbage
+        torch.cuda.empty_cache()
+        gc.collect()
     
-    # Compute Average CLIPSIM Scores
+    # Compute average CLIPSIM scores
     average_gt_similarity = total_gt_similarity / num_videos
     average_gen_similarity = total_gen_similarity / num_videos
     
