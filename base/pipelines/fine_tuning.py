@@ -722,17 +722,22 @@ def lora_model(data, video_folder, args, method=1):
         # Crea il sottoinsieme del dataset
         subset_dataset = Subset(datasetM, subset_indices)
         
-        # Esegui la valutazione sul sottoinsieme
-        average_gt_similarity, average_gen_similarity = evaluate_msrvtt_clip_similarity(
+        try:
+            # Il tuo codice principale qui
+            average_gt_similarity, average_gen_similarity = evaluate_msrvtt_clip_similarity(
             clip_model32, preprocess32, subset_dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper
         )
+        except Exception as e:
+            print(f"Si è verificato un errore: {e}")
+        # Esegui la valutazione sul sottoinsieme
+        
         
         print(f"Average Ground Truth CLIP Similarity (CLIPSIM): {average_gt_similarity:.4f}")
         print(f"Average Generated Video CLIP Similarity (CLIPSIM): {average_gen_similarity:.4f}")
 
 
 
-def evaluate_msrvtt_clip_similarity_(clip_model32, preprocess32, dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper):
+def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper):
 
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=msrvtt.collate_fn)
     
@@ -774,56 +779,6 @@ def evaluate_msrvtt_clip_similarity_(clip_model32, preprocess32, dataset, device
         num_videos += 1
     
     # Compute Average CLIPSIM Scores
-    average_gt_similarity = total_gt_similarity / num_videos
-    average_gen_similarity = total_gen_similarity / num_videos
-    
-    return average_gt_similarity, average_gen_similarity
-
-def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper):
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=msrvtt.collate_fn)
-    
-    total_gt_similarity = 0
-    total_gen_similarity = 0
-    num_videos = 0
-    
-    for batch in tqdm(dataloader, desc="Evaluating"):
-        with torch.no_grad():
-            
-            # Process ground truth video
-            gt_video = batch['video'].squeeze(0).to(device)
-            caption = batch['caption'][0]
-            
-            # Generate video from caption
-            generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption)
-            
-            # Compute CLIP similarity for ground truth and generated video
-            gt_frames = [transforms.ToPILImage()(frame.cpu()) for frame in gt_video]
-            gen_frames = [frame for frame in generated_video_frames]
-            
-            # Compute similarities in smaller batches
-            batch_size = 1  # Adjust this based on your GPU memory
-            gt_similarities = []
-            gen_similarities = []
-            
-            for i in range(0, len(gt_frames), batch_size):
-                gt_batch = gt_frames[i:i+batch_size]
-                gen_batch = gen_frames[i:i+batch_size]
-                
-                gt_similarities.extend([get_clip_similarity(clip_model32, preprocess32, caption, frame, device) for frame in gt_batch])
-                gen_similarities.extend([get_clip_similarity(clip_model32, preprocess32, caption, frame, device) for frame in gen_batch])
-            
-            avg_gt_similarity = sum(gt_similarities) / len(gt_similarities)
-            avg_gen_similarity = sum(gen_similarities) / len(gen_similarities)
-            
-            total_gt_similarity += avg_gt_similarity
-            total_gen_similarity += avg_gen_similarity
-            num_videos += 1
-        
-        # Clear cache and collect garbage
-        torch.cuda.empty_cache()
-        gc.collect()
-    
-    # Compute average CLIPSIM scores
     average_gt_similarity = total_gt_similarity / num_videos
     average_gen_similarity = total_gen_similarity / num_videos
     
