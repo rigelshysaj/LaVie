@@ -1,9 +1,13 @@
 from torch.utils.data import Dataset, DataLoader
 from typing import List, Union
 import torch
+import msrvtt
+import clip
 import os
 from tqdm import tqdm
 import plotly.graph_objs as go
+from torch.utils.data import Subset
+import random
 import shutil
 from transformers import CLIPProcessor, CLIPModel
 from peft import LoraConfig, get_peft_model
@@ -56,115 +60,6 @@ logger = logging.get_logger(__name__)
 @dataclass
 class StableDiffusionPipelineOutput(BaseOutput):
     video: torch.Tensor
-
-class VideoGenerator:
-    def __init__(self, args):
-        self.args = args  # Salva args per uso futuro
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        
-        logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
-
-        accelerator_project_config = ProjectConfiguration(project_dir="/content/drive/My Drive/", logging_dir=logging_dir)
-
-        accelerator = Accelerator(
-            gradient_accumulation_steps=args.gradient_accumulation_steps,
-            mixed_precision=args.mixed_precision,
-            log_with=args.report_to,
-            project_config=accelerator_project_config,
-        )
-
-        # Percorso del modello pre-addestrato
-        sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
-
-        # Carica il modello UNet fine-tuned
-        self.unet = get_models(args, sd_path).to(self.device, dtype=torch.float16)
-        state_dict = find_model(args.ckpt_path)
-        self.unet.load_state_dict(state_dict)
-
-        # Carica il modello UNet originale
-        self.original_unet = get_models(args, sd_path).to(self.device, dtype=torch.float32)
-        self.original_unet.load_state_dict(state_dict)
-
-        # Istanzia il mapping network
-        self.mapper = MappingNetwork().to(self.unet.device)
-        self.mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
-
-        # Carica gli altri modelli e tokenizer
-        self.tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
-        self.text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(self.device)
-        self.vae = AutoencoderKL.from_pretrained(sd_path, subfolder="vae").to(self.device)
-        self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(self.device)
-        self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
-        self.noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
-
-
-        self.unet, self.mapper,  = accelerator.prepare(
-            self.unet, self.mapper
-        )
-
-
-        if args.resume_from_checkpoint != "latest":
-            path = os.path.basename(args.resume_from_checkpoint)
-        else:
-            # Get the most recent checkpoint
-            dirs = os.listdir(args.output_dir)
-            dirs = [d for d in dirs if d.startswith("checkpoint")]
-            dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
-            path = dirs[-1] if len(dirs) > 0 else None
-
-        if path is None:
-            accelerator.print(
-                f"Checkpoint '{args.resume_from_checkpoint}' does not exist. Starting a new training run."
-            )
-            args.resume_from_checkpoint = None
-        else:
-            accelerator.print(f"Resuming from checkpoint {path}")
-            accelerator.load_state(os.path.join(args.output_dir, path))
-            # Load the mapper state dict
-            #self.mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
-
-        # Prepara la pipeline
-        self.pipeline = VideoGenPipeline(
-            vae=self.vae,
-            text_encoder=self.text_encoder,
-            tokenizer=self.tokenizer,
-            scheduler=self.noise_scheduler,
-            unet=self.unet,
-            clip_processor=self.clip_processor,
-            clip_model=self.clip_model,
-            mapper=self.mapper
-        ).to(self.device)
-
-        self.pipeline.enable_xformers_memory_efficient_attention()
-
-    def generate_video(self, caption, is_original=False):
-        if is_original:
-            # Usa il modello UNet originale
-            self.pipeline.unet = self.original_unet
-        else:
-            # Usa il modello UNet fine-tuned
-            self.pipeline.unet = self.unet
-
-        # Se necessario, carica e trasforma l'immagine
-        if not is_original:
-            image_tensor = load_and_transform_image(self.args.image_path)
-        else:
-            image_tensor = None
-
-        print(f'Processing the ({caption}) prompt for {"original" if is_original else "fine-tuned"} model')
-        videos = self.pipeline(
-            caption,
-            image_tensor=image_tensor,
-            video_length=self.args.video_length,
-            height=self.args.image_size[0],
-            width=self.args.image_size[1],
-            num_inference_steps=self.args.num_sampling_steps,
-            guidance_scale=self.args.guidance_scale
-        ).video
-
-        suffix = "original" if is_original else "fine_tuned"
-        imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
-        return videos[0]
 
 
 
@@ -306,7 +201,7 @@ def log_lora_weights(model, step):
                print(f"Step {step}: LoRA weight '{name}' mean = {param.data.mean().item():.6f}")
 
 
-def lora_model(data, video_folder, args, caption, training=True):
+def lora_model(data, video_folder, args, method=1):
 
     logging_dir = Path("/content/drive/My Drive/", "/content/drive/My Drive/")
 
@@ -529,12 +424,10 @@ def lora_model(data, video_folder, args, caption, training=True):
 
     unet.enable_xformers_memory_efficient_attention()
 
-    epoch_losses = []
-
     print(f"first_epoch: {first_epoch}")
     print(f"num_train_epochs: {args.num_train_epochs}")
 
-    if(training):
+    if(method==1):
 
         accum_total_loss = 0.0
         accum_diffusion_loss = 0.0
@@ -796,34 +689,121 @@ def lora_model(data, video_folder, args, caption, training=True):
                     
         accelerator.end_training()
 
-        num_epochs = len(epoch_losses)
-        epochs = list(range(1, num_epochs + 1))  # Crea una lista [1, 2, 3, ..., num_epochs]
-        print(f"num_epochs: {num_epochs}")
+    elif(method==2):
+        inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper, args.text_prompt)
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=epochs, y=epoch_losses, mode='lines'))
+    else:
+        clip_model32, preprocess32 = clip.load("ViT-B/32", device=device)
 
-        # Personalizza il layout
-        fig.update_layout(
-            title='Training Loss',
-            xaxis_title='Epoch',
-            yaxis_title='Loss'
+        transform = transforms.Compose([
+            transforms.Resize((224, 224)),  # Regola secondo necessità
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+        
+        # Inizializza il dataset
+        datasetM = msrvtt.MSRVTTDataset(
+            video_dir='/content/drive/My Drive/msrvtt/TrainValVideo',
+            annotation_file='/content/drive/My Drive/msrvtt/train_val_annotation/train_val_videodatainfo.json',
+            split='validate',
+            transform=transform
         )
 
-        # Salva il grafico come immagine
-        fig.write_image("/content/drive/My Drive/training_loss.png")
+        # Imposta un seme per la riproducibilità (opzionale)
+        random.seed(42)
+        
+        # Verifica che il dataset abbia almeno 10 campioni
+        if len(datasetM) < 10:
+            raise ValueError("Il dataset contiene meno di 10 campioni.")
+        
+        # Seleziona casualmente 10 indici
+        subset_indices = random.sample(range(len(datasetM)), 10)
+        
+        # Crea il sottoinsieme del dataset
+        subset_dataset = Subset(datasetM, subset_indices)
+        
+        # Esegui la valutazione sul sottoinsieme
+        average_gt_similarity, average_gen_similarity = evaluate_msrvtt_clip_similarity(
+            clip_model32, preprocess32, subset_dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper
+        )
+        
+        print(f"Average Ground Truth CLIP Similarity (CLIPSIM): {average_gt_similarity:.4f}")
+        print(f"Average Generated Video CLIP Similarity (CLIPSIM): {average_gen_similarity:.4f}")
 
-        # Opzionale: visualizza il grafico interattivo in Colab
-        fig.show()
-    else:
-        video_generator = VideoGenerator(args)
-        # Genera il video utilizzando il caption
-        video = video_generator.generate_video(caption)
-        return video
+
+
+def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper):
+
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=msrvtt.collate_fn)
     
+    total_gt_similarity = 0  # For ground truth videos
+    total_gen_similarity = 0  # For generated videos
+    num_videos = 0
+    
+    for batch in tqdm(dataloader, desc="Evaluating"):
+        # Ground Truth Video Frames and Caption
+        gt_video = batch['video'].squeeze(0).to(device)  # (num_frames, C, H, W)
+        caption = batch['caption'][0]  # Single caption
+        video_id = batch['video_id'][0]
+        
+        # Generate Video from Caption using Your Model
+        with torch.no_grad():
+            generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption)
+        
+        # Ensure frames are in the correct format (e.g., list of PIL Images)
+        gt_frames = [transforms.ToPILImage()(frame.cpu()) for frame in gt_video]
+        gen_frames = [frame for frame in generated_video_frames]
 
-def model(caption):
+        
+        # Compute CLIP Similarity for Ground Truth Video
+        gt_frame_similarities = []
+        for frame in gt_frames:
+            similarity = get_clip_similarity(clip_model32, preprocess32, caption, frame, device)
+            gt_frame_similarities.append(similarity)
+        avg_gt_similarity = sum(gt_frame_similarities) / len(gt_frame_similarities)
+        total_gt_similarity += avg_gt_similarity
+        
+        # Compute CLIP Similarity for Generated Video
+        gen_frame_similarities = []
+        for frame in gen_frames:
+            similarity = get_clip_similarity(clip_model32, preprocess32, caption, frame, device)
+            gen_frame_similarities.append(similarity)
+        avg_gen_similarity = sum(gen_frame_similarities) / len(gen_frame_similarities)
+        total_gen_similarity += avg_gen_similarity
+        
+        num_videos += 1
+    
+    # Compute Average CLIPSIM Scores
+    average_gt_similarity = total_gt_similarity / num_videos
+    average_gen_similarity = total_gen_similarity / num_videos
+    
+    return average_gt_similarity, average_gen_similarity
 
+
+def get_clip_similarity(clip_model, preprocess, text, image, device):
+    with torch.no_grad():
+        # Preprocess the image
+        image_input = preprocess(image).unsqueeze(0).to(device)
+        # Tokenize the text
+        text_input = clip.tokenize([text]).to(device)
+        
+        # Compute features
+        image_features = clip_model.encode_image(image_input)
+        text_features = clip_model.encode_text(text_input)
+        
+        # Normalize the features
+        image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+        text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+        
+        # Compute similarity
+        similarity = (image_features @ text_features.T).item()
+
+    return similarity
+
+
+
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
@@ -842,22 +822,4 @@ def model(caption):
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    return lora_model(data, video_folder, OmegaConf.load(args.config), caption, training=False)
-
-
-def model_inference(caption, video_generator):
-    # Genera il video
-    video = video_generator.generate_video(caption)
-    return video
-
-
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="")
-    args = parser.parse_args()
-
-    video_generator = VideoGenerator(OmegaConf.load(args.config))
-
-    model_inference(args.text_prompt, video_generator)
+    lora_model(data, video_folder, OmegaConf.load(args.config), method=1)
