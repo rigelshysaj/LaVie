@@ -794,7 +794,7 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
             caption = batch['caption'][0]
             
             # Generate video from caption
-            generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, 'cpu', mapper, caption)
+            generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption)
             
             # Compute CLIP similarity for ground truth and generated video
             gt_frames = [transforms.ToPILImage()(frame.cpu()) for frame in gt_video]
