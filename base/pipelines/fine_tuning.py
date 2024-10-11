@@ -98,7 +98,7 @@ class VideoGenerator:
         self.noise_scheduler = DDPMScheduler.from_pretrained(sd_path, subfolder="scheduler")
 
 
-        self.unet, self.mapper,  = self.accelerator.prepare(
+        self.unet, self.mapper,  = accelerator.prepare(
             self.unet, self.mapper
         )
 
