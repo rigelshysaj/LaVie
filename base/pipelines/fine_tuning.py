@@ -105,9 +105,6 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
             if(not is_original):
                 image_tensor = load_and_transform_image(args.image_path)
             
-            print(type(caption[0]))
-            print(caption)
-            print(caption[0])
             print(f'Processing the ({caption}) prompt for {"original" if is_original else "fine-tuned"} model')
             videos = pipeline(
                 caption[0],
