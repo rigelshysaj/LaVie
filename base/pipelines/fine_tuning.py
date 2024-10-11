@@ -476,6 +476,8 @@ def model():
     parser.add_argument("--config", type=str, default="")
     args = parser.parse_args()
 
+    args = OmegaConf.load(args.config)
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     sd_path = args.pretrained_path + "/stable-diffusion-v1-4"
