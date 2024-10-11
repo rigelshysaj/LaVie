@@ -738,6 +738,7 @@ def lora_model(data, video_folder, args, method=1):
 
 
 def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper):
+    print("Inizio valutazione CLIP similarity")
 
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=msrvtt.collate_fn)
     
@@ -746,6 +747,7 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
     num_videos = 0
     
     for batch in tqdm(dataloader, desc="Evaluating"):
+        print(f"Valutazione video numero: {num_videos + 1}")
         # Ground Truth Video Frames and Caption
         gt_video = batch['video'].squeeze(0).to(device)  # (num_frames, C, H, W)
         caption = batch['caption'][0]  # Single caption
