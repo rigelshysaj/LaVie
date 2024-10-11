@@ -791,6 +791,7 @@ def lora_model(data, video_folder, args, method=1):
                 feat = ucf.extract_i3d_features(video, i3d_model, device)  # [1, feature_dim, 1, 1, 1]
                 feat = feat.view(feat.size(0), -1)  # Appiattisci a [1, feature_dim]
                 features_gen.append(feat.squeeze(0).numpy())
+            break
 
         # Estrai le feature dai video reali
         print("Estrazione delle feature dai video reali...")
@@ -802,6 +803,7 @@ def lora_model(data, video_folder, args, method=1):
             feat = ucf.extract_i3d_features(frames, i3d_model, device)  # [B, feature_dim, 1, 1, 1]
             feat = feat.view(feat.size(0), -1)  # [B, feature_dim]
             features_real.extend(feat.cpu().numpy())
+            break
 
         # Converti le liste in array numpy
         features_gen = np.array(features_gen)
