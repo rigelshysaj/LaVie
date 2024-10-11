@@ -83,12 +83,14 @@ def load_and_transform_image(path):
 
 
 def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption):
-        
+    print("Inizio funzione inference")
     mapper.dtype = next(mapper.parameters()).dtype
-
+    print("Tipo di dato mapper:", mapper.dtype)
+    
     with torch.no_grad():
         # Funzione per generare video
         def generate_video(unet, is_original):
+            print(f"Inizio generazione video con unet {'original' if is_original else 'fine-tuned'}")
             pipeline = VideoGenPipeline(
                 vae=vae, 
                 text_encoder=text_encoder, 
@@ -100,38 +102,56 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 mapper=mapper
             ).to(device)
 
+            print("Pipeline creata e spostata sul device")
             pipeline.enable_xformers_memory_efficient_attention()
-
-
-            if(not is_original):
+            print("Memoria efficiente abilitata per pipeline")
+    
+            if not is_original:
+                print("Caricamento e trasformazione immagine")
                 image_tensor = load_and_transform_image(args.image_path)
-            
+            else:
+                image_tensor = None  # Assicurati che l'immagine sia gestita correttamente
+    
             print(f'Processing the ({caption}) prompt for {"original" if is_original else "fine-tuned"} model')
-            videos = pipeline(
-                caption[0],
-                image_tensor=image_tensor if not is_original else None,
-                video_length=args.video_length, 
-                height=args.image_size[0], 
-                width=args.image_size[1], 
-                num_inference_steps=args.num_sampling_steps,
-                guidance_scale=args.guidance_scale
-            ).video
-
+            try:
+                videos = pipeline(
+                    caption[0],
+                    image_tensor=image_tensor if not is_original else None,
+                    video_length=args.video_length, 
+                    height=args.image_size[0], 
+                    width=args.image_size[1], 
+                    num_inference_steps=args.num_sampling_steps,
+                    guidance_scale=args.guidance_scale
+                ).video
+                print("Pipeline completata")
+            except Exception as e:
+                print(f"Errore durante la pipeline: {e}")
+                return []
+    
             suffix = "original" if is_original else "fine_tuned"
-            imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
+            try:
+                print(f"Salvataggio video come /content/drive/My Drive/{suffix}.mp4")
+                imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
+                print("Video salvato correttamente")
+            except Exception as e:
+                print(f"Errore durante il salvataggio del video: {e}")
+                return []
+    
             return videos[0]
-
+    
         # Genera video con il modello fine-tuned
+        print("Generazione video fine-tuned")
         video = generate_video(unet, is_original=False)
-
+        print("Video fine-tuned generato")
+    
         #generate_video(original_unet, is_original=True)
-
+    
         #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
         torch.cuda.empty_cache()
-
         print('save path {}'.format("/content/drive/My Drive/"))
-
+    
         return video
+
     
 
 
