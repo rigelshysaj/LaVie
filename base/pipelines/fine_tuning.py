@@ -197,7 +197,7 @@ def log_lora_weights(model, step):
                print(f"Step {step}: LoRA weight '{name}' mean = {param.data.mean().item():.6f}")
 
 
-def lora_model(args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, caption, first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet, training=False):
+def lora_model(args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, caption, first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet, global_step, training=False):
 
     
 
@@ -714,10 +714,10 @@ def model():
     unet.enable_xformers_memory_efficient_attention()
     
     
-    return data, video_folder, args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet
+    return data, video_folder, args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet, global_step
 
 
 
 if __name__ == "__main__":
-    data, video_folder, args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet = model()
-    lora_model(args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, "a lion is playing with a ball", first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet, training=True)
+    data, video_folder, args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet, global_step = model()
+    lora_model(args, unet, device, tokenizer, text_encoder, vae, clip_model, clip_processor, noise_scheduler, "a lion is playing with a ball", first_epoch, mapper, train_dataloader, accelerator, criterion, trainable_params, optimizer, optimizer_mapper, lr_scheduler, scheduler_mapper, progress_bar, original_unet, global_step, training=True)
