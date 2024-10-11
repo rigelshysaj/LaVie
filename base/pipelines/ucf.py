@@ -171,7 +171,7 @@ if __name__ == "__main__":
 
     # Create the dataset
     train_dataset = UCF101Dataset(
-        csv_file='train.csv',
+        csv_file='test.csv',
         root_dir='/content/drive/My Drive/UCF101',  # Replace with your actual path
         transform=transform,
         num_frames=16
