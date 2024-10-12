@@ -927,4 +927,4 @@ if __name__ == "__main__":
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, OmegaConf.load(args.config), method=1)
+    lora_model(data, video_folder, OmegaConf.load(args.config), method=2)
