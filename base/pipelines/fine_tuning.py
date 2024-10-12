@@ -49,10 +49,10 @@ import plotly.graph_objects as go
 from inference import VideoGenPipeline
 from msvd import VideoDatasetMsvd
 from mapping import MappingNetwork
-import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend
-import matplotlib.pyplot as plt
-import seaborn as sns
+#import matplotlib
+#matplotlib.use('Agg')  # Use non-interactive backend
+#import matplotlib.pyplot as plt
+#import seaborn as sns
 
 from diffusers.utils import (
     logging,
