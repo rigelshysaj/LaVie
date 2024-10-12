@@ -95,6 +95,14 @@ class MappingNetwork(nn.Module):
         output = output.permute(1, 0, 2)  # [batch_size, seq_len_out, output_dim]
 
         return output
+    
+    @property
+    def dtype(self):
+        # Restituisce il dtype del primo parametro trovato
+        for param in self.parameters():
+            return param.dtype
+        # Se non ci sono parametri, restituisce il dtype predefinito
+        return torch.get_default_dtype()
 
     
     
