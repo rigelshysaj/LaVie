@@ -249,7 +249,7 @@ def lora_model(data, video_folder, args, method=1):
 
     # Instantiate the mapping network
     mapper = MappingNetwork().to(unet.device)
-    mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
+    #mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
@@ -927,4 +927,4 @@ if __name__ == "__main__":
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, OmegaConf.load(args.config), method=4)
+    lora_model(data, video_folder, OmegaConf.load(args.config), method=1)
