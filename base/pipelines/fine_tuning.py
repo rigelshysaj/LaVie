@@ -744,7 +744,7 @@ def lora_model(data, video_folder, args, method=1):
 
         # Crea il dataset
         train_dataset = ucf.UCF101Dataset(
-            csv_file='train.csv',
+            csv_file='test.csv',
             root_dir='/content/drive/My Drive/UCF101',  # Sostituisci con il tuo percorso reale
             transform=transform,
             num_frames=16
