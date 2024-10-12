@@ -87,7 +87,7 @@ def load_and_transform_image(path):
 
 def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption):
         
-    #mapper.dtype = next(mapper.parameters()).dtype
+    mapper.dtype = next(mapper.parameters()).dtype
 
     with torch.no_grad():
         # Funzione per generare video

@@ -78,6 +78,7 @@ class VideoGenPipeline(DiffusionPipeline):
         clip_processor: CLIPProcessor,
         clip_model: CLIPModel,
         mapper,
+        device: Optional[Union[str, torch.device]] = None
     ):
         super().__init__()
 
@@ -143,8 +144,47 @@ class VideoGenPipeline(DiffusionPipeline):
         )
 
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
+
+        # Robust device setting
+        self._device = None
+        self.set_device(device)
+        
+        # Robust mapper dtype setting
+        self.set_mapper_dtype()
         
         # self.register_to_config(requires_safety_checker=requires_safety_checker)
+
+    @property
+    def device(self) -> torch.device:
+        if self._device is None:
+            self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        return self._device
+
+    def set_device(self, device: Optional[Union[str, torch.device]] = None):
+        if device is None:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._device = torch.device(device)
+        
+    def set_mapper_dtype(self):
+        if hasattr(self, 'mapper') and self.mapper is not None:
+            params = list(self.mapper.parameters())
+            if params:
+                self.mapper.dtype = params[0].dtype
+            else:
+                print("Warning: mapper has no parameters. Unable to set dtype.")
+
+    def to(self, device: Optional[Union[str, torch.device]] = None):
+        if device is not None:
+            self.set_device(device)
+        
+        # Move all modules to the specified device
+        for module in self.modules():
+            module.to(self.device)
+        
+        # Reset mapper dtype after moving
+        self.set_mapper_dtype()
+        
+        return self
 
     @property
     def _execution_device(self):
