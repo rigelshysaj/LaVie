@@ -243,9 +243,9 @@ def lora_model(data, video_folder, args, method=1):
     unet.load_state_dict(state_dict)
 
     # Carica il modello UNet originale
-    #original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
-    #original_unet.load_state_dict(state_dict)
-    original_unet = None
+    original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
+    original_unet.load_state_dict(state_dict)
+    #original_unet = None
 
     # Instantiate the mapping network
     mapper = MappingNetwork().to(unet.device)
