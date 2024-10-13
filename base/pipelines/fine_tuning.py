@@ -67,7 +67,7 @@ class StableDiffusionPipelineOutput(BaseOutput):
 
 
 
-def load_and_transform_image(path, clip_processor, clip_model, device):
+def load_and_transform_image(path):
     image = Image.open(path).convert('RGB')
 
     transform = transforms.Compose([
@@ -80,15 +80,9 @@ def load_and_transform_image(path, clip_processor, clip_model, device):
 
     image_tensor = input_image.unsqueeze(0).to(torch.float32)  # Aggiunge una dimensione per il batch
 
-    image_inputs = clip_processor(images=list(image_tensor), return_tensors="pt").pixel_values.to(device)
-    image_features = clip_model.vision_model(
-        pixel_values=image_inputs,
-    ).last_hidden_state
+    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}") #torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
-    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") #torch.Size([1, 257, 1024]), dtype: torch.float32
-    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}") 
-
-    return image_features
+    return image_tensor
 
 
 def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption, eval_meth=""):
@@ -113,7 +107,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
 
 
             if(not is_original):
-                image_tensor = load_and_transform_image(args.image_path, clip_processor, clip_model, unet.device)
+                image_tensor = load_and_transform_image(args.image_path)
             
             print(f'Processing the ({caption}) prompt for {"original" if is_original else "fine-tuned"} model')
             videos = pipeline(
