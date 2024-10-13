@@ -81,10 +81,13 @@ class UCF101Dataset(Dataset):
 
         single_frame = video_frames[0]  # [H, W, C], dtype: uint8
 
-        print(f"single_frameeee shape: {single_frame.shape}, dtype: {single_frame.dtype}")
+        print(f"single_frameeee11 shape: {single_frame.shape}, dtype: {single_frame.dtype}")
 
         # Applica la trasformazione al singolo frame
         single_frame = self.frame_transform(single_frame)
+
+        print(f"single_frameeee22 shape: {single_frame.shape}, dtype: {single_frame.dtype}")
+
 
         sample = {
             'frames': frames,
