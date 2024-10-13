@@ -470,9 +470,8 @@ def lora_model(data, video_folder, args, method=1):
                         print(description)
                         continue
 
-                    print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #torch.Size([1, 320, 512, 3]), dtype: torch.uint8
-                    print(f"video shape: {video.shape}, dtype: {video.dtype}") #torch.Size([1, 320, 512, 3]), dtype: torch.uint8
-
+                    #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #torch.Size([1, 320, 512, 3]), dtype: torch.uint8
+                    #print(f"video shape: {video.shape}, dtype: {video.dtype}") #torch.Size([1, 16, 320, 512, 3]), dtype: torch.float32
                     
 
                     print(f"epoca {epoch}, iterazione {step}, global_step {global_step}")
@@ -517,22 +516,20 @@ def lora_model(data, video_folder, args, method=1):
                     
                     text_features=text_features.to(torch.float16)
 
-                    #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
+                    print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
 
                     image_inputs = clip_processor(images=list(frame_tensor), return_tensors="pt").pixel_values.to(unet.device)
                     image_features = clip_model.vision_model(
                         pixel_values=image_inputs,
                     ).last_hidden_state
 
-                    #print(f"image_outputs shape: {image_outputs.shape}, dtype: {image_outputs.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
+                    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
 
                     image_features=image_features.to(torch.float16)
-                    #image_features = image_outputs.pooler_output
-                    #print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
 
                     # Map image embeddings to text embedding space using the mapping network
                     mapped_image_features = mapper(image_features, text_features)  # Shape: (batch_size, hidden_size)
-                    #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
+                    print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
 
                     mapped_image_embeddings_flat = mapped_image_features.reshape(-1, 768)
                     text_embeddings_flat = text_features.reshape(-1, 768)
