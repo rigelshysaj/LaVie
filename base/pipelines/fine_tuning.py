@@ -85,7 +85,7 @@ def load_and_transform_image(path):
     return image_tensor
 
 
-def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption):
+def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption, eval_meth=""):
         
     mapper.dtype = next(mapper.parameters()).dtype
 
@@ -121,7 +121,17 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
             ).video
 
             suffix = "original" if is_original else "fine_tuned"
-            imageio.mimwrite(f"/content/drive/My Drive/{suffix}.mp4", videos[0], fps=8, quality=9)
+
+            # Sostituisci gli spazi con underscore nel caption
+            formatted_caption = caption[0].replace(' ', '_')
+
+            # Crea il nome del file
+            file_name = f"{suffix}_{formatted_caption}_{eval_meth}.mp4"
+
+            # Usa il nuovo nome del file nella funzione mimwrite
+            imageio.mimwrite(f"/content/drive/My Drive/Images/{file_name}", videos[0], fps=8, quality=9)
+
+            #imageio.mimwrite(f"/content/drive/My Drive/Images/{suffix}.mp4", videos[0], fps=8, quality=9)
             return videos[0]
 
         # Genera video con il modello fine-tuned
@@ -779,7 +789,7 @@ def lora_model(data, video_folder, args, method=1):
         for class_name in tqdm(class_names, desc="Generando video"):
             for _ in range(1):
                 # Genera un video utilizzando fine_tuned_lavie
-                video_tensor = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, class_name) # [16, 320, 512, 3], uint8
+                video_tensor = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, class_name, "FVD") # [16, 320, 512, 3], uint8
 
                 # Preprocessa il video generato
                 video = ucf.preprocess_generated_video(video_tensor)  # [3, 16, 224, 224]
@@ -834,7 +844,7 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
         
         # Generate Video from Caption using Your Model
         with torch.no_grad():
-            generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption)
+            generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption, "clipsim")
         
 
         #print(f"Shape of generated_video_frames: {generated_video_frames.shape}")
