@@ -54,22 +54,22 @@ class UCF101Dataset(Dataset):
         # Carica i frame del video
         video_frames, _, _ = read_video(video_path, pts_unit='sec')
 
-        print(f"video_frames shape: {video_frames.shape}, dtype: {video_frames.dtype}") #torch.Size([126, 240, 320, 3]), dtype: torch.uint8
+        #print(f"video_frames shape: {video_frames.shape}, dtype: {video_frames.dtype}") #torch.Size([126, 240, 320, 3]), dtype: torch.uint8
 
         single_frame = video_frames[0]
 
-        print(f"single_frame1 shape: {single_frame.shape}, dtype: {single_frame.dtype}") #torch.Size([240, 320, 3]), dtype: torch.uint8
+        #print(f"single_frame1 shape: {single_frame.shape}, dtype: {single_frame.dtype}") #torch.Size([240, 320, 3]), dtype: torch.uint8
 
         # Assicurati che il video abbia il numero desiderato di frame
         frames = self.process_frames(video_frames)
 
-        print(f"frames shape: {frames.shape}, dtype: {frames.dtype}")
+        #print(f"frames shape: {frames.shape}, dtype: {frames.dtype}") #torch.Size([3, 16, 240, 320]), dtype: torch.uint8
 
         # frames shape: [C, T, H, W]
         # Permute to [T, C, H, W] per applicare le trasformazioni
         frames = frames.permute(1, 0, 2, 3)
 
-        print(f"frames1 shape: {frames.shape}, dtype: {frames.dtype}")
+        #print(f"frames1 shape: {frames.shape}, dtype: {frames.dtype}") #torch.Size([16, 3, 240, 320]), dtype: torch.uint8
 
         if self.transform:
             # Applica la trasformazione a ciascun frame
@@ -78,12 +78,12 @@ class UCF101Dataset(Dataset):
             # Normalizza i frame se nessuna trasformazione è fornita
             frames = frames.float() / 255.0
 
-        print(f"frames2 shape: {frames.shape}, dtype: {frames.dtype}")
+        #print(f"frames2 shape: {frames.shape}, dtype: {frames.dtype}") #torch.Size([16, 3, 224, 224]), dtype: torch.float32
 
         # Permute di nuovo a [C, T, H, W]
         frames = frames.permute(1, 0, 2, 3)
 
-        print(f"frames3 shape: {frames.shape}, dtype: {frames.dtype}")
+        #print(f"frames3 shape: {frames.shape}, dtype: {frames.dtype}") #torch.Size([3, 16, 224, 224]), dtype: torch.float32
 
 
         sample = {
