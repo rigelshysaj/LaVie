@@ -54,17 +54,11 @@ class UCF101Dataset(Dataset):
         # Carica i frame del video
         video_frames, _, _ = read_video(video_path, pts_unit='sec')
 
-        print(f"video_frames shape: {video_frames.shape}, dtype: {video_frames.dtype}")
+        print(f"video_frames shape: {video_frames.shape}, dtype: {video_frames.dtype}") #torch.Size([126, 240, 320, 3]), dtype: torch.uint8
 
         single_frame = video_frames[0]
 
-        print(f"single_frame1 shape: {single_frame.shape}, dtype: {single_frame.dtype}")
-
-        # Applica la trasformazione al singolo frame
-        single_frame = self.frame_transform(single_frame)
-
-        print(f"single_frame2 shape: {single_frame.shape}, dtype: {single_frame.dtype}")
-
+        print(f"single_frame1 shape: {single_frame.shape}, dtype: {single_frame.dtype}") #torch.Size([240, 320, 3]), dtype: torch.uint8
 
         # Assicurati che il video abbia il numero desiderato di frame
         frames = self.process_frames(video_frames)
