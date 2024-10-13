@@ -796,7 +796,7 @@ def lora_model(data, video_folder, args, method=1):
 
                 indices = train_dataset.class_to_indices[class_name]
                 idx = random.choice(indices)
-                sample = dataset[idx]
+                sample = train_dataset[idx]
                 one_frame = sample['frame']
                 print(f"one_frame shape: {one_frame.shape}, dtype: {one_frame.dtype}")
 
