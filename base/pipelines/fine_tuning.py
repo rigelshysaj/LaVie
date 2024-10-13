@@ -855,7 +855,7 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
         video_id = batch['video_id'][0]
         frame = batch['frame'].to(device)
 
-        print(f"frame__ shape: {frame.shape}, dtype: {frame.dtype}")
+        print(f"frame__ shape: {frame.shape}, dtype: {frame.dtype}") #torch.Size([1, 240, 320, 3]), dtype: torch.uint8
 
 
         
@@ -954,4 +954,4 @@ if __name__ == "__main__":
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, OmegaConf.load(args.config), method=3)
+    lora_model(data, video_folder, OmegaConf.load(args.config), method=2)
