@@ -71,7 +71,6 @@ class StableDiffusionPipelineOutput(BaseOutput):
 def load_and_transform_image(path):
     image = Image.open(path).convert('RGB')
     transform = transforms.Compose([
-        transforms.Resize((320, 512)),
         transforms.ToTensor(),
     ])
     # Applica la trasformazione all'immagine
@@ -955,4 +954,4 @@ if __name__ == "__main__":
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, OmegaConf.load(args.config), method=4)
+    lora_model(data, video_folder, OmegaConf.load(args.config), method=2)
