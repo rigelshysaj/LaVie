@@ -57,9 +57,13 @@ class UCF101Dataset(Dataset):
         # Assicurati che il video abbia il numero desiderato di frame
         frames = self.process_frames(video_frames)
 
+        print(f"framessss shape: {frames.shape}, dtype: {frames.dtype}")
+
         # frames shape: [C, T, H, W]
         # Permute to [T, C, H, W] per applicare le trasformazioni
         frames = frames.permute(1, 0, 2, 3)
+
+        print(f"framessss11 shape: {frames.shape}, dtype: {frames.dtype}")
 
         if self.transform:
             # Applica la trasformazione a ciascun frame
@@ -68,10 +72,16 @@ class UCF101Dataset(Dataset):
             # Normalizza i frame se nessuna trasformazione è fornita
             frames = frames.float() / 255.0
 
+        print(f"framessss22 shape: {frames.shape}, dtype: {frames.dtype}")
+
         # Permute di nuovo a [C, T, H, W]
         frames = frames.permute(1, 0, 2, 3)
 
+        print(f"framessss33 shape: {frames.shape}, dtype: {frames.dtype}")
+
         single_frame = video_frames[0]  # [H, W, C], dtype: uint8
+
+        print(f"single_frameeee shape: {single_frame.shape}, dtype: {single_frame.dtype}")
 
         # Applica la trasformazione al singolo frame
         single_frame = self.frame_transform(single_frame)
