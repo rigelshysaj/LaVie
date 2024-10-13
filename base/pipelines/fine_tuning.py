@@ -6,6 +6,7 @@ import clip
 import os
 import ucf
 from tqdm import tqdm
+from itertools import cycle
 import gc
 from torchvision.transforms import Compose, Resize, ConvertImageDtype, Normalize
 import torchvision.models.video as models_video
@@ -110,6 +111,14 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                     image_tensor = load_and_transform_image(args.image_path)
                 else:
                     image_tensor = frame
+
+                    frame_np = frame.squeeze(0).cpu().numpy()
+                    # Crea un'immagine PIL
+                    image = Image.fromarray(frame_np)
+                    
+                    # Salva l'immagine
+                    image.save("/content/drive/My Drive/Images/prova.png")
+                    print(f"Immagine salvata")
             
             # Gestione del caption sia per OmegaConf che per stringhe
             caption_text = caption[0] if OmegaConf.is_list(caption) else caption
@@ -776,6 +785,7 @@ def lora_model(data, video_folder, args, method=1):
         # Inizializza le liste per le feature
         features_gen = []
         features_real = []
+        dataloader_iter = cycle(dataloader)
 
         # Inizializza l'oggetto FVD (se usi pytorch-fvd)
         #fvd_metric = FVD(feature_layer='pre_pool', max_features=10000)
@@ -784,8 +794,13 @@ def lora_model(data, video_folder, args, method=1):
         print("Generazione e estrazione delle feature dai video sintetici...")
         for class_name in tqdm(class_names, desc="Generando video"):
             for _ in range(2):
+
+                batch = next(dataloader_iter)
+                frame = batch['frame']
+                print(f"frame!! shape: {frame.shape}, dtype: {frame.dtype}")
+
                 # Genera un video utilizzando fine_tuned_lavie
-                video_tensor = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, class_name, "FVD") # [16, 320, 512, 3], uint8
+                video_tensor = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, class_name, "FVD", frame) # [16, 320, 512, 3], uint8
 
                 # Preprocessa il video generato
                 video = ucf.preprocess_generated_video(video_tensor)  # [3, 16, 224, 224]

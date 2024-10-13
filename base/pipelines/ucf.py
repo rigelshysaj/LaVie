@@ -31,6 +31,14 @@ class UCF101Dataset(Dataset):
         self.classes = sorted(self.annotations['label'].unique())
         self.class_to_idx = {label: idx for idx, label in enumerate(self.classes)}
 
+        self.frame_transform = transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.Resize((320, 512)),
+            transforms.ToTensor(),
+            transforms.Lambda(lambda x: x.permute(1, 2, 0)),  # Change from [C, H, W] to [H, W, C]
+            transforms.Lambda(lambda x: (x * 255).byte()),    # Scale to [0, 255] and convert to uint8
+        ])
+
     def __len__(self):
         return len(self.annotations)
 
@@ -63,7 +71,17 @@ class UCF101Dataset(Dataset):
         # Permute di nuovo a [C, T, H, W]
         frames = frames.permute(1, 0, 2, 3)
 
-        sample = {'frames': frames, 'label': label}
+        single_frame = video_frames[0]  # [H, W, C], dtype: uint8
+
+        # Applica la trasformazione al singolo frame
+        single_frame = self.frame_transform(single_frame)
+
+        sample = {
+            'frames': frames,
+            'label': label,
+            'frame': single_frame
+        }
+
         return sample
 
 
