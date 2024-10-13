@@ -110,14 +110,6 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                     image_tensor = load_and_transform_image(args.image_path)
                 else:
                     image_tensor = frame
-
-                    frame_np = frame.squeeze(0).cpu().numpy()
-    
-                    # Crea un'immagine PIL
-                    image = Image.fromarray(frame_np)
-                    
-                    # Salva l'immagine
-                    image.save("/content/drive/My Drive/Images/frame.png")
             
             # Gestione del caption sia per OmegaConf che per stringhe
             caption_text = caption[0] if OmegaConf.is_list(caption) else caption
