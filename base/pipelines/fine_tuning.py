@@ -798,6 +798,7 @@ def lora_model(data, video_folder, args, method=1):
                 idx = random.choice(indices)
                 sample = train_dataset[idx]
                 one_frame = sample['frame']
+                one_frame = one_frame.unsqueeze(0)
                 print(f"one_frame shape: {one_frame.shape}, dtype: {one_frame.dtype}")
 
                 # Genera un video utilizzando fine_tuned_lavie
