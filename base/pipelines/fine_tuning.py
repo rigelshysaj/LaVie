@@ -796,14 +796,13 @@ def lora_model(data, video_folder, args, method=1):
             for _ in range(2):
 
                 batch = next(dataloader_iter)
-                frame = batch['frame']
-                #print(f"frame1 shape: {frame.shape}, dtype: {frame.dtype}") #torch.Size([8, 240, 320, 3]), dtype: torch.uint8
-                frame = frame.squeeze(0)
-                frame = frame.unsqueeze(0)
-                print(f"frame2 shape: {frame.shape}, dtype: {frame.dtype}")
+                batch_frame = batch['frame']
+                #print(f"batch_frame shape: {batch_frame.shape}, dtype: {batch_frame.dtype}") #torch.Size([8, 240, 320, 3]), dtype: torch.uint8
+                one_frame = batch_frame[0]
+                print(f"one_frame shape: {one_frame.shape}, dtype: {one_frame.dtype}")
 
                 # Genera un video utilizzando fine_tuned_lavie
-                video_tensor = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, class_name, "FVD", frame) # [16, 320, 512, 3], uint8
+                video_tensor = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, class_name, "FVD", one_frame) # [16, 320, 512, 3], uint8
 
                 # Preprocessa il video generato
                 video = ucf.preprocess_generated_video(video_tensor)  # [3, 16, 224, 224]
