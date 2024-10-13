@@ -67,7 +67,7 @@ class StableDiffusionPipelineOutput(BaseOutput):
 
 
 
-def load_and_transform_image(path):
+def load_and_transform_image_(path):
     image = Image.open(path).convert('RGB')
 
     transform = transforms.Compose([
@@ -82,6 +82,24 @@ def load_and_transform_image(path):
 
     print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}") #torch.Size([1, 3, 320, 512]), dtype: torch.float32
 
+    return image_tensor
+
+def load_and_transform_image(path):
+    image = Image.open(path).convert('RGB')
+    transform = transforms.Compose([
+        transforms.Resize((320, 512)),
+        transforms.ToTensor(),
+    ])
+    # Applica la trasformazione all'immagine
+    input_image = transform(image)
+    
+    # Converte il tensore da [C, H, W] a [H, W, C]
+    input_image = input_image.permute(1, 2, 0)
+    
+    # Aggiunge una dimensione per il batch e converte in uint8
+    image_tensor = input_image.unsqueeze(0).mul(255).byte()
+    
+    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
     return image_tensor
 
 

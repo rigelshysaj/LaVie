@@ -289,7 +289,7 @@ class VideoGenPipeline(DiffusionPipeline):
             ).last_hidden_state
             
             image_features=image_features.to(torch.float16)
-            print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}")
+            print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") #torch.Size([1, 257, 1024]), dtype: torch.float16
 
 
             mapped_image_features = self.mapper(image_features, prompt_embeds)  # Shape: (batch_size, seq_len_img, hidden_size)
