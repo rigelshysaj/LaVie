@@ -31,6 +31,11 @@ class UCF101Dataset(Dataset):
         self.classes = sorted(self.annotations['label'].unique())
         self.class_to_idx = {label: idx for idx, label in enumerate(self.classes)}
 
+        self.class_to_indices = {
+            class_name: self.annotations[self.annotations['label'] == class_name].index.tolist()
+            for class_name in self.classes
+        }
+
         self.frame_transform = transforms.Compose([
             transforms.ToPILImage(),
             transforms.Resize((320, 512)),

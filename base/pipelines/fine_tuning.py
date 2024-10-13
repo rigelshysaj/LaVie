@@ -785,7 +785,6 @@ def lora_model(data, video_folder, args, method=1):
         # Inizializza le liste per le feature
         features_gen = []
         features_real = []
-        dataloader_iter = cycle(dataloader)
 
         # Inizializza l'oggetto FVD (se usi pytorch-fvd)
         #fvd_metric = FVD(feature_layer='pre_pool', max_features=10000)
@@ -795,10 +794,10 @@ def lora_model(data, video_folder, args, method=1):
         for class_name in tqdm(class_names, desc="Generando video"):
             for _ in range(2):
 
-                batch = next(dataloader_iter)
-                batch_frame = batch['frame']
-                #print(f"batch_frame shape: {batch_frame.shape}, dtype: {batch_frame.dtype}") #torch.Size([8, 240, 320, 3]), dtype: torch.uint8
-                one_frame = batch_frame[0]
+                indices = dataset.class_to_indices[class_name]
+                idx = random.choice(indices)
+                sample = dataset[idx]
+                one_frame = sample['frame']
                 print(f"one_frame shape: {one_frame.shape}, dtype: {one_frame.dtype}")
 
                 # Genera un video utilizzando fine_tuned_lavie
