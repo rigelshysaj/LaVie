@@ -67,7 +67,7 @@ class StableDiffusionPipelineOutput(BaseOutput):
 
 
 
-def load_and_transform_image(path):
+def load_and_transform_image(path, clip_processor, clip_model, device):
     image = Image.open(path).convert('RGB')
 
     transform = transforms.Compose([
@@ -80,9 +80,14 @@ def load_and_transform_image(path):
 
     image_tensor = input_image.unsqueeze(0).to(torch.float32)  # Aggiunge una dimensione per il batch
 
-    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}") #shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
+    image_inputs = clip_processor(images=list(image_tensor), return_tensors="pt").pixel_values.to(device)
+    image_features = clip_model.vision_model(
+        pixel_values=image_inputs,
+    ).last_hidden_state
 
-    return image_tensor
+    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") #shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
+
+    return image_features
 
 
 def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption, eval_meth=""):
@@ -107,7 +112,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
 
 
             if(not is_original):
-                image_tensor = load_and_transform_image(args.image_path)
+                image_tensor = load_and_transform_image(args.image_path, clip_processor, clip_model, unet.device)
             
             print(f'Processing the ({caption}) prompt for {"original" if is_original else "fine-tuned"} model')
             videos = pipeline(
@@ -464,6 +469,9 @@ def lora_model(data, video_folder, args, method=1):
                         print(f"Skipping iteration due to error: {e}")
                         print(description)
                         continue
+
+                    print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
+
                     
 
                     print(f"epoca {epoch}, iterazione {step}, global_step {global_step}")
@@ -937,4 +945,4 @@ if __name__ == "__main__":
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, OmegaConf.load(args.config), method=3)
+    lora_model(data, video_folder, OmegaConf.load(args.config), method=1)
