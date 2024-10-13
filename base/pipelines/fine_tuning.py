@@ -85,7 +85,8 @@ def load_and_transform_image(path, clip_processor, clip_model, device):
         pixel_values=image_inputs,
     ).last_hidden_state
 
-    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") #shape: torch.Size([1, 3, 320, 512]), dtype: torch.float32
+    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") 
+    print(f"image_inputs shape: {image_inputs.shape}, dtype: {image_inputs.dtype}") 
 
     return image_features
 
@@ -516,20 +517,20 @@ def lora_model(data, video_folder, args, method=1):
                     
                     text_features=text_features.to(torch.float16)
 
-                    print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}")
+                    #print(f"text_features shape: {text_features.shape}, dtype: {text_features.dtype}") #torch.Size([1, 77, 768]), dtype: torch.float16
 
                     image_inputs = clip_processor(images=list(frame_tensor), return_tensors="pt").pixel_values.to(unet.device)
                     image_features = clip_model.vision_model(
                         pixel_values=image_inputs,
                     ).last_hidden_state
 
-                    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") #shape: torch.Size([1, 3, 224, 224]), dtype: torch.float32
+                    #print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") #torch.Size([1, 257, 1024]), dtype: torch.float32
 
                     image_features=image_features.to(torch.float16)
 
                     # Map image embeddings to text embedding space using the mapping network
                     mapped_image_features = mapper(image_features, text_features)  # Shape: (batch_size, hidden_size)
-                    print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}")
+                    #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}") #torch.Size([1, 77, 768]), dtype: torch.float32
 
                     mapped_image_embeddings_flat = mapped_image_features.reshape(-1, 768)
                     text_embeddings_flat = text_features.reshape(-1, 768)
@@ -541,16 +542,13 @@ def lora_model(data, video_folder, args, method=1):
                     target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
                     loss_mapper = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
 
-                    #alpha = 0.5  # puoi regolare questo valore
-                    #interpolated_features = alpha * text_features + (1 - alpha) * mapped_image_features
-
+                    
                     combined_features = torch.cat([text_features, mapped_image_features], dim=1)
                     
                     encoder_hidden_states = combined_features
                     
                     
                     #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
-                    #print(f"attention_weights shape: {attention_weights.shape}, dtype: {attention_weights.dtype}") 
 
                     # Get the target for loss depending on the prediction type
                     if args.prediction_type is not None:
@@ -943,4 +941,4 @@ if __name__ == "__main__":
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, OmegaConf.load(args.config), method=1)
+    lora_model(data, video_folder, OmegaConf.load(args.config), method=2)
