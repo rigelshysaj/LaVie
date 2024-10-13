@@ -123,7 +123,7 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
             suffix = "original" if is_original else "fine_tuned"
 
             # Sostituisci gli spazi con underscore nel caption
-            formatted_caption = caption[0].replace(' ', '_')
+            formatted_caption = caption.replace(' ', '_')
 
             # Crea il nome del file
             file_name = f"{suffix}_{formatted_caption}_{eval_meth}.mp4"
