@@ -54,7 +54,7 @@ class MSRVTTDataset(Dataset):
             transforms.Resize((320, 512)),  # Ridimensiona il frame
             transforms.ToTensor(),          # Converte in tensore
             transforms.Lambda(lambda x: x.permute(1, 2, 0)),  # Cambia da [C, H, W] a [H, W, C]
-            transforms.Lambda(lambda x: x.unsqueeze(0) * 255),  # Aggiungi dimensione batch e scala a [0, 255]
+            transforms.Lambda(lambda x: x * 255),  # Scala a [0, 255]
             transforms.Lambda(lambda x: x.byte())  # Converte in torch.uint8
         ])
 

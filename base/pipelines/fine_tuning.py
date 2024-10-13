@@ -86,7 +86,7 @@ def load_and_transform_image(path):
     return image_tensor
     
 
-def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption, eval_meth=""):
+def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption, eval_meth="", frame=None):
 
     mapper.dtype = next(mapper.parameters()).dtype
 
@@ -106,7 +106,10 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
             pipeline.enable_xformers_memory_efficient_attention()
 
             if(not is_original):
-                image_tensor = load_and_transform_image(args.image_path)
+                if(frame is None):
+                    image_tensor = load_and_transform_image(args.image_path)
+                else:
+                    image_tensor = frame
             
             # Gestione del caption sia per OmegaConf che per stringhe
             caption_text = caption[0] if OmegaConf.is_list(caption) else caption
@@ -842,7 +845,7 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
         
         # Generate Video from Caption using Your Model
         with torch.no_grad():
-            generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption, "clipsim")
+            generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption, "clipsim", frame)
         
 
         #print(f"Shape of generated_video_frames: {generated_video_frames.shape}")
