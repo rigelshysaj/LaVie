@@ -126,7 +126,8 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 image_tensor = load_and_transform_image(args.image_path)
             
             # Gestione del caption sia per OmegaConf che per stringhe
-            caption_text = caption[0] if isinstance(caption, OmegaConf.ListConfig) else caption
+            caption_text = caption[0] if OmegaConf.is_list(caption) else caption
+
             print(f'Processing the ({caption_text}) prompt for {"original" if is_original else "fine-tuned"} model')
             videos = pipeline(
                 caption_text,
