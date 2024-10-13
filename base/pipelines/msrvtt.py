@@ -49,6 +49,15 @@ class MSRVTTDataset(Dataset):
                     self.captions[video_id] = []
                 self.captions[video_id].append(sentence['caption'])
 
+        # Definisci una trasformazione per il frame specifico
+        self.frame_transform = transforms.Compose([
+            transforms.Resize((320, 512)),  # Ridimensiona il frame
+            transforms.ToTensor(),          # Converte in tensore
+            transforms.Lambda(lambda x: x.permute(1, 2, 0)),  # Cambia da [C, H, W] a [H, W, C]
+            transforms.Lambda(lambda x: x.unsqueeze(0) * 255),  # Aggiungi dimensione batch e scala a [0, 255]
+            transforms.Lambda(lambda x: x.byte())  # Converte in torch.uint8
+        ])
+
     def __len__(self):
         return len(self.videos)
 
@@ -66,9 +75,15 @@ class MSRVTTDataset(Dataset):
         frames = self._load_video_frames(video_path)
 
         if self.transform:
-            frames = torch.stack([self.transform(frame) for frame in frames])
+            transformed_frames = torch.stack([self.transform(frame) for frame in frames])
         else:
-            frames = torch.stack([transforms.ToTensor()(frame) for frame in frames])
+            transformed_frames = torch.stack([transforms.ToTensor()(frame) for frame in frames])
+
+        # Seleziona un frame specifico (es. il primo frame)
+        selected_frame = frames[1]  # Puoi cambiare l'indice per selezionare un altro frame
+
+        # Applica le trasformazioni definite per il frame
+        frame_tensor = self.frame_transform(selected_frame)
 
         # Ottieni le didascalie (captions) associate al video
         captions = self.captions.get(video_id, [])
@@ -78,8 +93,14 @@ class MSRVTTDataset(Dataset):
         else:
             caption = ""
 
-        sample = {'video': frames, 'caption': caption, 'video_id': video_id}
+        sample = {
+            'video': transformed_frames,     # Tensor dei frame del video
+            'caption': caption,              # Didascalia
+            'video_id': video_id,            # ID del video
+            'frame': frame_tensor            # Frame specifico con shape [1, 320, 512, 3] e dtype torch.uint8
+        }
         return sample
+    
 
     def _load_video_frames(self, video_path):
         """
@@ -97,18 +118,24 @@ class MSRVTTDataset(Dataset):
         cap.release()
         return frames
     
+
 def collate_fn(batch):
     # Estrai i componenti del batch
     videos = [sample['video'] for sample in batch]
     captions = [sample['caption'] for sample in batch]
     video_ids = [sample['video_id'] for sample in batch]
-
-    # Tronca tutti i video alla lunghezza minima
-    #truncated_videos = [video[:5] for video in videos]
+    frames = [sample['frame'] for sample in batch]
 
     # Stack dei video
-    videos_tensor = torch.stack(videos)
+    videos_tensor = torch.stack(videos)  # [batch_size, num_frames, C, H, W]
 
-    return {'video': videos_tensor, 'caption': captions, 'video_id': video_ids}
+    # Stack dei frame specifici
+    frames_tensor = torch.stack(frames)  # [batch_size, 1, 320, 512, 3]
 
+    return {
+        'video': videos_tensor,
+        'caption': captions,
+        'video_id': video_ids,
+        'frame': frames_tensor
+    }
 

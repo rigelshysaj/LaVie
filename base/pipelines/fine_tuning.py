@@ -67,23 +67,6 @@ class StableDiffusionPipelineOutput(BaseOutput):
 
 
 
-def load_and_transform_image_(path):
-    image = Image.open(path).convert('RGB')
-
-    transform = transforms.Compose([
-        transforms.Resize((320, 512)),
-        transforms.ToTensor(),
-    ])
-
-    # Applica la trasformazione all'immagine
-    input_image = transform(image)
-
-    image_tensor = input_image.unsqueeze(0).to(torch.float32)  # Aggiunge una dimensione per il batch
-
-    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}") #torch.Size([1, 3, 320, 512]), dtype: torch.float32
-
-    return image_tensor
-
 def load_and_transform_image(path):
     image = Image.open(path).convert('RGB')
     transform = transforms.Compose([
@@ -99,7 +82,7 @@ def load_and_transform_image(path):
     # Aggiunge una dimensione per il batch e converte in uint8
     image_tensor = input_image.unsqueeze(0).mul(255).byte()
     
-    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
+    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}") #shape: torch.Size([1, 320, 512, 3]), dtype: torch.uint8
     return image_tensor
     
 
@@ -851,6 +834,11 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
         gt_video = batch['video'].squeeze(0).to(device)  # (num_frames, C, H, W)
         caption = batch['caption'][0]  # Single caption
         video_id = batch['video_id'][0]
+        frame = batch['frame'].to(device)
+
+        print(f"frame__ shape: {frame.shape}, dtype: {frame.dtype}")
+
+
         
         # Generate Video from Caption using Your Model
         with torch.no_grad():
@@ -947,4 +935,4 @@ if __name__ == "__main__":
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, OmegaConf.load(args.config), method=2)
+    lora_model(data, video_folder, OmegaConf.load(args.config), method=3)
