@@ -54,6 +54,16 @@ class UCF101Dataset(Dataset):
         # Carica i frame del video
         video_frames, _, _ = read_video(video_path, pts_unit='sec')
 
+        single_frame = video_frames[0]
+
+        print(f"single_frameeee11 shape: {single_frame.shape}, dtype: {single_frame.dtype}")
+
+        # Applica la trasformazione al singolo frame
+        single_frame = self.frame_transform(single_frame)
+
+        print(f"single_frameeee22 shape: {single_frame.shape}, dtype: {single_frame.dtype}")
+
+
         # Assicurati che il video abbia il numero desiderato di frame
         frames = self.process_frames(video_frames)
 
@@ -78,15 +88,6 @@ class UCF101Dataset(Dataset):
         frames = frames.permute(1, 0, 2, 3)
 
         print(f"framessss33 shape: {frames.shape}, dtype: {frames.dtype}")
-
-        single_frame = video_frames[0]  # [H, W, C], dtype: uint8
-
-        print(f"single_frameeee11 shape: {single_frame.shape}, dtype: {single_frame.dtype}")
-
-        # Applica la trasformazione al singolo frame
-        single_frame = self.frame_transform(single_frame)
-
-        print(f"single_frameeee22 shape: {single_frame.shape}, dtype: {single_frame.dtype}")
 
 
         sample = {
