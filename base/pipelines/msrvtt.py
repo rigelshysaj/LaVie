@@ -51,7 +51,6 @@ class MSRVTTDataset(Dataset):
 
         # Definisci una trasformazione per il frame specifico
         self.frame_transform = transforms.Compose([
-            transforms.Resize((320, 512)),  # Ridimensiona il frame
             transforms.ToTensor(),          # Converte in tensore
             transforms.Lambda(lambda x: x.permute(1, 2, 0)),  # Cambia da [C, H, W] a [H, W, C]
             transforms.Lambda(lambda x: x * 255),  # Scala a [0, 255]
