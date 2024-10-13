@@ -787,7 +787,7 @@ def lora_model(data, video_folder, args, method=1):
         # Genera video sintetici e estrae le feature
         print("Generazione e estrazione delle feature dai video sintetici...")
         for class_name in tqdm(class_names, desc="Generando video"):
-            for _ in range(1):
+            for _ in range(2):
                 # Genera un video utilizzando fine_tuned_lavie
                 video_tensor = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, class_name, "FVD") # [16, 320, 512, 3], uint8
 
