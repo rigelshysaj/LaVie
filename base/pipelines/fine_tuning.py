@@ -101,67 +101,60 @@ def load_and_transform_image(path):
     
     print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}")
     return image_tensor
-
+    
 
 def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption, eval_meth=""):
-        
+
     mapper.dtype = next(mapper.parameters()).dtype
 
     with torch.no_grad():
         # Funzione per generare video
         def generate_video(unet, is_original):
             pipeline = VideoGenPipeline(
-                vae=vae, 
-                text_encoder=text_encoder, 
-                tokenizer=tokenizer, 
-                scheduler=noise_scheduler, 
+                vae=vae,
+                text_encoder=text_encoder,
+                tokenizer=tokenizer,
+                scheduler=noise_scheduler,
                 unet=unet,
                 clip_processor=clip_processor,
                 clip_model=clip_model,
                 mapper=mapper
             ).to(device)
-
             pipeline.enable_xformers_memory_efficient_attention()
-
 
             if(not is_original):
                 image_tensor = load_and_transform_image(args.image_path)
             
-            print(f'Processing the ({caption}) prompt for {"original" if is_original else "fine-tuned"} model')
+            # Gestione del caption sia per OmegaConf che per stringhe
+            caption_text = caption[0] if isinstance(caption, OmegaConf.ListConfig) else caption
+            print(f'Processing the ({caption_text}) prompt for {"original" if is_original else "fine-tuned"} model')
             videos = pipeline(
-                caption[0],
+                caption_text,
                 image_tensor=image_tensor if not is_original else None,
-                video_length=args.video_length, 
-                height=args.image_size[0], 
-                width=args.image_size[1], 
+                video_length=args.video_length,
+                height=args.image_size[0],
+                width=args.image_size[1],
                 num_inference_steps=args.num_sampling_steps,
                 guidance_scale=args.guidance_scale
             ).video
 
             suffix = "original" if is_original else "fine_tuned"
-
             # Sostituisci gli spazi con underscore nel caption
-            formatted_caption = caption.replace(' ', '_')
-
+            formatted_caption = caption_text.replace(' ', '_')
             # Crea il nome del file
             file_name = f"{suffix}_{formatted_caption}_{eval_meth}.mp4"
-
             # Usa il nuovo nome del file nella funzione mimwrite
             imageio.mimwrite(f"/content/drive/My Drive/Images/{file_name}", videos[0], fps=8, quality=9)
-
             #imageio.mimwrite(f"/content/drive/My Drive/Images/{suffix}.mp4", videos[0], fps=8, quality=9)
             return videos[0]
 
         # Genera video con il modello fine-tuned
         video = generate_video(unet, is_original=False)
-
         #generate_video(original_unet, is_original=True)
 
         #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
         torch.cuda.empty_cache()
-
-        print('save path {}'.format("/content/drive/My Drive/"))
-
+        print('save path {}'.format("/content/drive/My Drive/Images"))
         return video
     
 
@@ -277,7 +270,7 @@ def lora_model(data, video_folder, args, method=1):
 
     # Instantiate the mapping network
     mapper = MappingNetwork().to(unet.device)
-    mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
+    #mapper.load_state_dict(torch.load('/content/drive/My Drive/checkpoints/mapping_network.pth'))
 
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
     text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
@@ -438,7 +431,7 @@ def lora_model(data, video_folder, args, method=1):
             accelerator.print(f"Resuming from checkpoint {path}")
             accelerator.load_state(os.path.join(args.output_dir, path))
             # Load the mapper state dict
-            #mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
+            mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
             global_step = int(path.split("-")[1])
 
             initial_global_step = global_step
