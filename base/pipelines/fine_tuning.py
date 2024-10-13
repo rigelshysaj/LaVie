@@ -85,8 +85,8 @@ def load_and_transform_image(path, clip_processor, clip_model, device):
         pixel_values=image_inputs,
     ).last_hidden_state
 
-    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") 
-    print(f"image_inputs shape: {image_inputs.shape}, dtype: {image_inputs.dtype}") 
+    print(f"image_features shape: {image_features.shape}, dtype: {image_features.dtype}") #torch.Size([1, 257, 1024]), dtype: torch.float32
+    print(f"image_tensor shape: {image_tensor.shape}, dtype: {image_tensor.dtype}") 
 
     return image_features
 
