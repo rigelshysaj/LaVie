@@ -470,7 +470,8 @@ def lora_model(data, video_folder, args, method=1):
                         print(description)
                         continue
 
-                    print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}")
+                    print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #torch.Size([1, 320, 512, 3]), dtype: torch.uint8
+                    print(f"video shape: {video.shape}, dtype: {video.dtype}") #torch.Size([1, 320, 512, 3]), dtype: torch.uint8
 
                     
 
