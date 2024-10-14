@@ -765,12 +765,23 @@ def lora_model(data, video_folder, args, method=1):
             num_frames=16
         )
 
+        class_names = train_dataset.classes
+        num_classes = len(class_names)
         random.seed(42)
-        total_samples = len(train_dataset)
-        subset_size = 100
-        subset_indices = random.sample(range(total_samples), subset_size)
+        num_classes = len(class_names)
+        subset_size = 100  # Your desired subset size
+        samples_per_class = max(1, subset_size // num_classes)
 
-        # Crea il sottoinsieme del dataset
+        subset_indices = []
+
+        for class_name in class_names:
+            indices_in_class = train_dataset.class_to_indices[class_name]
+            if len(indices_in_class) >= samples_per_class:
+                selected_indices = random.sample(indices_in_class, samples_per_class)
+            else:
+                selected_indices = indices_in_class  # Take all if not enough samples
+            subset_indices.extend(selected_indices)
+
         subset_train_dataset = Subset(train_dataset, subset_indices)
 
         # Crea il DataLoader per i video reali
@@ -786,8 +797,7 @@ def lora_model(data, video_folder, args, method=1):
         i3d_model.eval()
 
         # Ottieni i nomi delle classi
-        class_names = train_dataset.classes
-        num_classes = len(class_names)
+        
         print(f"number of classes is: {num_classes}")
 
         # Inizializza le liste per le feature
