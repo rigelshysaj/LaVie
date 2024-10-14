@@ -149,8 +149,8 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
             return videos[0]
 
         # Genera video con il modello fine-tuned
-        video = generate_video(unet, is_original=False)
-        #generate_video(original_unet, is_original=True)
+        #video = generate_video(unet, is_original=False)
+        video = generate_video(original_unet, is_original=True)
 
         #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
         torch.cuda.empty_cache()
@@ -264,9 +264,9 @@ def lora_model(data, video_folder, args, method=1):
     unet.load_state_dict(state_dict)
 
     # Carica il modello UNet originale
-    #original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
-    #original_unet.load_state_dict(state_dict)
-    original_unet = None
+    original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
+    original_unet.load_state_dict(state_dict)
+    #original_unet = None
 
     # Instantiate the mapping network
     mapper = MappingNetwork().to(unet.device)
@@ -980,4 +980,4 @@ if __name__ == "__main__":
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, OmegaConf.load(args.config), method=2)
+    lora_model(data, video_folder, OmegaConf.load(args.config), method=4)
