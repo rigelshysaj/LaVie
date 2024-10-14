@@ -802,7 +802,7 @@ def lora_model(data, video_folder, args, method=1):
         for class_name in tqdm(class_names, desc="Generando video"):
             for _ in range(2):
 
-                indices = subset_train_dataset.dataset.class_to_indices[class_name]
+                indices = get_class_indices_in_subset(subset_train_dataset, class_name)
                 idx = random.choice(indices)
                 sample = subset_train_dataset[idx]
                 one_frame = sample['frame']
@@ -847,6 +847,14 @@ def lora_model(data, video_folder, args, method=1):
         #fvd_score = fvd_metric(features_gen, features_real)
         #print(f"FVD score: {fvd_score}")
 
+
+def get_class_indices_in_subset(subset, class_name):
+    indices_in_subset = []
+    for i, original_idx in enumerate(subset.indices):
+        label = subset.dataset.annotations.iloc[original_idx]['label']
+        if label == class_name:
+            indices_in_subset.append(i)
+    return indices_in_subset
 
 
 def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device, args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, mapper):
