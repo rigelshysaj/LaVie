@@ -37,10 +37,14 @@ class UCF101Dataset(Dataset):
         }
 
         self.frame_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Lambda(lambda x: x.permute(1, 2, 0)),  # Change from [C, H, W] to [H, W, C]
-            transforms.Lambda(lambda x: (x * 255).byte()),    # Scale to [0, 255] and convert to uint8
+            transforms.Lambda(lambda x: x.permute(2, 0, 1)),  # Da [H, W, C] a [C, H, W]
+            transforms.ToPILImage(),
+            transforms.Resize((320, 512)),  # Ridimensiona a (altezza, larghezza)
+            transforms.ToTensor(),  # Converte in tensor con valori in [0, 1]
+            transforms.Lambda(lambda x: (x * 255).byte()),  # Scala a [0, 255] e converte in uint8
+            transforms.Lambda(lambda x: x.permute(1, 2, 0)),  # Da [C, H, W] a [H, W, C]
         ])
+
 
     def __len__(self):
         return len(self.annotations)
