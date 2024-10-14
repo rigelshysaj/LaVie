@@ -769,7 +769,7 @@ def lora_model(data, video_folder, args, method=1):
         num_classes = len(class_names)
         random.seed(42)
         num_classes = len(class_names)
-        subset_size = 100  # Your desired subset size
+        subset_size = 150  # Your desired subset size
         samples_per_class = max(1, subset_size // num_classes)
 
         subset_indices = []
