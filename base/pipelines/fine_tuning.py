@@ -802,7 +802,7 @@ def lora_model(data, video_folder, args, method=1):
         for class_name in tqdm(class_names, desc="Generando video"):
             for _ in range(2):
 
-                indices = subset_train_dataset.class_to_indices[class_name]
+                indices = subset_train_dataset.dataset.class_to_indices[class_name]
                 idx = random.choice(indices)
                 sample = subset_train_dataset[idx]
                 one_frame = sample['frame']
