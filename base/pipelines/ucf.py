@@ -37,10 +37,10 @@ class UCF101Dataset(Dataset):
         }
 
         self.frame_transform = transforms.Compose([
-            transforms.ToTensor(),          # Converte in tensore
-            transforms.Lambda(lambda x: x.permute(1, 2, 0)),  # Cambia da [C, H, W] a [H, W, C]
-            transforms.Lambda(lambda x: x * 255),  # Scala a [0, 255]
-            transforms.Lambda(lambda x: x.byte())  # Converte in torch.uint8
+            transforms.ToPILImage(),
+            transforms.ToTensor(),
+            transforms.Lambda(lambda x: x.permute(1, 2, 0)),  # Change from [C, H, W] to [H, W, C]
+            transforms.Lambda(lambda x: (x * 255).byte()),    # Scale to [0, 255] and convert to uint8
         ])
 
     def __len__(self):
@@ -60,7 +60,9 @@ class UCF101Dataset(Dataset):
 
         #print(f"video_frames shape: {video_frames.shape}, dtype: {video_frames.dtype}") #torch.Size([126, 240, 320, 3]), dtype: torch.uint8
 
-        single_frame = video_frames[3]
+        single_frame = video_frames[1]
+
+        single_frame = self.frame_transform(single_frame)
 
         #print(f"single_frame1 shape: {single_frame.shape}, dtype: {single_frame.dtype}") #torch.Size([240, 320, 3]), dtype: torch.uint8
 
