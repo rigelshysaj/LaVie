@@ -942,9 +942,15 @@ def get_clip_similarity(clip_model, preprocess, text, image, device):
         # Normalize the features
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
         text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+
+        cosine_similarity = F.cosine_similarity(image_features, text_features).item()
+
+        print(f"cosine_similirat is: {cosine_similarity}")
         
         # Compute similarity
         similarity = (image_features @ text_features.T).item()
+
+        print(f"similarity is: {similarity}")
 
     return similarity
 
@@ -979,4 +985,4 @@ if __name__ == "__main__":
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, OmegaConf.load(args.config), method=4)
+    lora_model(data, video_folder, OmegaConf.load(args.config), method=3)
