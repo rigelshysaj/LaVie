@@ -730,11 +730,7 @@ def lora_model(data, video_folder, args, method=1):
         # Imposta un seme per la riproducibilità (opzionale)
         random.seed(42)
         
-        # Verifica che il dataset abbia almeno 10 campioni
-        if len(datasetM) < 100:
-            raise ValueError("Il dataset contiene meno di 10 campioni.")
-        
-        # Seleziona casualmente 10 indici
+        # Seleziona casualmente 100 indici
         subset_indices = random.sample(range(len(datasetM)), 100)
         
         # Crea il sottoinsieme del dataset
@@ -764,8 +760,16 @@ def lora_model(data, video_folder, args, method=1):
             num_frames=16
         )
 
+        random.seed(42)
+        total_samples = len(train_dataset)
+        subset_size = 100
+        subset_indices = random.sample(range(total_samples), subset_size)
+
+        # Crea il sottoinsieme del dataset
+        subset_train_dataset = Subset(train_dataset, subset_indices)
+
         # Crea il DataLoader per i video reali
-        dataloader = DataLoader(train_dataset, batch_size=8, shuffle=False, num_workers=4)
+        dataloader = DataLoader(subset_train_dataset, batch_size=8, shuffle=False, num_workers=4)
 
         # Carica il modello I3D pre-addestrato
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -954,4 +958,4 @@ if __name__ == "__main__":
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, OmegaConf.load(args.config), method=2)
+    lora_model(data, video_folder, OmegaConf.load(args.config), method=4)
