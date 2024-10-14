@@ -122,13 +122,13 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 else:
                     image_tensor = frame
 
-                    frame_np = frame.squeeze(0).cpu().numpy()
+                    #frame_np = frame.squeeze(0).cpu().numpy()
                     # Crea un'immagine PIL
-                    image = Image.fromarray(frame_np)
+                    #image = Image.fromarray(frame_np)
                     
                     # Salva l'immagine
-                    image.save(f"/content/drive/My Drive/Images/{image_name}")
-                    print(f"Immagine salvata")
+                    #image.save(f"/content/drive/My Drive/Images/{image_name}")
+                    #print(f"Immagine salvata")
             
             
             videos = pipeline(
@@ -769,7 +769,7 @@ def lora_model(data, video_folder, args, method=1):
         num_classes = len(class_names)
         random.seed(42)
         num_classes = len(class_names)
-        subset_size = 150  # Your desired subset size
+        subset_size = 101  # Your desired subset size
         samples_per_class = max(1, subset_size // num_classes)
 
         subset_indices = []
@@ -810,28 +810,27 @@ def lora_model(data, video_folder, args, method=1):
         # Genera video sintetici e estrae le feature
         print("Generazione e estrazione delle feature dai video sintetici...")
         for class_name in tqdm(class_names, desc="Generando video"):
-            for _ in range(2):
+            #for _ in range(2):
+            indices = get_class_indices_in_subset(subset_train_dataset, class_name)
+            idx = random.choice(indices)
+            sample = subset_train_dataset[idx]
+            one_frame = sample['frame']
+            one_frame = one_frame.unsqueeze(0)
+            print(f"one_frame shape: {one_frame.shape}, dtype: {one_frame.dtype}")
 
-                indices = get_class_indices_in_subset(subset_train_dataset, class_name)
-                idx = random.choice(indices)
-                sample = subset_train_dataset[idx]
-                one_frame = sample['frame']
-                one_frame = one_frame.unsqueeze(0)
-                print(f"one_frame shape: {one_frame.shape}, dtype: {one_frame.dtype}")
+            # Genera un video utilizzando fine_tuned_lavie
+            video_tensor = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, class_name, "FVD", one_frame) # [16, 320, 512, 3], uint8
 
-                # Genera un video utilizzando fine_tuned_lavie
-                video_tensor = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, class_name, "FVD", one_frame) # [16, 320, 512, 3], uint8
+            # Preprocessa il video generato
+            video = ucf.preprocess_generated_video(video_tensor)  # [3, 16, 224, 224]
 
-                # Preprocessa il video generato
-                video = ucf.preprocess_generated_video(video_tensor)  # [3, 16, 224, 224]
+            # Aggiungi una dimensione batch
+            video = video.unsqueeze(0)  # [1, 3, 16, 224, 224]
 
-                # Aggiungi una dimensione batch
-                video = video.unsqueeze(0)  # [1, 3, 16, 224, 224]
-
-                # Estrai le feature utilizzando I3D
-                feat = ucf.extract_i3d_features(video, i3d_model, device)  # [1, feature_dim, 1, 1, 1]
-                feat = feat.view(feat.size(0), -1)  # Appiattisci a [1, feature_dim]
-                features_gen.append(feat.squeeze(0).numpy())
+            # Estrai le feature utilizzando I3D
+            feat = ucf.extract_i3d_features(video, i3d_model, device)  # [1, feature_dim, 1, 1, 1]
+            feat = feat.view(feat.size(0), -1)  # Appiattisci a [1, feature_dim]
+            features_gen.append(feat.squeeze(0).numpy())
 
         # Estrai le feature dai video reali
         print("Estrazione delle feature dai video reali...")
