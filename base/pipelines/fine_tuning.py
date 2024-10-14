@@ -105,24 +105,32 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
             ).to(device)
             pipeline.enable_xformers_memory_efficient_attention()
 
+            # Gestione del caption sia per OmegaConf che per stringhe
+            caption_text = caption[0] if OmegaConf.is_list(caption) else caption
+
+            print(f'Processing the ({caption_text}) prompt for {"original" if is_original else "fine-tuned"} model')
+
+            suffix = "original" if is_original else "fine_tuned"
+            # Sostituisci gli spazi con underscore nel caption
+            formatted_caption = caption_text.replace(' ', '_')
+
+            image_name = f"{suffix}_{formatted_caption}_{eval_meth}.png"
+
             if(not is_original):
                 if(frame is None):
                     image_tensor = load_and_transform_image(args.image_path)
                 else:
                     image_tensor = frame
 
-                    #frame_np = frame.squeeze(0).cpu().numpy()
+                    frame_np = frame.squeeze(0).cpu().numpy()
                     # Crea un'immagine PIL
-                    #image = Image.fromarray(frame_np)
+                    image = Image.fromarray(frame_np)
                     
                     # Salva l'immagine
-                    #image.save("/content/drive/My Drive/Images/prova.png")
-                    #print(f"Immagine salvata")
+                    image.save(f"/content/drive/My Drive/Images/{image_name}")
+                    print(f"Immagine salvata")
             
-            # Gestione del caption sia per OmegaConf che per stringhe
-            caption_text = caption[0] if OmegaConf.is_list(caption) else caption
-
-            print(f'Processing the ({caption_text}) prompt for {"original" if is_original else "fine-tuned"} model')
+            
             videos = pipeline(
                 caption_text,
                 image_tensor=image_tensor if not is_original else None,
@@ -133,13 +141,10 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
                 guidance_scale=args.guidance_scale
             ).video
 
-            suffix = "original" if is_original else "fine_tuned"
-            # Sostituisci gli spazi con underscore nel caption
-            formatted_caption = caption_text.replace(' ', '_')
             # Crea il nome del file
-            file_name = f"{suffix}_{formatted_caption}_{eval_meth}.mp4"
+            video_name = f"{suffix}_{formatted_caption}_{eval_meth}.mp4"
             # Usa il nuovo nome del file nella funzione mimwrite
-            imageio.mimwrite(f"/content/drive/My Drive/Images/{file_name}", videos[0], fps=8, quality=9)
+            imageio.mimwrite(f"/content/drive/My Drive/Images/{video_name}", videos[0], fps=8, quality=9)
             #imageio.mimwrite(f"/content/drive/My Drive/Images/{suffix}.mp4", videos[0], fps=8, quality=9)
             return videos[0]
 
@@ -797,9 +802,9 @@ def lora_model(data, video_folder, args, method=1):
         for class_name in tqdm(class_names, desc="Generando video"):
             for _ in range(2):
 
-                indices = train_dataset.class_to_indices[class_name]
+                indices = subset_train_dataset.class_to_indices[class_name]
                 idx = random.choice(indices)
-                sample = train_dataset[idx]
+                sample = subset_train_dataset[idx]
                 one_frame = sample['frame']
                 one_frame = one_frame.unsqueeze(0)
                 print(f"one_frame shape: {one_frame.shape}, dtype: {one_frame.dtype}")

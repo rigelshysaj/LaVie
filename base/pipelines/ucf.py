@@ -61,7 +61,7 @@ class UCF101Dataset(Dataset):
 
         #print(f"video_frames shape: {video_frames.shape}, dtype: {video_frames.dtype}") #torch.Size([126, 240, 320, 3]), dtype: torch.uint8
 
-        single_frame = video_frames[0]
+        single_frame = video_frames[3]
 
         #print(f"single_frame1 shape: {single_frame.shape}, dtype: {single_frame.dtype}") #torch.Size([240, 320, 3]), dtype: torch.uint8
 
