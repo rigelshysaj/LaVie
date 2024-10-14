@@ -37,7 +37,6 @@ class UCF101Dataset(Dataset):
         }
 
         self.frame_transform = transforms.Compose([
-            transforms.ToPILImage(),
             transforms.ToTensor(),
             transforms.Lambda(lambda x: x.permute(1, 2, 0)),  # Change from [C, H, W] to [H, W, C]
             transforms.Lambda(lambda x: (x * 255).byte()),    # Scale to [0, 255] and convert to uint8
