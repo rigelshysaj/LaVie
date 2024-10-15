@@ -732,7 +732,7 @@ def lora_model(data, video_folder, args, method=1):
             transform=transform
         )
 
-        print(f"dataset msrvtt samples: {len(datasetM)}")
+        #print(f"dataset msrvtt samples: {len(datasetM)}") #497
 
         # Imposta un seme per la riproducibilità (opzionale)
         random.seed(42)
@@ -989,4 +989,4 @@ if __name__ == "__main__":
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, OmegaConf.load(args.config), method=3)
+    lora_model(data, video_folder, OmegaConf.load(args.config), method=4)
