@@ -732,6 +732,8 @@ def lora_model(data, video_folder, args, method=1):
             transform=transform
         )
 
+        print(f"dataset msrvtt samples: {len(datasetM)}")
+
         # Imposta un seme per la riproducibilità (opzionale)
         random.seed(42)
         
@@ -764,6 +766,8 @@ def lora_model(data, video_folder, args, method=1):
             transform=transform,
             num_frames=16
         )
+
+        print(f"dataset ucf samples: {len(train_dataset)}")
 
         class_names = train_dataset.classes
         num_classes = len(class_names)
