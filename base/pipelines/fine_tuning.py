@@ -767,7 +767,7 @@ def lora_model(data, video_folder, args, method=1):
             num_frames=16
         )
 
-        print(f"dataset ucf samples: {len(train_dataset)}")
+        #print(f"dataset ucf samples: {len(train_dataset)}") #1723
 
         class_names = train_dataset.classes
         num_classes = len(class_names)
