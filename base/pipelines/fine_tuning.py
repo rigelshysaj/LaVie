@@ -108,9 +108,9 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
             # Gestione del caption sia per OmegaConf che per stringhe
             caption_text = caption[0] if OmegaConf.is_list(caption) else caption
 
-            print(f'Processing the ({caption_text}) prompt for {"fine-tuned"} model')
+            print(f'Processing the ({caption_text}) prompt for {"original" if is_original else "fine-tuned"} model')
 
-            suffix = "fine_tuned"
+            suffix = "original" if is_original else "fine_tuned"
             # Sostituisci gli spazi con underscore nel caption
             formatted_caption = caption_text.replace(' ', '_')
 
@@ -149,8 +149,8 @@ def inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processo
             return videos[0]
 
         # Genera video con il modello fine-tuned
-        #video = generate_video(unet, is_original=False)
-        video = generate_video(original_unet, is_original=True)
+        video = generate_video(unet, is_original=False)
+        #generate_video(original_unet, is_original=True)
 
         #del original_unet #Poi quando fa l'inference la seconda volta non trova più unet e dice referenced before assignment
         torch.cuda.empty_cache()
@@ -264,9 +264,9 @@ def lora_model(data, video_folder, args, method=1):
     unet.load_state_dict(state_dict)
 
     # Carica il modello UNet originale
-    original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
-    original_unet.load_state_dict(state_dict)
-    #original_unet = None
+    #original_unet = get_models(args, sd_path).to(device, dtype=torch.float32)
+    #original_unet.load_state_dict(state_dict)
+    original_unet = None
 
     # Instantiate the mapping network
     mapper = MappingNetwork().to(unet.device)
