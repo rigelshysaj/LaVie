@@ -729,8 +729,6 @@ def lora_model(data, video_folder, args, method=1):
             transform=transform
         )
 
-        #print(f"dataset msrvtt samples: {len(datasetM)}") #497
-
         # Imposta un seme per la riproducibilità (opzionale)
         random.seed(42)
         
@@ -763,8 +761,6 @@ def lora_model(data, video_folder, args, method=1):
             transform=transform,
             num_frames=16
         )
-
-        #print(f"dataset ucf samples: {len(train_dataset)}") #1723
 
         class_names = train_dataset.classes
         num_classes = len(class_names)
@@ -804,10 +800,6 @@ def lora_model(data, video_folder, args, method=1):
         features_gen = []
         features_real = []
 
-        # Inizializza l'oggetto FVD (se usi pytorch-fvd)
-        #fvd_metric = FVD(feature_layer='pre_pool', max_features=10000)
-
-        # Genera video sintetici e estrae le feature
         print("Generazione e estrazione delle feature dai video sintetici...")
         for class_name in tqdm(class_names, desc="Generando video"):
             #for _ in range(2):
@@ -852,9 +844,6 @@ def lora_model(data, video_folder, args, method=1):
         fvd_score = ucf.compute_fvd(features_gen, features_real)
         print(f"FVD score: {fvd_score}")
 
-        # Se utilizzi pytorch-fvd, puoi fare qualcosa di simile:
-        #fvd_score = fvd_metric(features_gen, features_real)
-        #print(f"FVD score: {fvd_score}")
 
 
 def get_class_indices_in_subset(subset, class_name):
@@ -870,7 +859,6 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
 
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=msrvtt.collate_fn)
     
-    total_gt_similarity = 0  # For ground truth videos
     total_gen_similarity = 0  # For generated videos
     num_videos = 0
     
@@ -882,29 +870,12 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
         frame = batch['frame'].to(device)
 
         print(f"frame__ shape: {frame.shape}, dtype: {frame.dtype}") #torch.Size([1, 240, 320, 3]), dtype: torch.uint8
-
-
         
         # Generate Video from Caption using Your Model
         with torch.no_grad():
             generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption, "clipsim", frame)
         
         gen_frames = process_video_frames(generated_video_frames)
-        
-        # Salva un frame per debug (opzionale)
-        #if len(gen_frames) > 0:
-        #    gen_frames[0].save("/content/drive/My Drive/Images/generated_frame_0.png")
-
-        
-        '''
-        # Compute CLIP Similarity for Ground Truth Video
-        gt_frame_similarities = []
-        for frame in gt_frames:
-            similarity = get_clip_similarity(clip_model32, preprocess32, caption, frame, device)
-            gt_frame_similarities.append(similarity)
-        avg_gt_similarity = sum(gt_frame_similarities) / len(gt_frame_similarities)
-        total_gt_similarity += avg_gt_similarity
-        '''
         
         # Compute CLIP Similarity for Generated Video
         gen_frame_similarities = []
@@ -915,9 +886,7 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
         total_gen_similarity += avg_gen_similarity
         
         num_videos += 1
-    
-    # Compute Average CLIPSIM Scores
-    #average_gt_similarity = total_gt_similarity / num_videos
+
     average_gen_similarity = total_gen_similarity / num_videos
     
     return average_gen_similarity
