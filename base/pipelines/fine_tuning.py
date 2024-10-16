@@ -483,8 +483,6 @@ def lora_model(data, video_folder, args, method=1):
                     print(f"epoca {epoch}, iterazione {step}, global_step {global_step}")
 
                     latents = encode_latents(video, vae)
-                    #print(f"train_lora_model latents1 shape: {latents.shape}, dtype: {latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
-
 
                     latents = latents * vae.config.scaling_factor
 
@@ -501,12 +499,8 @@ def lora_model(data, video_folder, args, method=1):
                     timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
                     timesteps = timesteps.long()
 
-                    # Add noise to the latents according to the noise magnitude at each timestep
-                    # (this is the forward diffusion process)
                     noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
-                    #print(f"train_lora_model noisy_latents shape: {noisy_latents.shape}, dtype: {noisy_latents.dtype}") #shape: torch.Size([1, 4, 16, 40, 64]), dtype: torch.float32
-                   
-                    
+                                       
                     text_inputs = tokenizer(
                         list(description),
                         max_length=tokenizer.model_max_length,
@@ -550,8 +544,6 @@ def lora_model(data, video_folder, args, method=1):
                     encoder_hidden_states = mapped_image_features
                     
                     
-                    #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
-
                     # Get the target for loss depending on the prediction type
                     if args.prediction_type is not None:
                         # set prediction_type of scheduler if defined
@@ -725,7 +717,7 @@ def lora_model(data, video_folder, args, method=1):
         datasetM = msrvtt.MSRVTTDataset(
             video_dir='/content/drive/My Drive/msrvtt/TrainValVideo',
             annotation_file='/content/drive/My Drive/msrvtt/train_val_annotation/train_val_videodatainfo.json',
-            split='validate',
+            split='test',
             transform=transform
         )
 
@@ -949,4 +941,4 @@ if __name__ == "__main__":
     video_folder = os.path.join(dataset_path, 'YouTubeClips')
     data = os.path.join(dataset_path, 'annotations.txt')
     
-    lora_model(data, video_folder, OmegaConf.load(args.config), method=4)
+    lora_model(data, video_folder, OmegaConf.load(args.config), method=2)
