@@ -717,7 +717,7 @@ def lora_model(data, video_folder, args, method=1):
         datasetM = msrvtt.MSRVTTDataset(
             video_dir='/content/drive/My Drive/msrvtt/TrainValVideo',
             annotation_file='/content/drive/My Drive/msrvtt/train_val_annotation/train_val_videodatainfo.json',
-            split='test',
+            split='validate',
             transform=transform
         )
 

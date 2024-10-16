@@ -13,8 +13,14 @@ from torch.utils.data import Subset
 
 
 class MSRVTTDataset(Dataset):
-    def __init__(self, video_dir, annotation_file, split='test', transform=None):
-        
+    def __init__(self, video_dir, annotation_file, split='validate', transform=None):
+        """
+        Args:
+            video_dir (string): Directory con i video .mp4.
+            annotation_file (string): Path al file train_val_videodatainfo.json.
+            split (string): 'train' o 'validate'.
+            transform (callable, optional): Trasformazioni da applicare ai frame.
+        """
         self.video_dir = video_dir
         self.transform = transform
         self.split = split
