@@ -546,11 +546,8 @@ def lora_model(data, video_folder, args, method=1):
 
                     target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
                     loss_mapper = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
-
                     
-                    combined_features = torch.cat([text_features, mapped_image_features], dim=1)
-                    
-                    encoder_hidden_states = combined_features
+                    encoder_hidden_states = mapped_image_features
                     
                     
                     #print(f"encoder_hidden_states shape: {encoder_hidden_states.shape}, dtype: {encoder_hidden_states.dtype}") 
@@ -892,12 +889,6 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
         with torch.no_grad():
             generated_video_frames = inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, caption, "clipsim", frame)
         
-
-        #print(f"Shape of generated_video_frames: {generated_video_frames.shape}")
-        #print(f"Dtype of generated_video_frames: {generated_video_frames.dtype}")
-
-        # Ensure frames are in the correct format (e.g., list of PIL Images)
-        #gt_frames = [transforms.ToPILImage()(frame.cpu()) for frame in gt_video]
         gen_frames = process_video_frames(generated_video_frames)
         
         # Salva un frame per debug (opzionale)
