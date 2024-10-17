@@ -443,7 +443,6 @@ def lora_model(data, video_folder, args, method=1):
         range(0, args.max_train_steps),
         initial=initial_global_step,
         desc="Steps",
-        # Only show the progress bar once on each machine.
         disable=not accelerator.is_local_main_process,
     )
 
@@ -692,8 +691,6 @@ def lora_model(data, video_folder, args, method=1):
 
                         inference(args, vae, text_encoder, tokenizer, noise_scheduler, clip_processor, clip_model, unet, original_unet, device, mapper, args.text_prompt)
 
-
-                #logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
 
                 if global_step >= args.max_train_steps:
                     break
