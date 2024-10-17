@@ -856,9 +856,7 @@ def evaluate_msrvtt_clip_similarity(clip_model32, preprocess32, dataset, device,
     
     for batch in tqdm(dataloader, desc="Evaluating"):
         # Ground Truth Video Frames and Caption
-        gt_video = batch['video'].squeeze(0).to(device)  # (num_frames, C, H, W)
         caption = batch['caption'][0]  # Single caption
-        video_id = batch['video_id'][0]
         frame = batch['frame'].to(device)
 
         print(f"frame__ shape: {frame.shape}, dtype: {frame.dtype}") #torch.Size([1, 240, 320, 3]), dtype: torch.uint8
