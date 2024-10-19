@@ -432,7 +432,7 @@ def lora_model(data, video_folder, args, method=1):
             accelerator.print(f"Resuming from checkpoint {path}")
             accelerator.load_state(os.path.join(args.output_dir, path))
             # Load the mapper state dict
-            mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
+            #mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
             global_step = int(path.split("-")[1])
 
             initial_global_step = global_step
@@ -476,8 +476,8 @@ def lora_model(data, video_folder, args, method=1):
                         print(description)
                         continue
 
-                    #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #torch.Size([1, 320, 512, 3]), dtype: torch.uint8
-                    #print(f"video shape: {video.shape}, dtype: {video.dtype}") #torch.Size([1, 16, 320, 512, 3]), dtype: torch.float32
+                    print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #torch.Size([1, 320, 512, 3]), dtype: torch.uint8
+                    print(f"video shape: {video.shape}, dtype: {video.dtype}") #torch.Size([1, 16, 320, 512, 3]), dtype: torch.float32
                     
 
                     print(f"epoca {epoch}, iterazione {step}, global_step {global_step}")
