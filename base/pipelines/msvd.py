@@ -77,7 +77,7 @@ class VideoDatasetMsvd(Dataset):
                 frames = self.apply_augmentation(frames)
 
             # Convert to numpy array and ensure all frames have the same shape
-            frames_np = np.stack([np.array(frame) for frame in frames])
+            frames_np = np.array([cv2.resize(frame, self.target_size) for frame in frames])
             
             frames_np = frames_np.astype(np.float32) / 255.0
             frames_np = (frames_np - 0.5) / 0.5
