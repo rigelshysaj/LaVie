@@ -432,7 +432,7 @@ def lora_model(data, video_folder, args, method=1):
             accelerator.print(f"Resuming from checkpoint {path}")
             accelerator.load_state(os.path.join(args.output_dir, path))
             # Load the mapper state dict
-            #mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
+            mapper.load_state_dict(torch.load(os.path.join(args.output_dir, path, 'mapper.pt')))
             global_step = int(path.split("-")[1])
 
             initial_global_step = global_step
