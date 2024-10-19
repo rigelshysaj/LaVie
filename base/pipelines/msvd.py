@@ -53,7 +53,6 @@ class VideoDatasetMsvd(Dataset):
         video_path = os.path.join(self.video_dir, video_file)
 
         try:
-            # Carica il video utilizzando OpenCV
             cap = cv2.VideoCapture(video_path)
             frames = []
             while cap.isOpened():
@@ -64,31 +63,34 @@ class VideoDatasetMsvd(Dataset):
                 frames.append(frame)
             cap.release()
 
+            if len(frames) == 0:
+                raise ValueError(f"No frames were read from the video {video_file}")
+
+            # Ensure we have exactly fixed_frame_count frames
             if len(frames) < self.fixed_frame_count:
-                frames += [frames[-1]] * (self.fixed_frame_count - len(frames))  # Ripeti l'ultimo frame
-            else:
-                # Prendi i primi fixed_frame_count frame
+                frames = frames + [frames[-1]] * (self.fixed_frame_count - len(frames))
+            elif len(frames) > self.fixed_frame_count:
                 frames = frames[:self.fixed_frame_count]
 
-            # Applica data augmentation
+            # Apply data augmentation
             if aug_idx > 0:
                 frames = self.apply_augmentation(frames)
 
-            frames_np = np.array(frames)
-            frames_np = frames_np.astype(np.float32) / 255.0  # Normalizza in [0, 1]
+            # Convert to numpy array and ensure all frames have the same shape
+            frames_np = np.stack([np.array(frame) for frame in frames])
+            
+            frames_np = frames_np.astype(np.float32) / 255.0
             frames_np = (frames_np - 0.5) / 0.5
             video = torch.tensor(frames_np)
 
-            # Estrarre un frame centrale
+            # Extract a central frame
             mid_frame = frames[len(frames) // 2]
             mid_frame_np = np.array(mid_frame)
             mid_frame = torch.tensor(mid_frame_np)
 
-            # Ottieni le descrizioni del video
             video_id = os.path.splitext(video_file)[0]
-            descriptions = self.video_descriptions.get(video_id, [])
+            descriptions = self.video_descriptions.get(video_id, "")
 
-            # Applica trasformazioni, se presenti
             if self.transform:
                 video = self.transform(video)
                 mid_frame = self.transform(mid_frame)
