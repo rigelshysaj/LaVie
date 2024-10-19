@@ -6,7 +6,7 @@ import numpy as np
 import random
 from torchvision import transforms
 
-class AugmentedVideoDatasetMsvd(Dataset):
+class VideoDatasetMsvd(Dataset):
     def __init__(self, annotations_file, video_dir, transform=None, target_size=(512, 320), fixed_frame_count=16, augmentation_factor=4):
         self.video_dir = video_dir
         self.transform = transform
