@@ -159,12 +159,22 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
             mapped_image_embeddings_flat = mapped_image_embeddings.reshape(-1, 768)
             text_embeddings_flat = text_embeddings.reshape(-1, 768)
 
+            target_positive = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * 77]
+            loss_positive = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target_positive)
+
+            # Genera coppie negative utilizzando in-batch negatives
+            # Shuffle le descrizioni per creare coppie negative
+            indices = torch.randperm(text_embeddings_flat.size(0))
+            text_embeddings_neg = text_embeddings_flat[indices]
+
+            target_negative = -torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * 77]
+            loss_negative = criterion(mapped_image_embeddings_flat, text_embeddings_neg, target_negative)
+
+            loss = loss_positive + loss_negative
+
             # Normalize embeddings
             mapped_image_embeddings_flat = F.normalize(mapped_image_embeddings_flat, p=2, dim=1)
             text_embeddings_flat = F.normalize(text_embeddings_flat, p=2, dim=1)
-
-            target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
-            loss = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
 
             # Calculate mean cosine similarity
             cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
@@ -223,12 +233,22 @@ def training_mapping(train_dataloader, val_dataloader, clip_model, clip_processo
                 mapped_image_embeddings_flat = mapped_image_embeddings.reshape(-1, 768)
                 text_embeddings_flat = text_embeddings.reshape(-1, 768)
 
+                target_positive = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * 77]
+                loss_positive = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target_positive)
+
+                # Genera coppie negative utilizzando in-batch negatives
+                # Shuffle le descrizioni per creare coppie negative
+                indices = torch.randperm(text_embeddings_flat.size(0))
+                text_embeddings_neg = text_embeddings_flat[indices]
+
+                target_negative = -torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * 77]
+                loss_negative = criterion(mapped_image_embeddings_flat, text_embeddings_neg, target_negative)
+
+                loss = loss_positive + loss_negative
+
                 # Normalize embeddings
                 mapped_image_embeddings_flat = F.normalize(mapped_image_embeddings_flat, p=2, dim=1)
                 text_embeddings_flat = F.normalize(text_embeddings_flat, p=2, dim=1)
-
-                target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
-                loss = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
 
                 cosine_sim = F.cosine_similarity(mapped_image_embeddings_flat, text_embeddings_flat)
                 mean_cosine_sim = cosine_sim.mean().item()
