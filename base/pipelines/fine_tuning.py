@@ -539,7 +539,17 @@ def lora_model(data, video_folder, args, method=1):
                     text_embeddings_flat = F.normalize(text_embeddings_flat, p=2, dim=1)
 
                     target = torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * seq_len]
-                    loss_mapper = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
+                    loss_positive = criterion(mapped_image_embeddings_flat, text_embeddings_flat, target)
+
+                    # Genera coppie negative utilizzando in-batch negatives
+                    # Shuffle le descrizioni per creare coppie negative
+                    indices = torch.randperm(text_embeddings_flat.size(0))
+                    text_embeddings_neg = text_embeddings_flat[indices]
+
+                    target_negative = -torch.ones(mapped_image_embeddings_flat.size(0)).to(device)  # [batch_size * 77]
+                    loss_negative = criterion(mapped_image_embeddings_flat, text_embeddings_neg, target_negative)
+
+                    loss_mapper = loss_positive + loss_negative
                     
                     encoder_hidden_states = mapped_image_features
                     
@@ -579,7 +589,7 @@ def lora_model(data, video_folder, args, method=1):
                         loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
                         loss = loss.mean()
 
-                    lambda_alignment = 0.3
+                    lambda_alignment = 0.1
 
                     # Calcolo della loss di diffusione
                     diffusion_loss = loss  # o rinomina 'loss' in 'diffusion_loss'
