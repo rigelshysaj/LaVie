@@ -531,8 +531,8 @@ def lora_model(data, video_folder, args, method=1):
                     mapped_image_features = mapper(image_features, text_features)  # Shape: (batch_size, hidden_size)
                     #print(f"mapped_image_features shape: {mapped_image_features.shape}, dtype: {mapped_image_features.dtype}") #torch.Size([1, 77, 768]), dtype: torch.float32
 
-                    mapped_image_embeddings_flat = mapped_image_features.reshape(-1, 768)
-                    text_embeddings_flat = text_features.reshape(-1, 768)
+                    mapped_image_embeddings_flat = mapped_image_features.mean(dim=1)
+                    text_embeddings_flat = text_features.mean(dim=1)
 
                     # Normalize embeddings
                     mapped_image_embeddings_flat = F.normalize(mapped_image_embeddings_flat, p=2, dim=1)
@@ -589,7 +589,7 @@ def lora_model(data, video_folder, args, method=1):
                         loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
                         loss = loss.mean()
 
-                    lambda_alignment = 0.1
+                    lambda_alignment = 0.2
 
                     # Calcolo della loss di diffusione
                     diffusion_loss = loss  # o rinomina 'loss' in 'diffusion_loss'
