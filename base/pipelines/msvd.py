@@ -7,7 +7,7 @@ import random
 from torchvision import transforms
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None, target_size=(512, 320), fixed_frame_count=16, augmentation_factor=5):
+    def __init__(self, annotations_file, video_dir, transform=None, target_size=(320, 512), fixed_frame_count=16, augmentation_factor=5):
         self.video_dir = video_dir
         self.transform = transform
         self.target_size = target_size
