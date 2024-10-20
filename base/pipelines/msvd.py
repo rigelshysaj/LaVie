@@ -7,7 +7,7 @@ import random
 from torchvision import transforms
 
 class VideoDatasetMsvd(Dataset):
-    def __init__(self, annotations_file, video_dir, transform=None, target_size=(320, 512), fixed_frame_count=16, augmentation_factor=5):
+    def __init__(self, annotations_file, video_dir, transform=None, target_size=(512, 320), fixed_frame_count=16, augmentation_factor=5):
         self.video_dir = video_dir
         self.transform = transform
         self.target_size = target_size
@@ -59,31 +59,33 @@ class VideoDatasetMsvd(Dataset):
                 ret, frame = cap.read()
                 if not ret:
                     break
-                frame = cv2.resize(frame, self.target_size)
                 frames.append(frame)
             cap.release()
 
             if len(frames) == 0:
                 raise ValueError(f"No frames were read from the video {video_file}")
 
-            # Ensure we have exactly fixed_frame_count frames
+            # Assicura di avere esattamente fixed_frame_count frame
             if len(frames) < self.fixed_frame_count:
                 frames = frames + [frames[-1]] * (self.fixed_frame_count - len(frames))
             elif len(frames) > self.fixed_frame_count:
                 frames = frames[:self.fixed_frame_count]
 
-            # Apply data augmentation
+            # Applica data augmentation
             if aug_idx > 0:
                 frames = self.apply_augmentation(frames)
 
-            # Convert to numpy array and ensure all frames have the same shape
-            frames_np = np.array([cv2.resize(frame, self.target_size) for frame in frames])
-            
+            # Ora ridimensiona i frame alla dimensione target
+            frames = [cv2.resize(frame, self.target_size) for frame in frames]
+
+            # Converti in array numpy e assicurati che tutti i frame abbiano la stessa forma
+            frames_np = np.array(frames)
+
             frames_np = frames_np.astype(np.float32) / 255.0
             frames_np = (frames_np - 0.5) / 0.5
             video = torch.tensor(frames_np)
 
-            # Extract a central frame
+            # Estrai un frame centrale
             mid_frame = frames[len(frames) // 2]
             mid_frame_np = np.array(mid_frame)
             mid_frame = torch.tensor(mid_frame_np)
