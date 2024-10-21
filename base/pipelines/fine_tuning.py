@@ -476,15 +476,14 @@ def lora_model(data, video_folder, args, method=1):
                         print(description)
                         continue
 
-                    print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #torch.Size([1, 320, 512, 3]), dtype: torch.uint8
-                    print(f"video shape: {video.shape}, dtype: {video.dtype}") #torch.Size([1, 16, 320, 512, 3]), dtype: torch.float32
-                    
+                    #print(f"frame_tensor shape: {frame_tensor.shape}, dtype: {frame_tensor.dtype}") #torch.Size([8, 320, 512, 3]), dtype: torch.uint8
+                    #print(f"video shape: {video.shape}, dtype: {video.dtype}") #torch.Size([8, 16, 320, 512, 3]), dtype: torch.float32
 
                     print(f"epoca {epoch}, iterazione {step}, global_step {global_step}")
 
                     latents = encode_latents(video, vae)
 
-                    print(f"latents shape: {latents.shape}, dtype: {latents.dtype}")
+                    #print(f"latents shape: {latents.shape}, dtype: {latents.dtype}") #torch.Size([8, 4, 16, 40, 64]), dtype: torch.float16
 
 
                     latents = latents * vae.config.scaling_factor
